@@ -7,12 +7,14 @@ to synthesize academic research inquiries and paper metadata into deep, structur
 import asyncio
 import logging
 import os
+import json
 import re
 import threading
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import httpx
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
 from .search import Paper, get_shared_http_client
 
 logger = logging.getLogger("academic_assistant.llm")
@@ -20,6 +22,95 @@ logger = logging.getLogger("academic_assistant.llm")
 DEFAULT_BASE_URL = "https://www.orcarouter.ai/v1"
 DEFAULT_MODEL = "deepseek/deepseek-v4-flash-free"
 SECONDARY_MODEL = "deepseek/deepseek-chat"
+
+
+class OutreachEmailRequest(BaseModel):
+    paper_title: str
+    authors: List[str] = Field(default_factory=list)
+    abstract: str = ""
+    target_professor: str
+    scope_type: str = "single_paper"  # Options: "single_paper" | "holistic_lab"
+    orcarouter_key: Optional[str] = None
+
+
+OUTREACH_SYSTEM_PROMPT = """You are an elite academic advisor and researcher specializing in computer systems and AI.
+You compose high-impact, intellectually rigorous academic cold outreach emails from prospective graduate/doctoral researchers or visiting scholars to principal investigators (professors).
+
+Adhere strictly to these core rules:
+1. Tone & Standards: Formal, intellectually rigorous, respectful, and direct.
+2. Length: Concise, strictly under 250 words for the body text.
+3. Content: Avoid superficial compliments (never say "I loved your paper", "I was fascinated by your work", or "I am a big fan of your research"). Directly connect the technical mechanics, concrete architectural bottlenecks, mathematical formulations, or unresolved trade-offs in the paper to prospective research collaboration.
+4. Scope Modes:
+   - "single_paper": Focus specifically on the core problem statement, architectural bottleneck, and unresolved trade-offs identified in the target paper.
+   - "holistic_lab": Frame the email around the professor's overarching research trajectory and lab vision in this domain, using the paper as the primary springboard.
+5. Placeholders: Include standardized bracketed placeholders for the applicant to customize (e.g., [My Current University/Degree], [Specific Technical Skill/Tooling], [Proposed Research Extension], [Link to CV/Portfolio]).
+6. Format: Output strictly valid JSON with no markdown fences, backticks, reasoning preamble, or extraneous conversational text. Start immediately with '{' and end with '}':
+{
+  "subject": "Inquiring on [Specific Topic] — Prospective Graduate Researcher",
+  "body": "Dear Professor [Last Name],\\n\\n..."
+}
+"""
+
+
+def generate_fallback_outreach_email(
+    paper_title: str,
+    target_professor: str,
+    abstract: str = "",
+    scope_type: str = "single_paper"
+) -> Dict[str, str]:
+    """
+    Generate an intellectually rigorous, publication-grade academic outreach email fallback
+    strictly under 250 words adhering to the specified scope.
+    """
+    name_parts = target_professor.strip().split()
+    last_name = name_parts[-1] if name_parts else "Professor"
+    if last_name.lower() in ("dr.", "dr", "prof.", "prof", "professor"):
+        last_name = name_parts[0] if len(name_parts) > 1 else "Professor"
+
+    clean_title = paper_title.strip().rstrip(".")
+
+    if scope_type == "holistic_lab":
+        subject = f"Inquiring on Scalable Systems & Lab Trajectory — Prospective Graduate Researcher"
+        body = (
+            f"Dear Professor {last_name},\n\n"
+            f"I have been following your laboratory's overarching research trajectory in scalable computing, "
+            f"and was particularly compelled by your recent paper, \"{clean_title}\". Your work provides an incisive "
+            f"formulation of core throughput-latency trade-offs in this domain.\n\n"
+            f"I am completing my [My Current Degree/Program] at [My Current University], focusing on [Specific Technical Skill/Tooling, e.g., distributed consensus / kernel concurrency]. "
+            f"Examining your group's methodology, I am particularly interested in extending these principles toward [Proposed Research Extension, e.g., lock-free execution pipelining under asymmetric latency]. "
+            f"Your lab's broader agenda aligns closely with my aspiration to pursue doctoral research on resilient systems.\n\n"
+            f"Are you considering prospective graduate researchers or research fellows for your group for upcoming cycles? "
+            f"I would welcome 15 minutes to discuss potential alignment with your lab's active projects.\n\n"
+            f"My curriculum vitae and recent implementations are linked at [Link to CV/Portfolio].\n\n"
+            f"Thank you for your time and guidance.\n\n"
+            f"Sincerely,\n\n"
+            f"[Your Full Name]\n"
+            f"[Your Contact Information / GitHub]"
+        )
+    else:
+        subject_title = clean_title[:45]
+        subject = f"Inquiring on \"{subject_title}\" — Prospective Graduate Researcher"
+        body = (
+            f"Dear Professor {last_name},\n\n"
+            f"I have been closely analyzing your paper, \"{clean_title}\", particularly regarding its approach to addressing the "
+            f"underlying bottleneck in [Core Architectural Bottleneck from Paper]. Your formulation provides a compelling mechanism "
+            f"for navigating the trade-off between [Technical Property A] and [Technical Property B].\n\n"
+            f"Currently pursuing my [My Current Degree/Program] at [My Current University], my background centers on [Specific Technical Skill/Tooling]. "
+            f"In evaluating your benchmark conclusions, I observed a potential open question regarding [Specific Limitation / Unresolved Edge Case]. "
+            f"I would be eager to investigate extending your architecture through [Proposed Research Extension, e.g., adaptive partition pruning or asynchronous state verification].\n\n"
+            f"Are you currently open to prospective graduate researchers or research assistants joining your group? "
+            f"I would appreciate the opportunity for a brief conversation to explore potential alignment.\n\n"
+            f"My CV and representative code repositories are available at [Link to CV/Portfolio].\n\n"
+            f"Thank you for your consideration.\n\n"
+            f"Sincerely,\n\n"
+            f"[Your Full Name]\n"
+            f"[Your Contact Information / GitHub]"
+        )
+
+    return {
+        "subject": subject,
+        "body": body
+    }
 
 
 class SynthesisCache:
@@ -1491,5 +1582,128 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
             "Kroki diagram rendering failed. Please retry in a few moments."
         )
 
+    async def generate_outreach_email(
+        self,
+        payload: OutreachEmailRequest
+    ) -> Dict[str, str]:
+        """
+        Generate an intellectually rigorous, publication-grade academic outreach email
+        strictly under 250 words using DeepSeek or graceful fallback.
+        """
+        target_prof = payload.target_professor.strip() or "Professor"
+        scope = "holistic_lab" if payload.scope_type == "holistic_lab" else "single_paper"
+        title = payload.paper_title.strip()
+        abstract = payload.abstract.strip()
+
+        cache_key = f"outreach:{scope}:{target_prof.lower()}:{title.lower()}"
+        cached_json = synthesis_cache.get(cache_key)
+        if cached_json is not None:
+            try:
+                data = json.loads(cached_json)
+                if isinstance(data, dict) and "subject" in data and "body" in data:
+                    logger.info("Synthesis cache HIT for outreach email to %r (0ms latency)", target_prof)
+                    return data
+            except Exception:
+                pass
+
+        client = self._get_client(payload.orcarouter_key)
+        if client is None:
+            logger.info("No OrcaRouter API key provided. Using fallback outreach email generation.")
+            fallback = generate_fallback_outreach_email(
+                paper_title=title,
+                target_professor=target_prof,
+                abstract=abstract,
+                scope_type=scope
+            )
+            synthesis_cache.set(cache_key, json.dumps(fallback))
+            return fallback
+
+        authors_str = ", ".join(payload.authors) if payload.authors else target_prof
+        abstract_str = abstract if abstract else "N/A"
+        user_prompt = (
+            f"Generate a cold outreach email from a prospective graduate researcher to Professor {target_prof}.\n\n"
+            f"Paper Title: {title}\n"
+            f"Authors: {authors_str}\n"
+            f"Abstract:\n{abstract_str}\n\n"
+            f"Scope Mode: {scope}\n"
+            f"Target Professor: {target_prof}\n\n"
+            f"Remember: Output strictly JSON with keys 'subject' and 'body'. Keep the body under 250 words, intellectually rigorous, and include standardized bracketed placeholders."
+        )
+
+        messages = [
+            {"role": "system", "content": OUTREACH_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        try:
+            async with llm_semaphore:
+                response = await _call_chat_with_retry(
+                    client=client,
+                    primary_model=self.model_name,
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=1500,
+                    secondary_model=SECONDARY_MODEL,
+                )
+            content = (response.choices[0].message.content or "").strip()
+
+            cleaned = re.sub(r"^```(?:json)?\s*", "", content, flags=re.MULTILINE)
+            cleaned = re.sub(r"```\s*$", "", cleaned, flags=re.MULTILINE).strip()
+
+            parsed = None
+            try:
+                parsed = json.loads(cleaned)
+            except Exception:
+                json_match = re.search(r"\{[\s\S]*\}", cleaned)
+                if json_match:
+                    try:
+                        parsed = json.loads(json_match.group(0))
+                    except Exception:
+                        pass
+
+            if isinstance(parsed, dict) and "subject" in parsed and "body" in parsed:
+                result = {
+                    "subject": str(parsed["subject"]).strip(),
+                    "body": str(parsed["body"]).strip()
+                }
+                synthesis_cache.set(cache_key, json.dumps(result))
+                return result
+
+            logger.warning("LLM response did not contain expected JSON keys for outreach email: %s", content[:200])
+            fallback = generate_fallback_outreach_email(
+                paper_title=title,
+                target_professor=target_prof,
+                abstract=abstract,
+                scope_type=scope
+            )
+            synthesis_cache.set(cache_key, json.dumps(fallback))
+            return fallback
+
+        except Exception as e:
+            logger.error("Error generating outreach email via DeepSeek: %s", str(e), exc_info=True)
+            fallback = generate_fallback_outreach_email(
+                paper_title=title,
+                target_professor=target_prof,
+                abstract=abstract,
+                scope_type=scope
+            )
+            synthesis_cache.set(cache_key, json.dumps(fallback))
+            return fallback
+
 
 LLMService = ResearchLLMService
+
+_default_llm_service: Optional[ResearchLLMService] = None
+
+
+def get_default_llm_service() -> ResearchLLMService:
+    global _default_llm_service
+    if _default_llm_service is None:
+        _default_llm_service = ResearchLLMService()
+    return _default_llm_service
+
+
+async def generate_outreach_email(payload: OutreachEmailRequest, service: Optional[ResearchLLMService] = None) -> Dict[str, str]:
+    """Module-level helper to generate academic cold outreach email."""
+    svc = service or get_default_llm_service()
+    return await svc.generate_outreach_email(payload)

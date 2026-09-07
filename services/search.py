@@ -39,14 +39,32 @@ class AsyncRateLimiter:
 
     @property
     def semaphore(self) -> asyncio.Semaphore:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
         if self._semaphore is None:
             self._semaphore = asyncio.Semaphore(self.concurrency)
+            self._semaphore_loop = current_loop
+        elif current_loop is not None and getattr(self, "_semaphore_loop", None) is not current_loop:
+            self._semaphore = asyncio.Semaphore(self.concurrency)
+            self._semaphore_loop = current_loop
         return self._semaphore
 
     @property
     def lock(self) -> asyncio.Lock:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
         if self._lock is None:
             self._lock = asyncio.Lock()
+            self._lock_loop = current_loop
+        elif current_loop is not None and getattr(self, "_lock_loop", None) is not current_loop:
+            self._lock = asyncio.Lock()
+            self._lock_loop = current_loop
         return self._lock
 
     async def __aenter__(self):
@@ -137,20 +155,34 @@ openalex_limiter = AsyncRateLimiter(min_interval=0.2, concurrency=4)
 
 # Global shared HTTP client with connection pooling
 _shared_http_client: Optional[httpx.AsyncClient] = None
+_shared_client_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 def get_shared_http_client() -> httpx.AsyncClient:
     """
     Retrieve or lazily initialize the shared HTTP client with keepalive connection pooling.
     Guarantees reuse across all search providers, Kroki, and OpenAI-compatible SDKs.
+    Automatically detects if the client was bound to a previously closed event loop and refreshes it.
     """
-    global _shared_http_client
+    global _shared_http_client, _shared_client_loop
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    recreate = False
     if _shared_http_client is None or _shared_http_client.is_closed:
+        recreate = True
+    elif current_loop is not None and (_shared_client_loop is None or _shared_client_loop.is_closed() or _shared_client_loop is not current_loop):
+        recreate = True
+
+    if recreate:
         _shared_http_client = httpx.AsyncClient(
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
             timeout=30.0,
             follow_redirects=True,
         )
+        _shared_client_loop = current_loop
     return _shared_http_client
 
 
@@ -174,6 +206,7 @@ class Paper(BaseModel):
     id: str
     title: str
     authors: List[str] = Field(default_factory=list)
+    institutions: List[str] = Field(default_factory=list)
     year: Optional[int] = None
     abstract: str = ""
     tldr: Optional[str] = None
@@ -283,34 +316,58 @@ async def fetch_arxiv_papers(
     keywords: str,
     client: httpx.AsyncClient,
     max_results: int = 10,
-    timeout: float = 12.0
+    timeout: float = 12.0,
+    author: Optional[str] = None,
+    categories: Optional[List[str]] = None
 ) -> List[Paper]:
     """
-    Fetch papers from ArXiv API filtered to CS categories (cs.DC, cs.SE, cs.AI, cs.AR).
-    Uses the top 3-4 essential terms combined with AND to maximize precision without over-constraining.
-    Includes an automatic relaxed fallback if 0 results are returned.
+    Fetch papers from ArXiv API filtered to CS categories or custom categories.
+    Uses essential terms combined with AND to maximize precision.
+    Supports author filtering (au:...) and parses author affiliation metadata.
     """
     papers: List[Paper] = []
-    tokens = keywords.split()
-    if not tokens:
+    tokens = keywords.split() if keywords else []
+    
+    if not tokens and not author:
         return papers
 
-    # Use top 3-4 essential terms to avoid over-constraining the ArXiv search
-    if len(tokens) >= 4:
-        arxiv_terms = tokens[:4]
-    elif len(tokens) >= 2:
-        arxiv_terms = tokens[:len(tokens)]
+    # Determine category clause
+    if categories and len(categories) > 0:
+        clean_cats = [c.strip() for c in categories if c.strip()]
+        cat_clause = "(" + " OR ".join(f"cat:{c}" for c in clean_cats) + ")" if clean_cats else TARGET_ARXIV_CATEGORIES
     else:
-        arxiv_terms = tokens
+        cat_clause = TARGET_ARXIV_CATEGORIES
 
-    term_clause = "all:(" + " AND ".join(arxiv_terms) + ")"
-    search_query = f"{term_clause} AND {TARGET_ARXIV_CATEGORIES}"
+    # Build search terms clause
+    if tokens:
+        if len(tokens) >= 4:
+            arxiv_terms = tokens[:4]
+        elif len(tokens) >= 2:
+            arxiv_terms = tokens[:len(tokens)]
+        else:
+            arxiv_terms = tokens
+        term_clause = "all:(" + " AND ".join(arxiv_terms) + ")"
+    else:
+        term_clause = ""
+
+    # Integrate author filter
+    query_parts = []
+    if term_clause:
+        query_parts.append(term_clause)
+    if author and author.strip():
+        query_parts.append(f'au:"{author.strip()}"')
+    if cat_clause:
+        query_parts.append(cat_clause)
+
+    search_query = " AND ".join(query_parts)
+
+    effective_max = min(max(max_results, 1), 100)
 
     async def _execute_arxiv_query(query_str: str) -> List[dict]:
         params = {
             "search_query": query_str,
             "start": 0,
-            "max_results": max_results,
+            "max_results": effective_max,
             "sortBy": "relevance",
             "sortOrder": "descending",
         }
@@ -339,7 +396,13 @@ async def fetch_arxiv_papers(
         # Automatic fallback: if 0 results returned and we had >= 3 terms, retry with top 2 core terms
         if not entries and len(tokens) > 2:
             relaxed_terms = tokens[:2]
-            relaxed_query = f"all:({' AND '.join(relaxed_terms)}) AND {TARGET_ARXIV_CATEGORIES}"
+            relaxed_term_clause = f"all:({' AND '.join(relaxed_terms)})"
+            relaxed_parts = [relaxed_term_clause]
+            if author and author.strip():
+                relaxed_parts.append(f'au:"{author.strip()}"')
+            if cat_clause:
+                relaxed_parts.append(cat_clause)
+            relaxed_query = " AND ".join(relaxed_parts)
             logger.info("ArXiv returned 0 results for %r. Retrying with relaxed terms: %r", search_query, relaxed_query)
             entries = await _execute_arxiv_query(relaxed_query)
 
@@ -350,14 +413,22 @@ async def fetch_arxiv_papers(
             if not title:
                 continue
 
-            # 2. Authors
+            # 2. Authors & Affiliations
             authors_data = entry.get("author", [])
             if isinstance(authors_data, dict):
                 authors_data = [authors_data]
             authors = []
+            affiliations = []
             for a in authors_data:
-                if isinstance(a, dict) and "name" in a:
-                    authors.append(a["name"])
+                if isinstance(a, dict):
+                    if "name" in a:
+                        authors.append(a["name"])
+                    aff = a.get("arxiv:affiliation")
+                    if aff:
+                        aff_text = aff.get("#text", "") if isinstance(aff, dict) else str(aff)
+                        aff_clean = aff_text.strip()
+                        if aff_clean and aff_clean not in affiliations:
+                            affiliations.append(aff_clean)
                 elif isinstance(a, str):
                     authors.append(a)
 
@@ -413,6 +484,7 @@ async def fetch_arxiv_papers(
                     id=f"arxiv:{paper_id}",
                     title=title,
                     authors=authors,
+                    institutions=affiliations,
                     year=year,
                     abstract=abstract,
                     tldr=None,
@@ -627,23 +699,35 @@ async def fetch_openalex_papers(
     keywords: str,
     client: httpx.AsyncClient,
     limit: int = 10,
-    timeout: float = 12.0
+    timeout: float = 12.0,
+    author: Optional[str] = None,
+    institution: Optional[str] = None
 ) -> List[Paper]:
     """
     Fetch academic papers from OpenAlex works endpoint with has_fulltext:true.
-    Reconstructs inverted index abstracts, extracts citations, authors, and open-access PDFs.
+    Reconstructs inverted index abstracts, extracts citations, authors, institutions, and open-access PDFs.
+    Scales up to 100 papers per page.
     """
     papers: List[Paper] = []
-    clean_kw = keywords.strip()
-    if not clean_kw:
+    clean_kw = keywords.strip() if keywords else ""
+
+    filter_parts = ["has_fulltext:true"]
+    if author and author.strip():
+        filter_parts.append(f"raw_author_name.search:{author.strip()}")
+    if institution and institution.strip():
+        filter_parts.append(f"raw_affiliation_strings.search:{institution.strip()}")
+
+    if not clean_kw and len(filter_parts) == 1:
         return papers
 
     params = {
-        "search": clean_kw,
-        "filter": "has_fulltext:true",
+        "filter": ",".join(filter_parts),
         "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count",
-        "per-page": min(max(limit, 5), 25),
+        "per-page": min(max(limit, 5), 100),
     }
+    if clean_kw:
+        params["search"] = clean_kw
+
     headers = {
         "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
         "Accept": "application/json",
@@ -670,14 +754,20 @@ async def fetch_openalex_papers(
             if not title:
                 continue
 
-            # Authors
+            # Authors & Institutions
             authorships = item.get("authorships", [])
             authors = []
+            institutions = []
             for a in authorships:
                 if isinstance(a, dict):
                     author_obj = a.get("author", {})
                     if isinstance(author_obj, dict) and author_obj.get("display_name"):
                         authors.append(author_obj["display_name"])
+                    for inst in a.get("institutions", []):
+                        if isinstance(inst, dict) and inst.get("display_name"):
+                            iname = inst["display_name"].strip()
+                            if iname and iname not in institutions:
+                                institutions.append(iname)
 
             # Year
             year = item.get("publication_year")
@@ -707,6 +797,7 @@ async def fetch_openalex_papers(
                     id=f"openalex:{work_id}" if work_id else f"openalex:{abs(hash(title))}",
                     title=title,
                     authors=authors,
+                    institutions=institutions,
                     year=year,
                     abstract=abstract,
                     tldr=None,
@@ -723,6 +814,145 @@ async def fetch_openalex_papers(
         logger.warning("OpenAlex request timed out after %.1fs.", timeout)
     except Exception as e:
         logger.warning("Error during OpenAlex fetch: %s", str(e))
+
+    return papers
+
+
+async def fetch_entity_papers(
+    entity_type: str,
+    name: str,
+    limit: int = 50,
+    client: Optional[httpx.AsyncClient] = None,
+    timeout: float = 15.0
+) -> List[Paper]:
+    """
+    Dedicated endpoint logic to query ALL works by a specific researcher or affiliated with an institution
+    without requiring a topic inquiry.
+    - If entity_type == 'author':
+      Query: https://api.openalex.org/works?filter=raw_author_name.search:{name}&sort=cited_by_count:desc&per_page={limit}
+    - If entity_type == 'institution':
+      Query: https://api.openalex.org/works?filter=authorships.institutions.display_name.search:{name}&sort=publication_year:desc,cited_by_count:desc&per_page={limit}
+      (With automatic fallback to raw_affiliation_strings.search:{name} if rejected by OpenAlex).
+    Returns standardized Paper list with authors, institutions, citations, and PDF links.
+    """
+    clean_name = (name or "").strip()
+    if not clean_name:
+        return []
+
+    entity_type_clean = entity_type.strip().lower()
+    effective_limit = min(max(limit, 1), 100)
+
+    # Check search cache first
+    cache_key = f"entity:{entity_type_clean}:{clean_name.lower()}:{effective_limit}"
+    cached = search_cache.get(cache_key)
+    if cached is not None:
+        cached_papers, _ = cached
+        logger.info("Search cache HIT for entity %s %r (%d papers)", entity_type_clean, clean_name, len(cached_papers))
+        return cached_papers
+
+    http_client = client or get_shared_http_client()
+    headers = {
+        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "Accept": "application/json",
+    }
+
+    papers: List[Paper] = []
+
+    def _parse_openalex_item(item: dict) -> Optional[Paper]:
+        title = (item.get("title") or "").strip()
+        if not title:
+            return None
+        authorships = item.get("authorships", [])
+        authors = []
+        institutions = []
+        for a in authorships:
+            if isinstance(a, dict):
+                author_obj = a.get("author", {})
+                if isinstance(author_obj, dict) and author_obj.get("display_name"):
+                    authors.append(author_obj["display_name"])
+                for inst in a.get("institutions", []):
+                    if isinstance(inst, dict) and inst.get("display_name"):
+                        iname = inst["display_name"].strip()
+                        if iname and iname not in institutions:
+                            institutions.append(iname)
+        year = item.get("publication_year")
+        if not isinstance(year, int):
+            year = None
+        abstract = reconstruct_openalex_abstract(item.get("abstract_inverted_index"))
+        oa_data = item.get("open_access", {})
+        pdf_url = oa_data.get("oa_url") if isinstance(oa_data, dict) else None
+        citation_count = item.get("cited_by_count")
+        raw_id = item.get("id") or ""
+        work_id = raw_id.split("/")[-1] if "/" in raw_id else raw_id
+        doi = item.get("doi")
+        canonical_url = doi or raw_id or pdf_url
+        return Paper(
+            id=f"openalex:{work_id}" if work_id else f"openalex:{abs(hash(title))}",
+            title=title,
+            authors=authors,
+            institutions=institutions,
+            year=year,
+            abstract=abstract,
+            tldr=None,
+            pdf_url=pdf_url,
+            citation_count=citation_count,
+            source="OpenAlex",
+            primary_category=None,
+            url=canonical_url,
+            code_url=None
+        )
+
+    if entity_type_clean == "author":
+        params = {
+            "filter": f"raw_author_name.search:{clean_name}",
+            "sort": "cited_by_count:desc",
+            "per-page": effective_limit,
+            "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
+        }
+        try:
+            async with openalex_limiter:
+                resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                for item in data.get("results", []):
+                    p = _parse_openalex_item(item)
+                    if p:
+                        papers.append(p)
+            else:
+                logger.warning("OpenAlex author search returned status %d: %s", resp.status_code, resp.text[:200])
+        except Exception as e:
+            logger.warning("Error fetching author works from OpenAlex: %s", str(e))
+
+    elif entity_type_clean == "institution":
+        candidate_filters = [
+            f"authorships.institutions.display_name.search:{clean_name}",
+            f"raw_affiliation_strings.search:{clean_name}"
+        ]
+        for filt in candidate_filters:
+            params = {
+                "filter": filt,
+                "sort": "publication_year:desc,cited_by_count:desc",
+                "per-page": effective_limit,
+                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
+            }
+            try:
+                async with openalex_limiter:
+                    resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = data.get("results", [])
+                    if results:
+                        for item in results:
+                            p = _parse_openalex_item(item)
+                            if p:
+                                papers.append(p)
+                        break
+            except Exception as e:
+                logger.warning("OpenAlex query with filter %r failed: %s", filt, str(e))
+
+    if papers:
+        await discover_paper_code_urls(papers, http_client)
+        search_cache.set(cache_key, papers, {"entity_type": entity_type_clean, "name": clean_name, "count": len(papers)})
 
     return papers
 
@@ -801,16 +1031,19 @@ def deduplicate_and_rank(
     ss_papers: List[Paper],
     openalex_papers: Optional[List[Paper]] = None,
     top_k: int = 6,
-    similarity_threshold: float = 0.85
+    similarity_threshold: float = 0.85,
+    author: Optional[str] = None,
+    institution: Optional[str] = None
 ) -> List[Paper]:
     """
     Deduplicate papers across ArXiv, Semantic Scholar, and OpenAlex by normalized title similarity.
-    Merges metadata when duplicates occur (preserving open-access PDFs, TLDRs, highest citation count, and code_url).
+    Merges metadata when duplicates occur (preserving open-access PDFs, TLDRs, institutions, highest citation count, and code_url).
     Ranks candidates by:
+      0. Author or Institution match (if filters specified)
       1. Presence of implementation code (code_url present gets highest priority)
       2. Recency (2025/2026 prioritized over older papers)
       3. Academic citation count and keyword match quality
-    Returns strictly the top_k requested papers.
+    Returns strictly the top_k requested papers (up to 100).
     """
     merged_papers: List[Paper] = []
     openalex_list = openalex_papers or []
@@ -848,6 +1081,11 @@ def deduplicate_and_rank(
                 if len(candidate.authors) > len(existing.authors):
                     existing.authors = candidate.authors
 
+                # Merge institutions
+                for inst in candidate.institutions:
+                    if inst not in existing.institutions:
+                        existing.institutions.append(inst)
+
                 # Merge abstract if candidate has longer text
                 if len(candidate.abstract) > len(existing.abstract):
                     existing.abstract = candidate.abstract
@@ -865,14 +1103,16 @@ def deduplicate_and_rank(
         merge_candidate(p)
 
     # Priority Ranking Heuristic:
-    # 1. Presence of implementation code (code_url present gets top priority)
-    # 2. Recency (2025/2026 prioritized over older papers)
-    # 3. Citation count and impact
-    def ranking_score(p: Paper) -> Tuple[int, int, int]:
+    author_clean = author.strip().lower() if author else ""
+    inst_clean = institution.strip().lower() if institution else ""
+
+    def ranking_score(p: Paper) -> Tuple[int, int, int, int]:
+        author_match = 1 if (author_clean and any(author_clean in a.lower() for a in p.authors)) else 0
+        inst_match = 1 if (inst_clean and any(inst_clean in i.lower() for i in p.institutions)) else 0
         has_code = 1 if p.code_url else 0
         year_score = p.year if p.year is not None else 0
         citation_score = p.citation_count if p.citation_count is not None else 0
-        return (has_code, year_score, citation_score)
+        return (author_match + inst_match, has_code, year_score, citation_score)
 
     merged_papers.sort(key=ranking_score, reverse=True)
     return merged_papers[:top_k]
@@ -884,6 +1124,9 @@ async def search_academic_papers(
     top_k: int = 6,
     use_cache: bool = True,
     client: Optional[httpx.AsyncClient] = None,
+    author: Optional[str] = None,
+    institution: Optional[str] = None,
+    categories: Optional[List[str]] = None,
     **kwargs: Any
 ) -> Tuple[List[Paper], Dict[str, Any]]:
     """
@@ -892,18 +1135,19 @@ async def search_academic_papers(
     Semantic Scholar, and OpenAlex. Checks and populates thread-safe in-memory TTL search cache.
     Discovers implementation code URLs, prioritizes ranking, and seamlessly compensates quota
     if any single provider fails or hits rate limits.
-    Reuses the pooled shared HTTP client to maintain persistent keep-alive connections.
+    Supports scaling up to 100 papers, author filtering, institution filtering, and category selection.
     """
+    cache_key = f"{inquiry}|author:{author or ''}|inst:{institution or ''}|cat:{','.join(categories) if categories else ''}|k:{top_k}"
     # 1. Check TTL Cache first
     if use_cache:
-        cached_result = search_cache.get(inquiry)
+        cached_result = search_cache.get(cache_key)
         if cached_result is not None:
             cached_papers, cached_meta = cached_result
-            logger.info("Search cache HIT for %r (%d papers returned from cache)", inquiry, len(cached_papers))
+            logger.info("Search cache HIT for %r (%d papers returned from cache)", cache_key, len(cached_papers))
             return cached_papers[:top_k], cached_meta
 
-    keywords = clean_academic_query(inquiry)
-    logger.info("Search cache MISS. Executing academic search for %r -> Keywords: %r", inquiry, keywords)
+    keywords = clean_academic_query(inquiry) if inquiry else ""
+    logger.info("Search cache MISS. Executing academic search for %r (author=%r, inst=%r) -> Keywords: %r", inquiry, author, institution, keywords)
 
     effective_ss_key = (
         semantic_scholar_api_key
@@ -915,6 +1159,9 @@ async def search_academic_papers(
     metadata: Dict[str, Any] = {
         "raw_inquiry": inquiry,
         "extracted_keywords": keywords,
+        "author_filter": author,
+        "institution_filter": institution,
+        "categories_filter": categories,
         "arxiv_count": 0,
         "ss_count": 0,
         "openalex_count": 0,
@@ -925,18 +1172,30 @@ async def search_academic_papers(
         "cache_hit": False,
     }
 
-    target_fetch_count = max(top_k, 10)
+    target_fetch_count = min(max(top_k, 10), 100)
     http_client = client or get_shared_http_client()
 
     # Run ArXiv, Semantic Scholar, and OpenAlex in parallel with return_exceptions=True
-    arxiv_task = fetch_arxiv_papers(keywords, http_client, max_results=target_fetch_count)
+    arxiv_task = fetch_arxiv_papers(
+        keywords,
+        http_client,
+        max_results=target_fetch_count,
+        author=author,
+        categories=categories
+    )
     ss_task = fetch_semantic_scholar_papers(
         keywords,
         http_client,
         api_key=effective_ss_key or None,
         limit=target_fetch_count
     )
-    openalex_task = fetch_openalex_papers(keywords, http_client, limit=target_fetch_count)
+    openalex_task = fetch_openalex_papers(
+        keywords,
+        http_client,
+        limit=target_fetch_count,
+        author=author,
+        institution=institution
+    )
 
     results = await asyncio.gather(arxiv_task, ss_task, openalex_task, return_exceptions=True)
 
@@ -981,11 +1240,18 @@ async def search_academic_papers(
     await discover_paper_code_urls(all_candidates, http_client)
 
     # Deduplicate, merge metadata, prioritize code & recency, take top k
-    final_papers = deduplicate_and_rank(arxiv_papers, ss_papers, openalex_papers, top_k=top_k)
+    final_papers = deduplicate_and_rank(
+        arxiv_papers,
+        ss_papers,
+        openalex_papers,
+        top_k=top_k,
+        author=author,
+        institution=institution
+    )
     metadata["final_count"] = len(final_papers)
 
     # Populate cache
     if use_cache:
-        search_cache.set(inquiry, final_papers, metadata)
+        search_cache.set(cache_key, final_papers, metadata)
 
     return final_papers, metadata

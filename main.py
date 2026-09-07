@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from services.search import (
     Paper,
@@ -30,6 +30,7 @@ from services.search import (
     deduplicate_and_rank,
     discover_paper_code_urls,
     fetch_arxiv_papers,
+    fetch_entity_papers,
     fetch_openalex_papers,
     fetch_semantic_scholar_papers,
     search_academic_papers,
@@ -38,7 +39,13 @@ from services.search import (
     set_shared_http_client,
     close_shared_http_client,
 )
-from services.llm import ResearchLLMService, synthesis_cache, llm_semaphore
+from services.llm import (
+    ResearchLLMService,
+    synthesis_cache,
+    llm_semaphore,
+    OutreachEmailRequest,
+    generate_outreach_email,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -336,10 +343,25 @@ llm_service = ResearchLLMService(
 
 
 class SearchRequest(BaseModel):
-    inquiry: str = Field(..., description="Research query or topic")
-    top_k: int = Field(default=6, ge=1, le=20)
-    limit: Optional[int] = Field(default=None, ge=1, le=20, description="Target paper count (5, 10, 15, 20)")
+    query: Optional[str] = Field(default=None, description="Research query or topic")
+    inquiry: Optional[str] = Field(default=None, description="Research query or topic (alias)")
+    author: Optional[str] = Field(default=None, description="Filter by author name")
+    institution: Optional[str] = Field(default=None, description="Filter by institution or university name")
+    categories: Optional[List[str]] = Field(default=None, description="Filter by subject categories")
+    top_k: int = Field(default=10, ge=1, le=100)
+    limit: Optional[int] = Field(default=None, ge=1, le=100, description="Target paper count (10, 25, 50, 100)")
     semantic_scholar_key: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_query_inquiry(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            q = data.get("query")
+            inq = data.get("inquiry")
+            val = q or inq or ""
+            data["query"] = val
+            data["inquiry"] = val
+        return data
 
 
 class SynthesizeRequest(BaseModel):
@@ -515,16 +537,47 @@ async def search_endpoint(payload: SearchRequest):
     """
     ss_key = payload.semantic_scholar_key or runtime_config.get("semantic_scholar_api_key")
     effective_top_k = payload.limit or payload.top_k
+    target_inquiry = payload.query or payload.inquiry or ""
     papers, meta = await search_academic_papers(
-        inquiry=payload.inquiry,
+        inquiry=target_inquiry,
         semantic_scholar_api_key=ss_key,
-        top_k=effective_top_k
+        top_k=effective_top_k,
+        author=payload.author,
+        institution=payload.institution,
+        categories=payload.categories
     )
     return {
-        "inquiry": payload.inquiry,
+        "inquiry": target_inquiry,
+        "query": target_inquiry,
         "keywords": meta.get("extracted_keywords"),
         "papers": [p.model_dump() for p in papers],
         "metadata": meta
+    }
+
+
+@app.get("/api/search/entity", dependencies=[Depends(verify_axiom_access)])
+async def search_entity_endpoint(
+    entity_type: str = Query(..., description="Entity type: 'author' or 'institution'"),
+    name: str = Query(..., description="Researcher or institution name"),
+    limit: int = Query(50, ge=1, le=100, description="Paper count up to 100")
+):
+    """
+    Dedicated endpoint to query all works by a specific researcher or institution without requiring a topic.
+    Queries OpenAlex works index, discovers code repositories, and returns normalized papers.
+    """
+    clean_type = (entity_type or "").strip().lower()
+    if clean_type not in ("author", "institution"):
+        raise HTTPException(status_code=400, detail="entity_type must be 'author' or 'institution'")
+    clean_name = (name or "").strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="name parameter is required")
+
+    papers = await fetch_entity_papers(entity_type=clean_type, name=clean_name, limit=limit)
+    return {
+        "entity_type": clean_type,
+        "name": clean_name,
+        "count": len(papers),
+        "papers": [p.model_dump() for p in papers]
     }
 
 
@@ -563,19 +616,22 @@ def sse_event(data: Any) -> str:
 
 @app.get("/api/research/stream", dependencies=[Depends(verify_axiom_access)])
 async def research_stream_endpoint(
-    query: str = Query(..., description="User research question or topic"),
-    limit: int = Query(6, ge=1, le=20, description="Target number of papers to retrieve (5, 10, 15, 20)"),
+    query: str = Query(..., description="User research question, topic, author, or institution name"),
+    limit: int = Query(10, ge=1, le=100, description="Target number of papers to retrieve (10, 25, 50, 100)"),
+    search_mode: str = Query("topic", description="Search mode: 'topic', 'author', or 'institution'"),
+    author: Optional[str] = Query(None, description="Optional author filter"),
+    institution: Optional[str] = Query(None, description="Optional institution filter"),
     orcarouter_key: Optional[str] = Query(None, description="Optional override OrcaRouter API key"),
     semantic_scholar_key: Optional[str] = Query(None, description="Optional override Semantic Scholar API key")
 ):
     """
     Real-time Server-Sent Events (SSE) streaming endpoint.
-    Emits live pipeline stages:
+    Emits live pipeline stages for topic exploration or dedicated entity profiles (author/institution):
       1. 'keywords': Query sanitized & academic terms extracted
       2. 'fetching_arxiv': ArXiv querying CS categories
       3. 'fetching_semanticscholar': Semantic Scholar querying
       4. 'fetching_openalex': OpenAlex peer-reviewed index querying
-      5. 'papers_ready': Emits deduplicated & code-prioritized papers
+      5. 'papers_ready': Emits deduplicated & code-prioritized papers (up to 100)
       6. 'discovery_ready': Literature overview summary
       7. 'done': Pipeline complete
     """
@@ -587,14 +643,69 @@ async def research_stream_endpoint(
 
     async def event_generator():
         try:
-            # 0. Check Search Cache first for instant sub-millisecond response
-            cached_entry = search_cache.get(query)
+            # Check if this is an entity search (author or university/institution)
+            if search_mode in ("author", "institution"):
+                clean_mode = search_mode.lower().strip()
+                entity_cache_key = f"entity:{clean_mode}:{query.strip().lower()}:{limit}"
+                cached_entity = search_cache.get(entity_cache_key)
+                if cached_entity is not None:
+                    cached_papers, cached_meta = cached_entity
+                    yield sse_event({"type": "status", "stage": "cache_hit", "message": f"Instant cache hit: Retrieving pre-indexed {clean_mode} publications (0ms network calls)..."})
+                    await asyncio.sleep(0.04)
+                    yield sse_event({"type": "status", "stage": "keywords_ready", "keywords": query, "message": f"Target {clean_mode}: '{query}' (from cache)"})
+                    await asyncio.sleep(0.04)
+                    yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in cached_papers[:limit]], "metadata": cached_meta, "message": f"Retrieved {len(cached_papers[:limit])} cached publications for {query}."})
+                    await asyncio.sleep(0.04)
+                    yield sse_event({"type": "status", "stage": "discovery_ready", "message": f"{clean_mode.capitalize()} literature discovery complete (cache hit)."})
+                    entity_summary = (
+                        f"### {clean_mode.capitalize()} Profile: {query} (Cached)\n\n"
+                        f"- **Discovered Publications**: **{len(cached_papers[:limit])}** works retrieved from cache.\n"
+                        f"- **Ranking Metric**: Sorted by academic citation impact and code availability.\n"
+                        f"- **Sidebar Available**: Publications are loaded in the **Discovered Papers** sidebar with affiliations and open-access links.\n\n"
+                        f"> [!TIP]\n"
+                        f"> Use the instant filter in the sidebar to search within these works, or select papers for deep synthesis and comparison."
+                    )
+                    yield sse_event({"type": "token", "content": entity_summary})
+                    yield sse_event({"type": "done", "message": f"{clean_mode.capitalize()} discovery complete (cache hit)."})
+                    return
+
+                yield sse_event({"type": "status", "stage": "extract_keywords", "message": f"Initializing {clean_mode} lookup for '{query}'..."})
+                await asyncio.sleep(0.05)
+                yield sse_event({"type": "status", "stage": "keywords_ready", "keywords": query, "message": f"Target {clean_mode}: '{query}'"})
+                yield sse_event({"type": "status", "stage": "fetching_openalex", "message": f"Querying OpenAlex works index for {clean_mode} '{query}' (up to {limit} papers)..."})
+
+                entity_papers = await fetch_entity_papers(entity_type=clean_mode, name=query, limit=limit)
+
+                yield sse_event({"type": "status", "stage": "discovering_code", "message": "Scanning papers for open-source code repositories..."})
+                await asyncio.sleep(0.04)
+
+                entity_meta = {"entity_type": clean_mode, "name": query, "final_count": len(entity_papers), "openalex_count": len(entity_papers)}
+                yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in entity_papers], "metadata": entity_meta, "message": f"Discovered {len(entity_papers)} works by {query} ranked by citations."})
+                await asyncio.sleep(0.04)
+
+                yield sse_event({"type": "status", "stage": "discovery_ready", "message": f"{clean_mode.capitalize()} literature discovery complete."})
+
+                entity_summary = (
+                    f"### {clean_mode.capitalize()} Profile: {query}\n\n"
+                    f"- **Discovered Publications**: **{len(entity_papers)}** peer-reviewed works retrieved from OpenAlex index.\n"
+                    f"- **Ranking Metric**: Sorted in descending order of citation count and code availability.\n"
+                    f"- **Sidebar Available**: All publications are loaded in the **Discovered Papers** sidebar with affiliations and open-access links.\n\n"
+                    f"> [!TIP]\n"
+                    f"> Use the instant filter in the sidebar to search within these works, or select papers for deep synthesis and comparison."
+                )
+                yield sse_event({"type": "token", "content": entity_summary})
+                yield sse_event({"type": "done", "message": f"{clean_mode.capitalize()} discovery complete."})
+                return
+
+            # Topic Exploration Pipeline
+            cache_key = f"{query}|author:{author or ''}|inst:{institution or ''}|k:{limit}"
+            cached_entry = search_cache.get(cache_key) or search_cache.get(query)
             if cached_entry is not None:
                 cached_papers, cached_meta = cached_entry
                 selected_papers = cached_papers[:limit]
-                logger.info("Stream research: cache hit for %r (%d papers)", query, len(selected_papers))
+                logger.info("Stream research: cache hit for %r (%d papers)", cache_key, len(selected_papers))
                 keywords = cached_meta.get("extracted_keywords") or clean_academic_query(query)
-                yield f"data: {json.dumps({'type': 'status', 'stage': 'cache_hit', 'message': 'Instant cache hit: Retrieving pre-indexed academic literature (0ms network calls)...'})}\n\n"
+                yield sse_event({"type": "status", "stage": "cache_hit", "message": "Instant cache hit: Retrieving pre-indexed academic literature (0ms network calls)..."})
                 await asyncio.sleep(0.04)
 
                 payload = {
@@ -606,10 +717,10 @@ async def research_stream_endpoint(
                 yield sse_event(payload)
                 await asyncio.sleep(0.04)
 
-                yield f"data: {json.dumps({'type': 'papers_ready', 'papers': [p.model_dump() for p in selected_papers], 'metadata': cached_meta, 'message': f'Retrieved {len(selected_papers)} cached high-relevance papers.'})}\n\n"
+                yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in selected_papers], "metadata": cached_meta, "message": f"Retrieved {len(selected_papers)} cached high-relevance papers."})
                 await asyncio.sleep(0.04)
 
-                yield f"data: {json.dumps({'type': 'status', 'stage': 'discovery_ready', 'message': 'Literature discovery complete (cache hit). Ready for on-demand analysis.'})}\n\n"
+                yield sse_event({"type": "status", "stage": "discovery_ready", "message": "Literature discovery complete (cache hit). Ready for on-demand analysis."})
 
                 source_breakdown = f"ArXiv: {cached_meta.get('arxiv_count', 0)} | Semantic Scholar: {cached_meta.get('ss_count', 0)} | OpenAlex: {cached_meta.get('openalex_count', 0)}"
                 overview_summary = (
@@ -620,12 +731,12 @@ async def research_stream_endpoint(
                     f"> [!TIP]\n"
                     f"> Click **'Explain Paper with DeepSeek'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
                 )
-                yield f"data: {json.dumps({'type': 'token', 'content': overview_summary})}\n\n"
-                yield f"data: {json.dumps({'type': 'done', 'message': 'Literature discovery complete (cache hit).'})}\n\n"
+                yield sse_event({"type": "token", "content": overview_summary})
+                yield sse_event({"type": "done", "message": "Literature discovery complete (cache hit)."})
                 return
 
             # Stage 1: Keyword extraction
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'extract_keywords', 'message': 'Extracting academic keywords and filtering conversational syntax...'})}\n\n"
+            yield sse_event({"type": "status", "stage": "extract_keywords", "message": "Extracting academic keywords and filtering conversational syntax..."})
             await asyncio.sleep(0.05)
 
             keywords = clean_academic_query(query)
@@ -638,13 +749,15 @@ async def research_stream_endpoint(
             yield sse_event(payload)
 
             # Stage 2: Concurrently query ArXiv, Semantic Scholar, and OpenAlex
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'fetching_arxiv', 'message': 'Fetching ArXiv papers in CS categories (cs.DC, cs.SE, cs.AI, cs.AR)...'})}\n\n"
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'fetching_semanticscholar', 'message': 'Querying Semantic Scholar API for citations & open-access PDFs...'})}\n\n"
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'fetching_openalex', 'message': 'Querying OpenAlex works index for peer-reviewed & open-access literature...'})}\n\n"
+            yield sse_event({"type": "status", "stage": "fetching_arxiv", "message": "Fetching ArXiv papers in CS categories (cs.DC, cs.SE, cs.AI, cs.AR)..."})
+            yield sse_event({"type": "status", "stage": "fetching_semanticscholar", "message": "Querying Semantic Scholar API for citations & open-access PDFs..."})
+            yield sse_event({"type": "status", "stage": "fetching_openalex", "message": "Querying OpenAlex works index for peer-reviewed & open-access literature..."})
 
             metadata: Dict[str, Any] = {
                 "raw_inquiry": query,
                 "extracted_keywords": keywords,
+                "author_filter": author,
+                "institution_filter": institution,
                 "arxiv_count": 0,
                 "ss_count": 0,
                 "openalex_count": 0,
@@ -655,17 +768,17 @@ async def research_stream_endpoint(
                 "cache_hit": False,
             }
 
-            fetch_quota = max(limit, 10)
+            fetch_quota = min(max(limit, 10), 100)
             client = get_shared_http_client()
 
-            arxiv_task = fetch_arxiv_papers(keywords, client, max_results=fetch_quota)
+            arxiv_task = fetch_arxiv_papers(keywords, client, max_results=fetch_quota, author=author)
             ss_task = fetch_semantic_scholar_papers(
                 keywords,
                 client,
                 api_key=effective_ss_key or None,
                 limit=fetch_quota
             )
-            openalex_task = fetch_openalex_papers(keywords, client, limit=fetch_quota)
+            openalex_task = fetch_openalex_papers(keywords, client, limit=fetch_quota, author=author, institution=institution)
 
             results = await asyncio.gather(arxiv_task, ss_task, openalex_task, return_exceptions=True)
 
@@ -703,23 +816,30 @@ async def research_stream_endpoint(
                 metadata["openalex_status"] = "success" if openalex_papers else "empty"
 
             # Stage 3: Discover code and deduplicate
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'discovering_code', 'message': 'Scanning repositories and discoverable code implementations...'})}\n\n"
+            yield sse_event({"type": "status", "stage": "discovering_code", "message": "Scanning repositories and discoverable code implementations..."})
             all_candidates = arxiv_papers + ss_papers + openalex_papers
             await discover_paper_code_urls(all_candidates, client)
 
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'deduplicating', 'message': f'Deduplicating across {len(arxiv_papers)} ArXiv, {len(ss_papers)} Semantic Scholar, and {len(openalex_papers)} OpenAlex papers...'})}\n\n"
-            final_papers = deduplicate_and_rank(arxiv_papers, ss_papers, openalex_papers, top_k=limit)
+            yield sse_event({"type": "status", "stage": "deduplicating", "message": f"Deduplicating across {len(arxiv_papers)} ArXiv, {len(ss_papers)} Semantic Scholar, and {len(openalex_papers)} OpenAlex papers..."})
+            final_papers = deduplicate_and_rank(
+                arxiv_papers,
+                ss_papers,
+                openalex_papers,
+                top_k=limit,
+                author=author,
+                institution=institution
+            )
             metadata["final_count"] = len(final_papers)
 
             # Store in search cache
-            search_cache.set(query, final_papers, metadata)
+            search_cache.set(cache_key, final_papers, metadata)
 
             # Stage 4: Emit papers_ready event
-            yield f"data: {json.dumps({'type': 'papers_ready', 'papers': [p.model_dump() for p in final_papers], 'metadata': metadata, 'message': f'Discovered {len(final_papers)} high-relevance papers across multi-source repositories.'})}\n\n"
+            yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in final_papers], "metadata": metadata, "message": f"Discovered {len(final_papers)} high-relevance papers across multi-source repositories."})
             await asyncio.sleep(0.05)
 
             # Stage 5: Search Overview Summary
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'discovery_ready', 'message': 'Literature discovery complete. Ready for on-demand analysis.'})}\n\n"
+            yield sse_event({"type": "status", "stage": "discovery_ready", "message": "Literature discovery complete. Ready for on-demand analysis."})
 
             source_breakdown = f"ArXiv: {metadata['arxiv_count']} | Semantic Scholar: {metadata['ss_count']} | OpenAlex: {metadata['openalex_count']}"
             overview_summary = (
@@ -731,14 +851,14 @@ async def research_stream_endpoint(
                 f"> [!TIP]\n"
                 f"> Click **'Explain Paper with DeepSeek'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
             )
-            yield f"data: {json.dumps({'type': 'token', 'content': overview_summary})}\n\n"
+            yield sse_event({"type": "token", "content": overview_summary})
 
             # Stage 6: Done
-            yield f"data: {json.dumps({'type': 'done', 'message': 'Literature discovery complete.'})}\n\n"
+            yield sse_event({"type": "done", "message": "Literature discovery complete."})
 
         except Exception as e:
             logger.error("Unhandled error in research stream: %s", str(e), exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Pipeline error: {str(e)}'})}\n\n"
+            yield sse_event({"type": "error", "message": f"Pipeline error: {str(e)}"})
 
     return StreamingResponse(
         event_generator(),
@@ -833,6 +953,52 @@ async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
             content={
                 "error": f"Diagram generation failed: {str(e)}",
                 "details": "Kroki diagram service could not render the architecture."
+            }
+        )
+
+
+@app.post("/api/paper/outreach-email", dependencies=[Depends(verify_axiom_access)])
+async def generate_outreach_email_endpoint(payload: OutreachEmailRequest):
+    """
+    On-demand Professor Cold Outreach Email Generator.
+    Generates an intellectually rigorous, publication-grade academic email draft (<250 words)
+    to a paper author or PI with customizable bracketed placeholders.
+    """
+    if not payload.paper_title or not payload.paper_title.strip():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Field 'paper_title' cannot be empty."}
+        )
+    if not payload.target_professor or not payload.target_professor.strip():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Field 'target_professor' cannot be empty."}
+        )
+    if payload.scope_type not in ("single_paper", "holistic_lab"):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Field 'scope_type' must be 'single_paper' or 'holistic_lab'."}
+        )
+
+    try:
+        if not payload.orcarouter_key:
+            payload.orcarouter_key = runtime_config["orcarouter_api_key"] or None
+
+        result = await llm_service.generate_outreach_email(payload)
+        return {
+            "status": "success",
+            "subject": result.get("subject", ""),
+            "body": result.get("body", ""),
+            "scope_type": payload.scope_type,
+            "target_professor": payload.target_professor,
+        }
+    except Exception as e:
+        logger.error("Outreach email generation failed: %s", str(e), exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": f"Failed to generate outreach email: {str(e)}",
+                "status": "error"
             }
         )
 

@@ -306,6 +306,7 @@
       .compare-bar,
       #citation-modal,
       #diagram-modal,
+      #outreach-modal,
       #auth-gate-modal,
       #support-modal {
         display: none !important;
@@ -475,12 +476,32 @@
 
       <!-- Bottom Query Input Dock (Refined spacing & clean border) -->
       <div class="flex-none p-4 bg-white/95 dark:bg-[#111827]/90 border-t border-slate-200 dark:border-[#1E293B] backdrop-blur-md transition-colors">
+        
+        <!-- 3-Way Search Mode Switcher -->
+        <div class="flex items-center justify-between mb-2.5 px-1">
+          <div id="search-mode-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B] text-xs">
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5" data-mode="topic">
+              <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+              <span>Topic Exploration</span>
+            </button>
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="author">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+              <span>Author Profile</span>
+            </button>
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="institution">
+              <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+              <span>University / Lab</span>
+            </button>
+          </div>
+          <span id="search-mode-label" class="hidden sm:inline-block text-[11px] font-mono text-slate-400 dark:text-slate-500">Multi-source CS index</span>
+        </div>
+
         <form id="research-form" class="relative">
           <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 rounded-xl transition shadow-xs">
             <textarea
               id="query-input"
               rows="2"
-              placeholder="Ask an academic systems inquiry (e.g., 'Consensus in geo-distributed systems with variable latency')..."
+              placeholder="e.g., FlashAttention-3 GPU kernel optimizations, diffusion state-space models..."
               class="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-4 py-3 focus:outline-none resize-none leading-relaxed"
               required
             ></textarea>
@@ -503,17 +524,16 @@
               <div class="flex items-center space-x-1.5">
                 <span class="font-medium text-slate-600 dark:text-slate-400">Papers:</span>
                 <div id="paper-limit-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B]">
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="5">5</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer" data-limit="6">6</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="10">10</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="15">15</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="20">20</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer" data-limit="10">10</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="25">25</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="50">50</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="100">100</button>
                 </div>
               </div>
 
               <div class="hidden sm:flex items-center space-x-1.5 text-[11px] pl-3 border-l border-slate-200 dark:border-[#1E293B]">
-                <span>CS Categories:</span>
-                <span class="font-mono text-slate-600 dark:text-slate-300">cs.DC, cs.SE, cs.AI, cs.AR</span>
+                <span>Index Scope:</span>
+                <span id="category-scope-text" class="font-mono text-slate-600 dark:text-slate-300">cs.DC, cs.SE, cs.AI, cs.AR</span>
               </div>
             </div>
 
@@ -561,6 +581,20 @@
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Instant In-Results Client-Side Filter -->
+      <div class="flex-none px-4 py-2 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/70 dark:bg-[#0B0F19]/60">
+        <div class="relative flex items-center">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
+          <input
+            type="text"
+            id="filter-entity-input"
+            placeholder="Filter loaded papers by author or institution..."
+            class="w-full pl-8 pr-32 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-sans"
+          />
+          <span id="filter-match-count" class="absolute right-2.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 pointer-events-none"></span>
         </div>
       </div>
 
@@ -627,6 +661,19 @@
 
         <!-- Target Container for Paper Cards -->
         <div id="discovered-papers-list" class="space-y-3.5 hidden"></div>
+
+        <!-- DOM Pagination Controls Bar -->
+        <div id="papers-pagination" class="hidden items-center justify-between pt-3 pb-1 text-xs border-t border-slate-200 dark:border-slate-800">
+          <button type="button" id="btn-prev-page" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer flex items-center space-x-1">
+            <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+            <span>Previous</span>
+          </button>
+          <span id="pagination-page-info" class="text-[11px] font-mono text-slate-500 dark:text-slate-400">Page 1 of 1</span>
+          <button type="button" id="btn-next-page" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer flex items-center space-x-1">
+            <span>Next</span>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
 
       </div>
 
@@ -737,6 +784,120 @@
       <div id="diagram-modal-viewport" class="flex-1 bg-slate-950/95 rounded-xl border border-slate-800/80 p-4 overflow-auto flex items-center justify-center relative select-none">
         <!-- SVG injected dynamically -->
       </div>
+    </div>
+  </div>
+
+  <!-- Academic Cold Outreach Email Generator Modal -->
+  <div id="outreach-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-slate-800 dark:text-slate-100 flex flex-col max-h-[92vh]">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3 gap-2 shrink-0">
+        <div class="min-w-0">
+          <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+            <span class="text-lg">✉️</span>
+            <span>Academic Outreach Generator</span>
+          </h3>
+          <p id="outreach-paper-title" class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium truncate max-w-lg">Paper Title</p>
+        </div>
+        <button id="btn-close-outreach-modal" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0 cursor-pointer" title="Close Modal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Configuration Controls -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800/80 shrink-0">
+        <!-- Recipient Selector -->
+        <div>
+          <label for="outreach-recipient-select" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+            Target Professor / Author
+          </label>
+          <select id="outreach-recipient-select" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-brand-500 focus:outline-none cursor-pointer">
+            <!-- Dynamically populated options -->
+          </select>
+        </div>
+
+        <!-- Scope Mode Toggle -->
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+            Outreach Scope Mode
+          </label>
+          <div class="flex items-center space-x-1 p-1 bg-slate-200/80 dark:bg-slate-900 rounded-lg border border-slate-300 dark:border-slate-800 text-xs">
+            <button type="button" id="btn-scope-single" class="scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition bg-brand-600 text-white shadow-xs cursor-pointer" data-scope="single_paper" title="Focus specifically on this paper's core bottleneck">
+              Single Paper
+            </button>
+            <button type="button" id="btn-scope-holistic" class="scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer" data-scope="holistic_lab" title="Focus on the professor's lab direction & broader corpus">
+              Holistic Lab
+            </button>
+          </div>
+        </div>
+
+        <!-- Generate Button -->
+        <div class="sm:col-span-2 pt-1 flex justify-end">
+          <button id="btn-run-outreach" class="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-semibold text-xs shadow-lg shadow-brand-500/25 transition cursor-pointer disabled:opacity-50">
+            <svg id="outreach-spinner" class="hidden animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="outreach-btn-icon">⚡</span>
+            <span id="outreach-btn-text">Generate Cold Email Draft</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Output View -->
+      <div class="space-y-3 flex-1 overflow-y-auto min-h-0 pr-0.5">
+        <!-- Subject Line Field -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="outreach-subject" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              Subject Line
+            </label>
+            <button id="btn-copy-outreach-subject" class="text-[11px] text-brand-600 dark:text-brand-400 hover:underline flex items-center space-x-1 cursor-pointer" title="Copy Subject">
+              <i data-lucide="copy" class="w-3 h-3"></i>
+              <span id="copy-subject-label">Copy Subject</span>
+            </button>
+          </div>
+          <input
+            id="outreach-subject"
+            type="text"
+            class="w-full bg-slate-50 dark:bg-slate-950 text-xs font-mono text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            placeholder="Subject line will appear here..."
+          />
+        </div>
+
+        <!-- Email Body Area -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="outreach-body" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              Email Body (Editable, with [BRACKETED_PLACEHOLDERS])
+            </label>
+            <span class="text-[10px] text-slate-500 font-mono">Formal • &lt;250 words</span>
+          </div>
+          <textarea
+            id="outreach-body"
+            rows="9"
+            class="w-full bg-slate-50 dark:bg-slate-950 text-xs font-mono text-slate-800 dark:text-slate-200 p-3 rounded-xl border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y leading-relaxed"
+            placeholder="Email draft will appear here..."
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Quick Actions Footer -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 text-xs shrink-0">
+        <span class="text-[11px] text-slate-500 hidden sm:inline">Customize bracketed placeholders before dispatching</span>
+        <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+          <button id="btn-copy-outreach-body" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition cursor-pointer">
+            <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+            <span id="copy-outreach-label">📋 Copy Full Email</span>
+          </button>
+          <a id="btn-mailto-outreach" href="#" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-semibold text-xs shadow-md shadow-brand-500/20 transition cursor-pointer" target="_blank" rel="noopener noreferrer">
+            <span>↗️</span>
+            <span>Open in Mail Client</span>
+          </a>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1265,6 +1426,7 @@
     document.querySelectorAll('.starter-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const query = chip.getAttribute('data-query');
+        if (typeof setMode === 'function') setMode('topic');
         if (queryInput) {
           queryInput.value = query;
           queryInput.focus();
@@ -1870,11 +2032,72 @@
     let activeFilters = {
       year: 'all',
       source: 'all',
-      pdfOnly: false
+      pdfOnly: false,
+      entityQuery: ''
     };
 
-    // Dynamic Paper Limit State
-    let currentPaperLimit = 6;
+    // Dynamic Search Mode State ('topic' | 'author' | 'institution')
+    let currentSearchMode = 'topic';
+    const searchModeBtns = document.querySelectorAll('.search-mode-btn');
+    const searchModeLabel = document.getElementById('search-mode-label');
+    const categoryScopeText = document.getElementById('category-scope-text');
+
+    const searchModePlaceholders = {
+      topic: "e.g., FlashAttention-3 GPU kernel optimizations, diffusion state-space models...",
+      author: "e.g., Tri Dao, Ilya Sutskever, Kaiming He, Yann LeCun...",
+      institution: "e.g., Stanford University, MIT, DeepMind, OpenAI..."
+    };
+
+    const searchModeButtonTexts = {
+      topic: "Research",
+      author: "Find Works",
+      institution: "Find Works"
+    };
+
+    const searchModeLabels = {
+      topic: "Multi-source CS index (ArXiv, Scholar, OpenAlex)",
+      author: "OpenAlex Researcher Works Index",
+      institution: "OpenAlex Institution / Lab Works Index"
+    };
+
+    function setMode(mode) {
+      if (!mode) return;
+      currentSearchMode = mode;
+      searchModeBtns.forEach(b => {
+        if (b.getAttribute('data-mode') === mode) {
+          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5';
+        } else {
+          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5';
+        }
+      });
+      if (queryInput) {
+        queryInput.placeholder = searchModePlaceholders[mode] || searchModePlaceholders.topic;
+      }
+      if (btnText) {
+        btnText.textContent = searchModeButtonTexts[mode] || "Research";
+      }
+      if (searchModeLabel) {
+        searchModeLabel.textContent = searchModeLabels[mode] || "";
+      }
+      if (categoryScopeText) {
+        if (mode === 'author') {
+          categoryScopeText.textContent = 'Global Author Publications';
+        } else if (mode === 'institution') {
+          categoryScopeText.textContent = 'Global Lab / University Works';
+        } else {
+          categoryScopeText.textContent = 'cs.DC, cs.SE, cs.AI, cs.AR';
+        }
+      }
+    }
+
+    searchModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setMode(btn.getAttribute('data-mode'));
+      });
+    });
+
+    // Dynamic Paper Limit State (10, 25, 50, 100)
+    let currentPaperLimit = 10;
     const paperLimitBtns = document.querySelectorAll('.paper-limit-btn');
     paperLimitBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1882,13 +2105,55 @@
         if (!isNaN(limitVal)) {
           currentPaperLimit = limitVal;
           paperLimitBtns.forEach(b => {
-            b.className = 'paper-limit-btn px-2 py-0.5 rounded text-[10px] font-semibold text-slate-400 hover:text-white transition';
+            b.className = 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer';
           });
-          btn.className = 'paper-limit-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-brand-600 text-white transition shadow';
+          btn.className = 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer';
           showToast(`Target paper quota set to ${currentPaperLimit}`, 'info');
         }
       });
     });
+
+    // DOM Pagination State
+    let currentPage = 1;
+    const PAGE_SIZE = 12;
+
+    // Instant Client-side Entity/Text Filter Listener
+    const filterEntityInput = document.getElementById('filter-entity-input');
+    if (filterEntityInput) {
+      filterEntityInput.addEventListener('input', (e) => {
+        activeFilters.entityQuery = (e.target.value || '').trim().toLowerCase();
+        currentPage = 1;
+        renderPapersView();
+      });
+    }
+
+    // Pagination Controls Listeners
+    const btnPrevPage = document.getElementById('btn-prev-page');
+    if (btnPrevPage) {
+      btnPrevPage.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderPapersView();
+          const pList = document.getElementById('papers-list');
+          if (pList) pList.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    }
+
+    const btnNextPage = document.getElementById('btn-next-page');
+    if (btnNextPage) {
+      btnNextPage.addEventListener('click', () => {
+        const rawPool = activeTab === 'discovered' ? currentPapers : savedPapers;
+        const displayPapers = activeTab === 'discovered' ? applyFilters(rawPool) : rawPool;
+        const totalPages = Math.max(1, Math.ceil(displayPapers.length / PAGE_SIZE));
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderPapersView();
+          const pList = document.getElementById('papers-list');
+          if (pList) pList.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    }
 
     // Citation Modal State
     let activeCitationPaper = null;
@@ -2073,6 +2338,14 @@
 
     function applyFilters(papers) {
       return papers.filter(p => {
+        // Instant Text / Entity filter (Author, Institution, Title)
+        if (activeFilters.entityQuery) {
+          const q = activeFilters.entityQuery;
+          const authorMatch = Array.isArray(p.authors) && p.authors.some(a => (a || '').toLowerCase().includes(q));
+          const instMatch = Array.isArray(p.institutions) && p.institutions.some(i => (i || '').toLowerCase().includes(q));
+          const titleMatch = (p.title || '').toLowerCase().includes(q);
+          if (!authorMatch && !instMatch && !titleMatch) return false;
+        }
         // Year filter
         if (activeFilters.year === 'recent') {
           if (!p.year || p.year < 2024) return false;
@@ -2150,11 +2423,12 @@
     // --- Render Papers (Entrypoint) ---
     function renderPapers(papers) {
       currentPapers = papers;
+      currentPage = 1;
       updateWorkspaceBadges();
       renderPapersView();
     }
 
-    // Render active papers view (Discovered or Saved, with filters applied)
+    // Render active papers view (Discovered or Saved, with filters & DOM pagination applied)
     function renderPapersView() {
       const rawPool = activeTab === 'discovered' ? currentPapers : savedPapers;
       const displayPapers = activeTab === 'discovered' ? applyFilters(rawPool) : rawPool;
@@ -2164,15 +2438,26 @@
       }
       updateWorkspaceBadges();
 
+      // Real-time Instant Match Counter
+      const filterMatchCountEl = document.getElementById('filter-match-count');
+      if (filterMatchCountEl) {
+        if (rawPool && rawPool.length > 0) {
+          filterMatchCountEl.textContent = `Showing ${displayPapers.length} of ${rawPool.length} loaded papers`;
+        } else {
+          filterMatchCountEl.textContent = '';
+        }
+      }
+
       const placeholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
       const cardsContainer = document.getElementById('discovered-papers-list') || papersList;
+      const paginationBar = document.getElementById('papers-pagination');
 
       if (!displayPapers || displayPapers.length === 0) {
         const emptyMsg = activeTab === 'discovered'
           ? (currentPapers.length > 0 ? 'No papers match active filter criteria.' : 'No Papers Retrieved Yet')
           : 'No Saved Papers in Workspace.';
         const emptySub = activeTab === 'discovered'
-          ? (currentPapers.length > 0 ? 'Try clearing or loosening the Year/Source/PDF filter chips above.' : 'Submit an academic inquiry to concurrently fetch relevant literature from ArXiv, Semantic Scholar, and OpenAlex.')
+          ? (currentPapers.length > 0 ? 'Try clearing or loosening the Year/Source/PDF or text filter above.' : 'Submit an academic inquiry to concurrently fetch relevant literature from ArXiv, Semantic Scholar, and OpenAlex.')
           : 'Click the bookmark icon on any paper card to save papers into your persistent workspace.';
 
         if (cardsContainer && cardsContainer !== placeholder) {
@@ -2187,6 +2472,10 @@
           const descEl = document.getElementById('empty-placeholder-desc');
           if (titleEl) titleEl.textContent = emptyMsg;
           if (descEl) descEl.textContent = emptySub;
+        }
+        if (paginationBar) {
+          paginationBar.classList.add('hidden');
+          paginationBar.classList.remove('flex');
         }
         lucide.createIcons();
         return;
@@ -2205,7 +2494,16 @@
         cardsContainer.innerHTML = '';
       }
 
-      displayPapers.forEach((p, index) => {
+      // DOM Pagination Slicing (12 items per page for instant rendering of up to 100 papers)
+      const totalPages = Math.max(1, Math.ceil(displayPapers.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIndex = (currentPage - 1) * PAGE_SIZE;
+      const pagePapers = displayPapers.slice(startIndex, startIndex + PAGE_SIZE);
+
+      pagePapers.forEach((p, index) => {
+        const globalIndex = startIndex + index + 1;
         const card = document.createElement('div');
         card.className = 'p-4 rounded-xl bg-white dark:bg-[#0B0F19]/70 border border-slate-200 dark:border-[#1E293B] hover:border-brand-500/50 dark:hover:border-brand-500/50 transition group space-y-3 shadow-xs dark:shadow-sm relative';
         card.setAttribute('data-paper-id', p.id);
@@ -2270,7 +2568,7 @@
               >
                 <i data-lucide="bookmark" class="w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}"></i>
               </button>
-              <span class="text-[11px] font-mono text-slate-400 dark:text-slate-500">#${index + 1}</span>
+              <span class="text-[11px] font-mono text-slate-400 dark:text-slate-500">#${globalIndex}</span>
             </div>
           </div>
 
@@ -2283,6 +2581,13 @@
           <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
             <i data-lucide="user" class="w-3 h-3 inline mr-1 text-slate-400"></i> ${escapeHtml(authorsStr)}
           </p>
+
+          ${p.institutions && p.institutions.length > 0 ? `
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center">
+              <i data-lucide="building" class="w-2.5 h-2.5 inline mr-1 text-slate-400 shrink-0"></i>
+              <span title="${escapeHtml(p.institutions.join(', '))}">${escapeHtml(p.institutions.slice(0, 2).join(' · '))}${p.institutions.length > 2 ? ' et al.' : ''}</span>
+            </p>
+          ` : ''}
 
           ${p.tldr ? `
             <div class="text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#111827] p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80 leading-relaxed">
@@ -2323,6 +2628,14 @@
             >
               <i data-lucide="graduation-cap" class="w-3 h-3"></i>
               <span>Thesis Draft</span>
+            </button>
+            <button
+              type="button"
+              class="btn-outreach-email text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
+              title="Generate Professor Outreach Email"
+            >
+              <span>✉️</span>
+              <span>Outreach</span>
             </button>
           </div>
 
@@ -2369,34 +2682,43 @@
           });
         }
 
-        // Bookmark Toggle Listener
-        const btnToggleSave = card.querySelector('.btn-toggle-save');
-        if (btnToggleSave) {
-          btnToggleSave.addEventListener('click', (e) => {
+        // Bookmark / Save Listener
+        const saveBtn = card.querySelector('.btn-toggle-save');
+        if (saveBtn) {
+          saveBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleSavePaper(p);
           });
         }
 
-        // Cite Modal Listener
-        const btnOpenCite = card.querySelector('.btn-open-cite');
-        if (btnOpenCite) {
-          btnOpenCite.addEventListener('click', (e) => {
+        // Citation Button Listener
+        const citeBtn = card.querySelector('.btn-open-cite');
+        if (citeBtn) {
+          citeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             openCitationModal(p);
           });
         }
 
-        // Thesis Draft Listener
-        const btnThesisDraft = card.querySelector('.btn-thesis-draft');
-        if (btnThesisDraft) {
-          btnThesisDraft.addEventListener('click', (e) => {
+        // Thesis Draft Button Listener
+        const thesisBtn = card.querySelector('.btn-thesis-draft');
+        if (thesisBtn) {
+          thesisBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerThesisDraft(p);
           });
         }
 
-        // Segmented Depth Selector Listener
+        // Outreach Email Button Listener
+        const outreachBtn = card.querySelector('.btn-outreach-email');
+        if (outreachBtn) {
+          outreachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openOutreachModal(p);
+          });
+        }
+
+        // Analysis Depth Selection Listener
         let cardDepth = 'balanced';
         const depthBtns = card.querySelectorAll('.depth-btn');
         const explainBtnLabel = card.querySelector('.explain-btn-label');
@@ -2435,6 +2757,25 @@
 
         cardsContainer.appendChild(card);
       });
+
+      // Update Pagination Controls Bar
+      if (paginationBar) {
+        if (totalPages > 1) {
+          paginationBar.classList.remove('hidden');
+          paginationBar.classList.add('flex');
+          const pageInfo = document.getElementById('pagination-page-info');
+          if (pageInfo) {
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${displayPapers.length} papers)`;
+          }
+          const btnPrev = document.getElementById('btn-prev-page');
+          const btnNext = document.getElementById('btn-next-page');
+          if (btnPrev) btnPrev.disabled = (currentPage <= 1);
+          if (btnNext) btnNext.disabled = (currentPage >= totalPages);
+        } else {
+          paginationBar.classList.add('hidden');
+          paginationBar.classList.remove('flex');
+        }
+      }
 
       updateCompareBar();
       lucide.createIcons();
@@ -2611,6 +2952,232 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast('Architecture SVG downloaded successfully!', 'success');
+    }
+
+    // --- Academic Cold Outreach Email Modal Management ---
+    const outreachModal = document.getElementById('outreach-modal');
+    const outreachPaperTitle = document.getElementById('outreach-paper-title');
+    const outreachRecipientSelect = document.getElementById('outreach-recipient-select');
+    const btnScopeSingle = document.getElementById('btn-scope-single');
+    const btnScopeHolistic = document.getElementById('btn-scope-holistic');
+    const btnRunOutreach = document.getElementById('btn-run-outreach');
+    const outreachSpinner = document.getElementById('outreach-spinner');
+    const outreachBtnIcon = document.getElementById('outreach-btn-icon');
+    const outreachBtnText = document.getElementById('outreach-btn-text');
+    const outreachSubjectInput = document.getElementById('outreach-subject');
+    const outreachBodyTextarea = document.getElementById('outreach-body');
+    const btnCopyOutreachSubject = document.getElementById('btn-copy-outreach-subject');
+    const btnCopyOutreachBody = document.getElementById('btn-copy-outreach-body');
+    const btnMailtoOutreach = document.getElementById('btn-mailto-outreach');
+    const btnCloseOutreachModal = document.getElementById('btn-close-outreach-modal');
+
+    let currentOutreachPaper = null;
+    let currentOutreachScope = 'single_paper';
+
+    function setOutreachScope(scope) {
+      currentOutreachScope = scope;
+      if (scope === 'single_paper') {
+        if (btnScopeSingle) {
+          btnScopeSingle.className = 'scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition bg-brand-600 text-white shadow-xs cursor-pointer';
+        }
+        if (btnScopeHolistic) {
+          btnScopeHolistic.className = 'scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+        }
+      } else {
+        if (btnScopeHolistic) {
+          btnScopeHolistic.className = 'scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition bg-brand-600 text-white shadow-xs cursor-pointer';
+        }
+        if (btnScopeSingle) {
+          btnScopeSingle.className = 'scope-toggle-btn flex-1 py-1 rounded-md font-medium text-center transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+        }
+      }
+    }
+
+    if (btnScopeSingle) {
+      btnScopeSingle.addEventListener('click', () => setOutreachScope('single_paper'));
+    }
+    if (btnScopeHolistic) {
+      btnScopeHolistic.addEventListener('click', () => setOutreachScope('holistic_lab'));
+    }
+
+    function updateMailtoLink() {
+      if (!btnMailtoOutreach) return;
+      const subject = outreachSubjectInput ? outreachSubjectInput.value : '';
+      const body = outreachBodyTextarea ? outreachBodyTextarea.value : '';
+      btnMailtoOutreach.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+
+    if (outreachSubjectInput) {
+      outreachSubjectInput.addEventListener('input', updateMailtoLink);
+    }
+    if (outreachBodyTextarea) {
+      outreachBodyTextarea.addEventListener('input', updateMailtoLink);
+    }
+
+    function openOutreachModal(paper) {
+      if (!paper) return;
+      currentOutreachPaper = paper;
+
+      if (outreachPaperTitle) {
+        outreachPaperTitle.textContent = paper.title || 'Academic Paper';
+      }
+
+      // Populate recipient select dynamically
+      if (outreachRecipientSelect) {
+        outreachRecipientSelect.innerHTML = '';
+        let authorsList = [];
+        if (Array.isArray(paper.authors) && paper.authors.length > 0) {
+          authorsList = paper.authors;
+        } else if (typeof paper.authors === 'string' && paper.authors.trim()) {
+          authorsList = paper.authors.split(/,|;/).map(a => a.trim()).filter(Boolean);
+        } else {
+          authorsList = ['Lead Author / Principal Investigator'];
+        }
+
+        authorsList.forEach((auth, idx) => {
+          const opt = document.createElement('option');
+          opt.value = auth;
+          opt.textContent = auth;
+          if (idx === 0) opt.selected = true;
+          outreachRecipientSelect.appendChild(opt);
+        });
+      }
+
+      setOutreachScope('single_paper');
+      if (outreachSubjectInput) outreachSubjectInput.value = '';
+      if (outreachBodyTextarea) outreachBodyTextarea.value = '';
+      updateMailtoLink();
+
+      if (outreachModal) {
+        outreachModal.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function closeOutreachModal() {
+      if (outreachModal) outreachModal.classList.add('hidden');
+    }
+
+    if (btnCloseOutreachModal) {
+      btnCloseOutreachModal.addEventListener('click', closeOutreachModal);
+    }
+
+    if (outreachModal) {
+      outreachModal.addEventListener('click', (e) => {
+        if (e.target === outreachModal) {
+          closeOutreachModal();
+        }
+      });
+    }
+
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && outreachModal && !outreachModal.classList.contains('hidden')) {
+          closeOutreachModal();
+        }
+      });
+    }
+
+    if (btnCopyOutreachSubject) {
+      btnCopyOutreachSubject.addEventListener('click', () => {
+        const text = outreachSubjectInput ? outreachSubjectInput.value : '';
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          const label = document.getElementById('copy-subject-label');
+          if (label) {
+            const orig = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = orig; }, 1500);
+          }
+          showToast('Subject line copied to clipboard!', 'success');
+        });
+      });
+    }
+
+    if (btnCopyOutreachBody) {
+      btnCopyOutreachBody.addEventListener('click', () => {
+        const subj = outreachSubjectInput ? outreachSubjectInput.value : '';
+        const body = outreachBodyTextarea ? outreachBodyTextarea.value : '';
+        if (!body) return;
+        const fullText = subj ? `Subject: ${subj}\n\n${body}` : body;
+        navigator.clipboard.writeText(fullText).then(() => {
+          const label = document.getElementById('copy-outreach-label');
+          if (label) {
+            const orig = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = orig; }, 1500);
+          }
+          showToast('Full outreach email copied to clipboard!', 'success');
+        });
+      });
+    }
+
+    if (btnRunOutreach) {
+      btnRunOutreach.addEventListener('click', async () => {
+        if (!currentOutreachPaper) {
+          showToast('No paper selected.', 'warning');
+          return;
+        }
+
+        const targetProf = outreachRecipientSelect ? outreachRecipientSelect.value : '';
+        if (!targetProf) {
+          showToast('Please select a target professor / author.', 'warning');
+          return;
+        }
+
+        btnRunOutreach.disabled = true;
+        if (outreachSpinner) outreachSpinner.classList.remove('hidden');
+        if (outreachBtnIcon) outreachBtnIcon.classList.add('hidden');
+        if (outreachBtnText) outreachBtnText.textContent = 'Generating Email Draft...';
+
+        try {
+          const authorsArr = Array.isArray(currentOutreachPaper.authors)
+            ? currentOutreachPaper.authors
+            : (currentOutreachPaper.authors ? [currentOutreachPaper.authors] : []);
+
+          const res = await authenticatedFetch('/api/paper/outreach-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paper_title: currentOutreachPaper.title || '',
+              authors: authorsArr,
+              abstract: currentOutreachPaper.abstract || '',
+              target_professor: targetProf,
+              scope_type: currentOutreachScope
+            })
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}: Failed to generate outreach email.`);
+          }
+
+          const data = await res.json();
+          if (outreachSubjectInput) outreachSubjectInput.value = data.subject || '';
+          if (outreachBodyTextarea) outreachBodyTextarea.value = data.body || '';
+          updateMailtoLink();
+          showToast('Cold outreach email draft generated!', 'success');
+        } catch (err) {
+          console.error('Outreach generation error:', err);
+          showToast(`Error: ${err.message}`, 'error');
+        } finally {
+          btnRunOutreach.disabled = false;
+          if (outreachSpinner) outreachSpinner.classList.add('hidden');
+          if (outreachBtnIcon) outreachBtnIcon.classList.remove('hidden');
+          if (outreachBtnText) outreachBtnText.textContent = 'Generate Cold Email Draft';
+        }
+      });
+    }
+
+    const staticBtnOutreach = document.getElementById('btn-outreach-email');
+    if (staticBtnOutreach) {
+      staticBtnOutreach.addEventListener('click', () => {
+        if (currentOutreachPaper) {
+          openOutreachModal(currentOutreachPaper);
+        } else if (typeof currentDiscoveredPapers !== 'undefined' && currentDiscoveredPapers && currentDiscoveredPapers.length > 0) {
+          openOutreachModal(currentDiscoveredPapers[0]);
+        }
+      });
     }
 
     // --- On-Demand Thesis Proposal Generator ---
@@ -3049,6 +3616,10 @@
                   <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
                   <span>Thesis Draft</span>
                 </button>
+                <button id="btn-outreach-email" class="btn-outreach-email inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 transition-colors cursor-pointer" title="Generate Academic Cold Outreach Email to Author">
+                  <span>✉️</span>
+                  <span>Outreach Email</span>
+                </button>
                 <button id="btn-print-synthesis" class="btn-print-paper-report btn-print-synthesis flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Print or Save as PDF">
                   <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
                   <span>PDF / Print</span>
@@ -3076,12 +3647,18 @@
             <div class="markdown-body prose-academic text-sm text-slate-200 min-h-[60px]"></div>
 
             <!-- Action Bar with Generate Architecture Diagram Button -->
-            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              <button class="btn-generate-diagram-footer flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600/30 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shadow-sm" title="Generate Professional Architecture Diagram via Kroki">
-                <i data-lucide="network" class="w-4 h-4 text-emerald-400"></i>
-                <span class="btn-diagram-text">📐 Generate Architecture Diagram</span>
-              </button>
-              <span class="text-[10px] text-slate-500 font-mono">On-Demand Kroki SVG Engine</span>
+            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center space-x-2 flex-wrap gap-2">
+                <button class="btn-generate-diagram-footer flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600/30 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shadow-sm" title="Generate Professional Architecture Diagram via Kroki">
+                  <i data-lucide="network" class="w-4 h-4 text-emerald-400"></i>
+                  <span class="btn-diagram-text">📐 Generate Architecture Diagram</span>
+                </button>
+                <button class="btn-outreach-email inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs text-slate-300 transition-colors cursor-pointer" title="Generate Academic Cold Outreach Email to Author">
+                  <span>✉️</span>
+                  <span>Outreach Email</span>
+                </button>
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">On-Demand Academic Tools</span>
             </div>
 
             <!-- Architecture Diagram Section (Expandable) -->
@@ -3276,6 +3853,13 @@
           triggerThesisDraft(paper);
         });
       }
+
+      const btnOutreachEmailBtns = assistantContainer.querySelectorAll('#btn-outreach-email, .btn-outreach-email');
+      btnOutreachEmailBtns.forEach(btnEl => {
+        btnEl.addEventListener('click', () => {
+          openOutreachModal(paper);
+        });
+      });
 
       const startTime = Date.now();
       const timerInterval = setInterval(() => {
@@ -3511,11 +4095,18 @@
       const sessionBlock = document.createElement('div');
       sessionBlock.className = 'space-y-4';
 
+      let modeBadge = '';
+      if (currentSearchMode === 'author') {
+        modeBadge = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white mr-1.5 uppercase tracking-wider">Author Profile</span>';
+      } else if (currentSearchMode === 'institution') {
+        modeBadge = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white mr-1.5 uppercase tracking-wider">University / Lab</span>';
+      }
+
       const userBubble = document.createElement('div');
       userBubble.className = 'flex items-start space-x-3 justify-end';
       userBubble.innerHTML = `
         <div class="max-w-2xl bg-brand-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm shadow-md text-sm leading-relaxed">
-          <p class="font-medium">${escapeHtml(inquiry)}</p>
+          <p class="font-medium">${modeBadge}${escapeHtml(inquiry)}</p>
         </div>
         <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
           <i data-lucide="user" class="w-4 h-4"></i>
@@ -3620,7 +4211,11 @@
 
       let accumulatedMarkdown = '';
 
-      const params = new URLSearchParams({ query: inquiry, limit: currentPaperLimit });
+      const params = new URLSearchParams({
+        query: inquiry,
+        limit: currentPaperLimit,
+        search_mode: currentSearchMode
+      });
       const axiomToken = localStorage.getItem('axiom_access_token') || '';
       if (axiomToken) {
         params.set('access_code', axiomToken);
