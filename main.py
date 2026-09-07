@@ -556,6 +556,11 @@ async def synthesize_endpoint(payload: SynthesizeRequest):
     }
 
 
+def sse_event(data: Any) -> str:
+    """Format payload dictionary as a standard Server-Sent Event (SSE) message."""
+    return "data: " + json.dumps(data) + "\n\n"
+
+
 @app.get("/api/research/stream", dependencies=[Depends(verify_axiom_access)])
 async def research_stream_endpoint(
     query: str = Query(..., description="User research question or topic"),
@@ -592,7 +597,13 @@ async def research_stream_endpoint(
                 yield f"data: {json.dumps({'type': 'status', 'stage': 'cache_hit', 'message': 'Instant cache hit: Retrieving pre-indexed academic literature (0ms network calls)...'})}\n\n"
                 await asyncio.sleep(0.04)
 
-                yield f"data: {json.dumps({'type': 'status', 'stage': 'keywords_ready', 'keywords': keywords, 'message': f'Target keywords: \"{keywords}\" (from cache)'})}\n\n"
+                payload = {
+                    "type": "status",
+                    "stage": "keywords_ready",
+                    "keywords": keywords,
+                    "message": f"Target keywords: '{keywords}' (from cache)",
+                }
+                yield sse_event(payload)
                 await asyncio.sleep(0.04)
 
                 yield f"data: {json.dumps({'type': 'papers_ready', 'papers': [p.model_dump() for p in selected_papers], 'metadata': cached_meta, 'message': f'Retrieved {len(selected_papers)} cached high-relevance papers.'})}\n\n"
@@ -618,7 +629,13 @@ async def research_stream_endpoint(
             await asyncio.sleep(0.05)
 
             keywords = clean_academic_query(query)
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'keywords_ready', 'keywords': keywords, 'message': f'Target keywords: \"{keywords}\"'})}\n\n"
+            payload = {
+                "type": "status",
+                "stage": "keywords_ready",
+                "keywords": keywords,
+                "message": f"Target keywords: '{keywords}'",
+            }
+            yield sse_event(payload)
 
             # Stage 2: Concurrently query ArXiv, Semantic Scholar, and OpenAlex
             yield f"data: {json.dumps({'type': 'status', 'stage': 'fetching_arxiv', 'message': 'Fetching ArXiv papers in CS categories (cs.DC, cs.SE, cs.AI, cs.AR)...'})}\n\n"
@@ -752,7 +769,13 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
     async def event_generator():
         try:
             model_display = runtime_config["model_name"]
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'starting', 'message': f'Initiating DeepSeek [{depth_norm.capitalize()}] synthesis for \"{payload.paper.title}\" with {model_display}...'})}\n\n"
+            paper_title = payload.paper.title
+            payload_msg = {
+                "type": "status",
+                "stage": "starting",
+                "message": f"Initiating DeepSeek [{depth_norm.capitalize()}] synthesis for '{paper_title}' with {model_display}...",
+            }
+            yield sse_event(payload_msg)
 
             async for token in llm_service.stream_single_paper_analysis(
                 paper=payload.paper,
@@ -816,7 +839,13 @@ async def thesis_draft_endpoint(payload: ThesisProposalRequest):
     async def event_generator():
         try:
             model_display = runtime_config["model_name"]
-            yield f"data: {json.dumps({'type': 'status', 'stage': 'starting', 'message': f'Drafting Academic Thesis Proposal for \"{payload.paper.title}\" with {model_display}...'})}\n\n"
+            paper_title = payload.paper.title
+            payload_msg = {
+                "type": "status",
+                "stage": "starting",
+                "message": f"Drafting Academic Thesis Proposal for '{paper_title}' with {model_display}...",
+            }
+            yield sse_event(payload_msg)
             await asyncio.sleep(0.05)
 
             async for token in llm_service.stream_thesis_proposal(
