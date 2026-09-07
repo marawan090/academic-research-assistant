@@ -1,0 +1,3185 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axiom Research AI</title>
+  <link rel="icon" type="image/jpeg" href="/static/axiom_logo.jpg">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            accent: {
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            },
+            lab: {
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Menlo', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Marked.js for Markdown & DOMPurify for security -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+
+  <!-- KaTeX for Scientific & Mathematical Formula Rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" onload="initKatexAutoRender()"></script>
+
+  <!-- Mermaid.js for System Architecture & Dataflow Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Instant Theme Initializer (Prevents FOUC) -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('axiom_theme') || 'dark';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
+
+  <style>
+    /* Custom Theme Colors & Variables */
+    :root {
+      --bg-body: #F8FAFC;
+      --border-color: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+    }
+    html.dark {
+      --bg-body: #0B0F19;
+      --border-color: #1E293B;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.5);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.8);
+    }
+
+    /* Markdown Styling in Light & Dark Mode */
+    .prose-academic h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 1.3rem;
+      margin-bottom: 0.65rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .dark .prose-academic h1 {
+      color: #f8fafc;
+      border-bottom-color: #334155;
+    }
+    .prose-academic h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-top: 1.2rem;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .dark .prose-academic h2 {
+      color: #e2e8f0;
+      border-bottom-color: #1e293b;
+    }
+    .prose-academic h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #2563eb;
+      margin-top: 1rem;
+      margin-bottom: 0.4rem;
+    }
+    .dark .prose-academic h3 {
+      color: #93c5fd;
+    }
+    .prose-academic p {
+      margin-bottom: 0.8rem;
+      line-height: 1.65;
+      color: #334155;
+    }
+    .dark .prose-academic p {
+      color: #cbd5e1;
+    }
+    .prose-academic ul {
+      list-style-type: disc;
+      padding-left: 1.4rem;
+      margin-bottom: 0.85rem;
+    }
+    .prose-academic li {
+      margin-bottom: 0.3rem;
+      color: #334155;
+      line-height: 1.55;
+    }
+    .dark .prose-academic li {
+      color: #cbd5e1;
+    }
+    .prose-academic strong {
+      color: #0f172a;
+      font-weight: 600;
+    }
+    .dark .prose-academic strong {
+      color: #f1f5f9;
+    }
+    .prose-academic a {
+      color: #2563eb;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .dark .prose-academic a {
+      color: #38bdf8;
+    }
+    .prose-academic a:hover {
+      color: #1d4ed8;
+    }
+    .dark .prose-academic a:hover {
+      color: #7dd3fc;
+    }
+    .prose-academic blockquote {
+      border-left: 4px solid #6366f1;
+      font-style: italic;
+      background: rgba(99, 102, 241, 0.05);
+      color: #334155;
+      padding: 0.75rem 1rem;
+      border-radius: 0 0.5rem 0.5rem 0;
+      margin-bottom: 1rem;
+    }
+    .dark .prose-academic blockquote {
+      background: rgba(99, 102, 241, 0.08);
+      color: #cbd5e1;
+    }
+    .prose-academic code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+    }
+    .dark .prose-academic code {
+      background: #1e293b;
+      color: #f1f5f9;
+    }
+    .prose-academic pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+    }
+    .dark .prose-academic pre {
+      background: #020617;
+      border-color: #1e293b;
+    }
+    .prose-academic table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+    }
+    .prose-academic th, .prose-academic td {
+      border: 1px solid #e2e8f0;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    .dark .prose-academic th, .dark .prose-academic td {
+      border-color: #334155;
+    }
+    .prose-academic th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 600;
+    }
+    .dark .prose-academic th {
+      background: #1e293b;
+      color: #f8fafc;
+    }
+
+    /* KaTeX Mathematical Formulas Styling */
+    .katex {
+      font-size: 1.05em !important;
+      text-rendering: auto;
+    }
+    .katex-display {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .dark .katex-display {
+      background: #020617;
+      border-color: #1e293b;
+    }
+
+    /* Print Media Styles */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      header,
+      #saved-actions-toolbar,
+      #discovered-filters,
+      #research-form,
+      .btn-generate-diagram,
+      .btn-open-cite,
+      .paper-select-cb,
+      .btn-toggle-save,
+      button,
+      #toast-container,
+      .status-timeline-card,
+      .status-banner,
+      .proposal-status-banner,
+      .compare-status-banner,
+      .compare-bar,
+      #citation-modal,
+      #diagram-modal,
+      #auth-gate-modal,
+      #support-modal {
+        display: none !important;
+      }
+      #feed-container, #messages-list, .markdown-body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        color: #0f172a !important;
+      }
+      .bg-slate-900\/80,
+      .bg-slate-900\/85,
+      .bg-slate-900\/90,
+      .bg-slate-950,
+      .bg-slate-950\/70,
+      .bg-slate-950\/90 {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        box-shadow: none !important;
+      }
+      .prose-academic h1,
+      .prose-academic h2,
+      .prose-academic h3,
+      .prose-academic h4,
+      .prose-academic strong,
+      .prose-academic p,
+      .prose-academic li,
+      .prose-academic span {
+        color: #0f172a !important;
+      }
+      .prose-academic a {
+        color: #2563eb !important;
+        text-decoration: underline !important;
+      }
+      .katex {
+        color: #0f172a !important;
+      }
+      .katex-display {
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        overflow: visible !important;
+      }
+      pre, code {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      table, th, td {
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
+      }
+      th {
+        background: #f1f5f9 !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-150">
+
+  <!-- Top Navigation Header (Minimalist & Clutter-Free) -->
+  <header class="flex-none border-b border-slate-200 dark:border-[#1E293B] bg-white/90 dark:bg-[#0B0F19]/90 backdrop-blur-md z-30 px-4 lg:px-6 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      
+      <!-- Axiom Brand & Logo (Zero subtitle pills or engine clutter) -->
+      <div class="flex items-center space-x-3 min-w-0">
+        <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-sm ring-1 ring-brand-500/40 shrink-0 bg-black flex items-center justify-center">
+          <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+        </div>
+        <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
+          Axiom <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:via-indigo-300 dark:to-accent-400">Research AI</span>
+        </h1>
+      </div>
+
+      <!-- Right Header Actions (Status Pill, Theme Toggle, Support Button ONLY) -->
+      <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+        
+        <!-- Status Pill: Cohort Access Active -->
+        <div title="Axiom Engine: Online (Cohort Access Active)" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
+          <span class="font-semibold tracking-wide">● Cohort Access Active</span>
+        </div>
+
+        <!-- Dark / Light Mode Switcher Toggle -->
+        <button id="btn-theme-toggle" class="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition cursor-pointer" title="Toggle Dark / Light Mode">
+          <i data-lucide="sun" id="theme-icon" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i>
+        </button>
+
+        <!-- Support Project Button -->
+        <button id="btn-support-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300/80 dark:text-amber-300 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:border-amber-500/40 transition shadow-xs cursor-pointer" title="Support Axiom Research Project">
+          <i data-lucide="coffee" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i>
+          <span>☕ Support Project</span>
+        </button>
+
+        <!-- Discreet Session Reset Button -->
+        <button id="btn-clear-session" title="Start New Session" class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container: 2-Column Split Workspace -->
+  <main class="flex-1 flex overflow-hidden max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 gap-4 lg:gap-6 min-h-0">
+
+    <!-- LEFT COLUMN: Chat Feed & Synthesis Display -->
+    <section class="flex-1 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl relative min-w-0 transition-colors">
+      
+      <!-- Feed Scrollable Area -->
+      <div id="feed-container" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        
+        <!-- Minimalist Hero State (shown when feed is empty) -->
+        <div id="welcome-card" class="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-[#1E293B] rounded-2xl p-6 sm:p-10 shadow-sm dark:shadow-xl relative overflow-hidden text-center space-y-6 max-w-2xl mx-auto my-auto transition-colors">
+          
+          <div class="space-y-3">
+            <div class="inline-flex relative w-12 h-12 rounded-2xl overflow-hidden shadow-sm ring-1 ring-brand-500/40 bg-black items-center justify-center mx-auto">
+              <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Axiom <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-accent-400">Research AI</span>
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+              Accelerating academic systems literature discovery, multi-source synthesis, and thesis ideation.
+            </p>
+          </div>
+
+          <!-- Suggested Starter Chips (Clean 3-chip sample queries) -->
+          <div class="pt-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">Sample Inquiries:</p>
+            <div class="flex flex-wrap items-center justify-center gap-2" id="starter-chips">
+              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                data-query="Distributed checkpointing techniques for large language model training">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
+                <span>Distributed Checkpointing</span>
+              </button>
+              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                data-query="Mitigating serverless cold starts with microVM snapshots and CXL">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
+                <span>Serverless Cold Starts</span>
+              </button>
+              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                data-query="Byzantine fault-tolerant consensus for geo-distributed datastores">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
+                <span>Byzantine Consensus</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Dynamic Content Sections will be appended here -->
+        <div id="messages-list" class="space-y-6"></div>
+
+      </div>
+
+      <!-- Bottom Query Input Dock (Refined spacing & clean border) -->
+      <div class="flex-none p-4 bg-white/95 dark:bg-[#111827]/90 border-t border-slate-200 dark:border-[#1E293B] backdrop-blur-md transition-colors">
+        <form id="research-form" class="relative">
+          <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 rounded-xl transition shadow-xs">
+            <textarea
+              id="query-input"
+              rows="2"
+              placeholder="Ask an academic systems inquiry (e.g., 'Consensus in geo-distributed systems with variable latency')..."
+              class="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-4 py-3 focus:outline-none resize-none leading-relaxed"
+              required
+            ></textarea>
+            
+            <div class="pr-3 flex items-center space-x-2">
+              <button
+                type="submit"
+                id="submit-btn"
+                class="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-medium text-xs shadow-md shadow-brand-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
+              >
+                <i data-lucide="send" class="w-3.5 h-3.5 transition group-hover:translate-x-0.5"></i>
+                <span id="btn-text">Research</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-2.5 flex flex-wrap items-center justify-between gap-y-2 text-xs text-slate-500 dark:text-slate-400 px-1">
+            <div class="flex items-center space-x-3">
+              <!-- Dynamic Paper Count Selector -->
+              <div class="flex items-center space-x-1.5">
+                <span class="font-medium text-slate-600 dark:text-slate-400">Papers:</span>
+                <div id="paper-limit-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B]">
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="5">5</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer" data-limit="6">6</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="10">10</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="15">15</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="20">20</button>
+                </div>
+              </div>
+
+              <div class="hidden sm:flex items-center space-x-1.5 text-[11px] pl-3 border-l border-slate-200 dark:border-[#1E293B]">
+                <span>CS Categories:</span>
+                <span class="font-mono text-slate-600 dark:text-slate-300">cs.DC, cs.SE, cs.AI, cs.AR</span>
+              </div>
+            </div>
+
+            <div class="hidden md:flex items-center text-[11px] text-slate-400 dark:text-slate-500">
+              <span>Press <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 font-mono text-[10px]">Enter</kbd> to search</span>
+            </div>
+          </div>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: Discovered Papers Drawer -->
+    <aside id="papers-drawer" class="w-full lg:w-[420px] shrink-0 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl transition-colors">
+      
+      <!-- Drawer Header & Workspace Tabs -->
+      <div class="flex-none px-4 py-3 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/80 dark:bg-[#111827]/90 flex items-center justify-between gap-2">
+        <!-- Dual Workspace Tabs -->
+        <div class="flex space-x-1 bg-slate-100 dark:bg-[#0B0F19] p-1 rounded-xl border border-slate-200 dark:border-[#1E293B] text-xs">
+          <button id="tab-discovered" class="px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-xs cursor-pointer">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+            <span>Discovered</span>
+            <span id="tab-discovered-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-700 text-white ml-1">0</span>
+            <span id="paper-count-badge" class="hidden">0 papers</span>
+          </button>
+          <button id="tab-saved" class="px-2.5 py-1 rounded-lg font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition flex items-center space-x-1.5 cursor-pointer">
+            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400"></i>
+            <span>Saved</span>
+            <span id="tab-saved-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ml-1">0</span>
+          </button>
+        </div>
+
+        <!-- Export Actions Toolbar -->
+        <div class="flex items-center space-x-1">
+          <button id="btn-export-notebooklm" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer" title="Export to Google NotebookLM Pack">
+            <i data-lucide="file-box" class="w-4 h-4 text-accent-600 dark:text-accent-400"></i>
+          </button>
+          <button id="btn-export-litreview" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer" title="Export IEEE Literature Review">
+            <i data-lucide="download" class="w-4 h-4 text-emerald-600 dark:text-lab-400"></i>
+          </button>
+
+          <!-- Saved Workspace Actions (visible when in Saved tab) -->
+          <div id="saved-actions-toolbar" class="hidden items-center space-x-1 pl-1">
+            <button id="btn-clear-saved" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer" title="Clear All Saved Papers">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Faceted Filters & Comparative Matrix Action Strip -->
+      <div class="flex-none px-4 py-2 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/50 dark:bg-[#0B0F19]/40 space-y-2">
+        <!-- Faceted Filter Chips -->
+        <div id="discovered-filters" class="flex items-center space-x-2 flex-wrap gap-y-1.5 text-[11px]">
+          <!-- Year Filter -->
+          <div class="flex items-center space-x-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+            <span class="text-slate-400">Year:</span>
+            <select id="filter-year" class="bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer font-medium">
+              <option value="all" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">All Time</option>
+              <option value="recent" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">2024–2026</option>
+            </select>
+          </div>
+
+          <!-- Source Filter -->
+          <div class="flex items-center space-x-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+            <span class="text-slate-400">Source:</span>
+            <select id="filter-source" class="bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer font-medium">
+              <option value="all" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">All Sources</option>
+              <option value="arxiv" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">ArXiv</option>
+              <option value="scholar" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">Semantic Scholar</option>
+              <option value="openalex" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">OpenAlex</option>
+            </select>
+          </div>
+
+          <!-- PDF Only Toggle -->
+          <button id="filter-pdf-toggle" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 transition cursor-pointer font-medium" data-active="false">
+            <i data-lucide="file-check" class="w-3 h-3 text-slate-400"></i>
+            <span>PDF Only</span>
+          </button>
+        </div>
+
+        <!-- Comparative Matrix Action Bar (Appears when 1 or more papers checked) -->
+        <div id="compare-bar" class="hidden items-center justify-between bg-gradient-to-r from-brand-950/90 to-indigo-950/90 border border-brand-500/40 p-2 rounded-xl text-xs shadow-md">
+          <div class="flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-brand-400 animate-pulse"></span>
+            <span class="font-semibold text-brand-200" id="compare-count-text">Selected: 0/3</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <button id="btn-run-compare" class="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white font-semibold shadow transition flex items-center space-x-1" disabled>
+              <i data-lucide="columns-2" class="w-3.5 h-3.5"></i>
+              <span>Compare Approaches</span>
+            </button>
+            <button id="btn-clear-selection" class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition" title="Clear selection">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawer Content: Paper Cards List -->
+      <div id="papers-list" class="flex-1 overflow-y-auto p-4 space-y-3.5">
+        
+        <!-- Empty Placeholder Container -->
+        <div id="no-papers-placeholder" data-legacy-id="papers-empty-placeholder" class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+          <div class="w-14 h-14 rounded-2xl overflow-hidden bg-black ring-1 ring-slate-800 flex items-center justify-center mb-3 shadow-md">
+            <img src="/static/axiom_logo.jpg" alt="Axiom Research" class="w-full h-full object-cover opacity-85" />
+          </div>
+          <p id="empty-placeholder-title" class="text-sm font-medium text-slate-300">No Papers Retrieved Yet</p>
+          <p id="empty-placeholder-desc" class="text-xs text-slate-500 max-w-xs mt-1">Submit an academic inquiry to concurrently fetch relevant literature from ArXiv, Semantic Scholar, and OpenAlex.</p>
+        </div>
+
+        <!-- Target Container for Paper Cards -->
+        <div id="discovered-papers-list" class="space-y-3.5 hidden"></div>
+
+      </div>
+
+      <!-- Drawer Footer (Subtle minimal metrics) -->
+      <div class="flex-none px-4 py-2.5 border-t border-slate-200 dark:border-[#1E293B] bg-slate-50/50 dark:bg-[#0B0F19]/40 text-[11px] text-slate-400 flex items-center justify-between">
+        <span>Multi-Source Academic Pipeline</span>
+        <span class="font-mono text-[10px] text-slate-400 dark:text-slate-500">Ranked by Signal</span>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Minimalist Clean Footer -->
+  <footer class="flex-none border-t border-slate-200 dark:border-[#1E293B] bg-white/70 dark:bg-[#0B0F19]/80 backdrop-blur-md px-4 lg:px-6 py-2.5 z-20 transition-colors">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div class="flex items-center space-x-2">
+        <span class="font-semibold text-slate-800 dark:text-slate-200">Axiom Research AI</span>
+        <span>&mdash;</span>
+        <span class="text-[11px]">Academic Systems Literature Discovery</span>
+      </div>
+      <div class="text-[11px] text-slate-400 dark:text-slate-500">
+        <span>© 2026</span>
+      </div>
+    </div>
+  </footer>
+
+
+
+  <!-- Academic Citation Modal -->
+  <div id="citation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      
+      <div class="flex items-start justify-between border-b border-slate-800 pb-3 gap-2">
+        <div class="min-w-0">
+          <h3 class="text-base font-bold text-white flex items-center space-x-2">
+            <i data-lucide="quote" class="w-4 h-4 text-brand-400 shrink-0"></i>
+            <span>Academic Citation & Metadata</span>
+          </h3>
+          <p id="cite-paper-title" class="text-xs text-slate-400 mt-1 font-medium line-clamp-1">Paper Title</p>
+        </div>
+        <button id="btn-close-cite" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition shrink-0">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Citation Format Selector Tabs -->
+      <div class="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
+        <button class="cite-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white transition cursor-pointer" data-format="bibtex">
+          BibTeX
+        </button>
+        <button class="cite-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" data-format="ieee">
+          IEEE Reference
+        </button>
+        <button class="cite-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" data-format="apa">
+          APA 7th Edition
+        </button>
+      </div>
+
+      <!-- Citation Display Box -->
+      <div class="relative">
+        <textarea
+          id="citation-text"
+          readonly
+          rows="8"
+          class="w-full bg-slate-950 text-xs font-mono text-slate-200 p-3.5 rounded-xl border border-slate-800 focus:outline-none resize-none leading-relaxed select-all"
+        ></textarea>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-1 text-xs">
+        <span class="text-[11px] text-slate-500">1-click citation export for LaTeX & bibliography</span>
+        <button id="btn-copy-citation-modal" class="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-semibold text-xs shadow-lg shadow-brand-500/25 transition cursor-pointer">
+          <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+          <span>Copy to Clipboard</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- High-Resolution Architecture Diagram Modal -->
+  <div id="diagram-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[85vh] p-5 shadow-2xl flex flex-col space-y-3">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <i data-lucide="network" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 id="diagram-modal-title" class="text-sm font-bold text-white truncate max-w-xl">System Architecture Diagram</h3>
+            <span class="text-[10px] text-slate-400 font-mono">Rendered via Kroki Engine (PlantUML Component & Deployment)</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="btn-download-diagram-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="Download High-Res SVG">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Download SVG</span>
+          </button>
+          <button id="btn-close-diagram-modal" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Close Modal">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Viewport -->
+      <div id="diagram-modal-viewport" class="flex-1 bg-slate-950/95 rounded-xl border border-slate-800/80 p-4 overflow-auto flex items-center justify-center relative select-none">
+        <!-- SVG injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Closed Cohort Gate Modal (Unclosable Overlay) -->
+  <div id="auth-gate-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800/90 rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Axiom & SWMP Labs Logos -->
+      <div class="flex items-center justify-center space-x-3">
+        <div class="relative w-12 h-12 rounded-xl overflow-hidden shadow-lg shadow-brand-500/30 ring-1 ring-brand-500/50 bg-black flex items-center justify-center">
+          <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+        </div>
+        <div class="w-px h-8 bg-slate-800"></div>
+        <div class="w-10 h-10 rounded-xl overflow-hidden bg-black ring-1 ring-cyan-500/40 flex items-center justify-center">
+          <img src="/static/swmp_logo.jpg" alt="SWMP Labs Logo" class="w-full h-full object-cover" />
+        </div>
+      </div>
+
+      <!-- Title & Context -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-center space-x-2">
+          <h2 class="text-xl font-bold tracking-tight text-white">Axiom <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-indigo-300 to-accent-400">Research AI</span></h2>
+        </div>
+        <div class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 border border-brand-500/30 text-[11px] font-semibold uppercase tracking-wider">
+          <i data-lucide="shield-lock" class="w-3.5 h-3.5 text-brand-400"></i>
+          <span>Closed Cohort Gate</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+          Enter your designated access code provided in your onboarding email.
+        </p>
+      </div>
+
+      <!-- Error / Status Alert Box (Hidden by default) -->
+      <div id="auth-gate-error" class="hidden text-left p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-start space-x-2.5">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400 shrink-0 mt-0.5"></i>
+        <span id="auth-gate-error-text" class="leading-relaxed">Invalid access code. Please check your credentials.</span>
+      </div>
+
+      <!-- Authentication Form -->
+      <form id="auth-gate-form" class="space-y-4" onsubmit="return false;">
+        <div class="relative text-left">
+          <label for="auth-gate-input" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+            Researcher Access Code
+          </label>
+          <div class="relative">
+            <input
+              id="auth-gate-input"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="AXIOM-XXXX-XXXX"
+              class="w-full bg-slate-950/90 border border-slate-700/80 focus:border-brand-500 rounded-xl px-4 py-3 text-sm font-mono tracking-widest text-center text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition uppercase"
+            />
+            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+            </div>
+          </div>
+        </div>
+
+        <button
+          id="btn-auth-gate-submit"
+          type="button"
+          class="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-brand-600 via-indigo-600 to-accent-600 hover:from-brand-500 hover:to-accent-500 text-white font-semibold text-xs shadow-lg shadow-brand-500/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span id="auth-gate-btn-spinner" class="hidden w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          <span id="auth-gate-btn-text">Authenticate & Enter</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </button>
+      </form>
+
+      <!-- Machine lock & Rate limit footer notice -->
+      <p class="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800/80 pt-4">
+        🔒 Protected cohort node. Codes permanently lock to your workstation on first use and enforce rate limits.
+      </p>
+
+    </div>
+  </div>
+
+
+  <!-- Dual Support & Donation Modal (InstaPay + Binance Smart Chain USDT) -->
+  <div id="support-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between border-b border-slate-800 pb-3 gap-2">
+        <div class="min-w-0">
+          <div class="flex items-center space-x-2">
+            <span class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <i data-lucide="coffee" class="w-4 h-4"></i>
+            </span>
+            <h3 class="text-base font-bold text-white">Support Axiom Research AI</h3>
+          </div>
+          <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            Axiom is an open-source academic systems engine engineered by <strong class="text-slate-200">SWMP Labs</strong>. Your support helps maintain GPU inference clusters, crawler pipelines, and hosting infrastructure.
+          </p>
+        </div>
+        <button id="btn-close-support" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition shrink-0 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Payment Method Tabs -->
+      <div class="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
+        <button id="tab-btn-instapay" class="support-tab-btn flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white transition cursor-pointer" data-tab="instapay">
+          <span>🇪🇬 Domestic (InstaPay)</span>
+        </button>
+        <button id="tab-btn-crypto" class="support-tab-btn flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer" data-tab="crypto">
+          <span>🌐 International (Crypto / USDT)</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: Domestic InstaPay (Egypt) -->
+      <div id="panel-instapay" class="space-y-4">
+        <div class="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-xs font-bold text-emerald-300">InstaPay National Payment Network</span>
+            </div>
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">EGP / Egypt</span>
+          </div>
+
+          <!-- Direct InstaPay Payment Link Button -->
+          <a
+            href="https://ipn.eg/S/marwan.a146350/instapay/8WC6Yh"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+          >
+            <span>Open Direct InstaPay Link</span>
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+
+          <!-- IPA Address Box -->
+          <div class="space-y-1.5 pt-1">
+            <span class="text-[11px] font-medium text-slate-400">Or transfer manually via Instant Payment Address (IPA):</span>
+            <div class="flex items-center space-x-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+              <code id="text-instapay-ipa" class="flex-1 font-mono text-xs text-emerald-300 select-all truncate">marwan.a146350@instapay</code>
+              <button
+                id="btn-copy-instapay"
+                class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer shrink-0"
+              >
+                <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                <span>Copy IPA</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: International Crypto (Binance Smart Chain USDT) -->
+      <div id="panel-crypto" class="space-y-4 hidden">
+        <div class="p-4 rounded-xl bg-amber-950/30 border border-amber-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span class="text-xs font-bold text-amber-300">Binance Smart Chain (BEP-20)</span>
+            </div>
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">USDT (BEP-20)</span>
+          </div>
+
+          <!-- Deposit Address Box -->
+          <div class="space-y-1.5">
+            <span class="text-[11px] font-medium text-slate-400">Deposit Address:</span>
+            <div class="flex items-center space-x-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+              <code id="text-crypto-address" class="flex-1 font-mono text-xs text-amber-300 select-all break-all">0xd3C2C0a3b9e03Fdb50843E51b17fb3a6bceB7D9C</code>
+              <button
+                id="btn-copy-crypto"
+                class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer shrink-0"
+              >
+                <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                <span>Copy Address</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Network Alert -->
+          <div class="text-[11px] text-amber-200/80 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 leading-relaxed flex items-start space-x-2">
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"></i>
+            <span>Send only <strong>USDT</strong> on the <strong>Binance Smart Chain (BEP-20)</strong> network to this address. Transfers via other networks or tokens cannot be recovered.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- In-app Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-12 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Client-side Logic -->
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // ============================================================================
+    // Theme Manager: Dark / Light Mode
+    // ============================================================================
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+
+    function applyTheme(theme) {
+      const isDark = theme === 'dark';
+      document.documentElement.classList.toggle('dark', isDark);
+      localStorage.setItem('axiom_theme', theme);
+      if (themeIcon) {
+        themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+        themeIcon.className = `w-4 h-4 ${isDark ? 'text-amber-400' : 'text-slate-700'}`;
+        lucide.createIcons();
+      }
+    }
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('axiom_theme') || 'dark';
+      applyTheme(savedTheme);
+    }
+
+    if (btnThemeToggle) {
+      btnThemeToggle.addEventListener('click', () => {
+        const isCurrentlyDark = document.documentElement.classList.contains('dark');
+        applyTheme(isCurrentlyDark ? 'light' : 'dark');
+      });
+    }
+
+    initTheme();
+
+
+
+    // ============================================================================
+    // Closed Cohort Security Gate & Token Management
+    // ============================================================================
+    const authGateModal = document.getElementById('auth-gate-modal');
+    const authGateInput = document.getElementById('auth-gate-input');
+    const authGateError = document.getElementById('auth-gate-error');
+    const authGateErrorText = document.getElementById('auth-gate-error-text');
+    const btnAuthGateSubmit = document.getElementById('btn-auth-gate-submit');
+    const authGateBtnSpinner = document.getElementById('auth-gate-btn-spinner');
+    const authGateBtnText = document.getElementById('auth-gate-btn-text');
+
+    function showAuthGate(errorMessage = '') {
+      if (authGateModal) {
+        authGateModal.classList.remove('hidden');
+        lucide.createIcons();
+      }
+      if (errorMessage && authGateError && authGateErrorText) {
+        authGateErrorText.textContent = errorMessage;
+        authGateError.classList.remove('hidden');
+      } else if (authGateError) {
+        authGateError.classList.add('hidden');
+      }
+      if (authGateInput) {
+        setTimeout(() => authGateInput.focus(), 120);
+      }
+    }
+
+    function hideAuthGate() {
+      if (authGateModal) {
+        authGateModal.classList.add('hidden');
+      }
+      if (authGateError) {
+        authGateError.classList.add('hidden');
+      }
+    }
+
+    // Uppercase formatting on input
+    if (authGateInput) {
+      authGateInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+      });
+      authGateInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAuthGateSubmit();
+        }
+      });
+    }
+
+    async function handleAuthGateSubmit() {
+      if (!authGateInput || !btnAuthGateSubmit) return;
+      const code = authGateInput.value.trim().toUpperCase();
+      if (!code) {
+        showAuthGate('Please enter an access code.');
+        return;
+      }
+
+      btnAuthGateSubmit.disabled = true;
+      if (authGateBtnSpinner) authGateBtnSpinner.classList.remove('hidden');
+      if (authGateBtnText) authGateBtnText.textContent = 'Verifying...';
+      if (authGateError) authGateError.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_code: code })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.valid) {
+          localStorage.setItem('axiom_access_token', code);
+          hideAuthGate();
+          showToast(`Access granted (${data.type || 'researcher'}). Cohort active.`, 'success');
+        } else {
+          const errMsg = data.error || (data.detail ? data.detail : 'Authentication failed. Please verify code.');
+          showAuthGate(errMsg);
+        }
+      } catch (err) {
+        showAuthGate('Network error communicating with authentication service.');
+      } finally {
+        btnAuthGateSubmit.disabled = false;
+        if (authGateBtnSpinner) authGateBtnSpinner.classList.add('hidden');
+        if (authGateBtnText) authGateBtnText.textContent = 'Authenticate & Enter';
+        lucide.createIcons();
+      }
+    }
+
+    if (btnAuthGateSubmit) {
+      btnAuthGateSubmit.addEventListener('click', handleAuthGateSubmit);
+    }
+
+    async function initCohortGate() {
+      const storedToken = localStorage.getItem('axiom_access_token');
+      if (!storedToken) {
+        showAuthGate();
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_code: storedToken })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.valid) {
+          localStorage.removeItem('axiom_access_token');
+          showAuthGate(data.error || 'Access session expired or unauthorized.');
+        } else {
+          hideAuthGate();
+        }
+      } catch (e) {
+        // Offline or temporary glitch: retain session
+        hideAuthGate();
+      }
+    }
+
+    // Authenticated fetch wrapper injecting X-Axiom-Key and catching 401/403
+    async function authenticatedFetch(url, options = {}) {
+      const token = localStorage.getItem('axiom_access_token') || '';
+      const headers = { ...(options.headers || {}) };
+      if (token) {
+        headers['X-Axiom-Key'] = token;
+      }
+      const response = await fetch(url, { ...options, headers });
+      if (response.status === 401 || response.status === 403) {
+        try {
+          const clone = response.clone();
+          const errData = await clone.json();
+          const msg = errData.detail || errData.error || 'Session unauthorized. Please re-authenticate.';
+          localStorage.removeItem('axiom_access_token');
+          showAuthGate(msg);
+        } catch (_) {
+          localStorage.removeItem('axiom_access_token');
+          showAuthGate('Session unauthorized. Please enter your access code.');
+        }
+      }
+      return response;
+    }
+
+    // ============================================================================
+    // Dual Support Modal (InstaPay + Binance Smart Chain USDT)
+    // ============================================================================
+    const btnSupportModal = document.getElementById('btn-support-modal');
+    const supportModal = document.getElementById('support-modal');
+    const btnCloseSupport = document.getElementById('btn-close-support');
+    const tabBtnInstapay = document.getElementById('tab-btn-instapay');
+    const tabBtnCrypto = document.getElementById('tab-btn-crypto');
+    const panelInstapay = document.getElementById('panel-instapay');
+    const panelCrypto = document.getElementById('panel-crypto');
+    const btnCopyInstapay = document.getElementById('btn-copy-instapay');
+    const btnCopyCrypto = document.getElementById('btn-copy-crypto');
+
+    function openSupportModal() {
+      if (supportModal) {
+        supportModal.classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    function closeSupportModal() {
+      if (supportModal) {
+        supportModal.classList.add('hidden');
+      }
+    }
+
+    if (btnSupportModal) {
+      btnSupportModal.addEventListener('click', openSupportModal);
+    }
+    if (btnCloseSupport) {
+      btnCloseSupport.addEventListener('click', closeSupportModal);
+    }
+    if (supportModal) {
+      supportModal.addEventListener('click', (e) => {
+        if (e.target === supportModal) {
+          closeSupportModal();
+        }
+      });
+    }
+
+    function switchSupportTab(tabName) {
+      if (tabName === 'instapay') {
+        if (panelInstapay) panelInstapay.classList.remove('hidden');
+        if (panelCrypto) panelCrypto.classList.add('hidden');
+        if (tabBtnInstapay) {
+          tabBtnInstapay.classList.add('bg-emerald-600', 'text-white');
+          tabBtnInstapay.classList.remove('text-slate-400');
+        }
+        if (tabBtnCrypto) {
+          tabBtnCrypto.classList.remove('bg-amber-600', 'text-white');
+          tabBtnCrypto.classList.add('text-slate-400');
+        }
+      } else {
+        if (panelCrypto) panelCrypto.classList.remove('hidden');
+        if (panelInstapay) panelInstapay.classList.add('hidden');
+        if (tabBtnCrypto) {
+          tabBtnCrypto.classList.add('bg-amber-600', 'text-white');
+          tabBtnCrypto.classList.remove('text-slate-400');
+        }
+        if (tabBtnInstapay) {
+          tabBtnInstapay.classList.remove('bg-emerald-600', 'text-white');
+          tabBtnInstapay.classList.add('text-slate-400');
+        }
+      }
+      lucide.createIcons();
+    }
+
+    if (tabBtnInstapay) {
+      tabBtnInstapay.addEventListener('click', () => switchSupportTab('instapay'));
+    }
+    if (tabBtnCrypto) {
+      tabBtnCrypto.addEventListener('click', () => switchSupportTab('crypto'));
+    }
+
+    if (btnCopyInstapay) {
+      btnCopyInstapay.addEventListener('click', async () => {
+        const textToCopy = 'marwan.a146350@instapay';
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          btnCopyInstapay.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-300">✓ Copied!</span>';
+          lucide.createIcons();
+          showToast('InstaPay IPA copied to clipboard!', 'success');
+          setTimeout(() => {
+            btnCopyInstapay.innerHTML = '<i data-lucide="clipboard" class="w-3.5 h-3.5"></i><span>Copy IPA</span>';
+            lucide.createIcons();
+          }, 2000);
+        } catch (e) {
+          showToast('Failed to copy. Please select and copy manually.', 'error');
+        }
+      });
+    }
+
+    if (btnCopyCrypto) {
+      btnCopyCrypto.addEventListener('click', async () => {
+        const textToCopy = '0xd3C2C0a3b9e03Fdb50843E51b17fb3a6bceB7D9C';
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          btnCopyCrypto.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-amber-400"></i><span class="text-amber-300">✓ Copied!</span>';
+          lucide.createIcons();
+          showToast('BSC USDT Address copied to clipboard!', 'success');
+          setTimeout(() => {
+            btnCopyCrypto.innerHTML = '<i data-lucide="clipboard" class="w-3.5 h-3.5"></i><span>Copy Address</span>';
+            lucide.createIcons();
+          }, 2000);
+        } catch (e) {
+          showToast('Failed to copy. Please select and copy manually.', 'error');
+        }
+      });
+    }
+
+    // DOM Elements
+    const researchForm = document.getElementById('research-form');
+    const queryInput = document.getElementById('query-input');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const feedContainer = document.getElementById('feed-container');
+    const messagesList = document.getElementById('messages-list');
+    const welcomeCard = document.getElementById('welcome-card');
+    const papersList = document.getElementById('papers-list');
+    const discoveredPapersList = document.getElementById('discovered-papers-list') || papersList;
+    const paperCountBadge = document.getElementById('paper-count-badge');
+    const noPapersPlaceholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
+    const papersEmptyPlaceholder = noPapersPlaceholder;
+    const btnClearSession = document.getElementById('btn-clear-session');
+
+    // Runtime state
+    let activeEventSource = null;
+    let currentPapers = [];
+    let currentInquiry = '';
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Auto-expand textarea
+    queryInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    queryInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        researchForm.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    // Starter Chips
+    document.querySelectorAll('.starter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const query = chip.getAttribute('data-query');
+        queryInput.value = query;
+        queryInput.focus();
+        researchForm.dispatchEvent(new Event('submit'));
+      });
+    });
+
+    // --- Mermaid.js Dark Mode Initialization ---
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          background: '#090d16',
+          primaryColor: '#6366f1',
+          primaryTextColor: '#f8fafc',
+          primaryBorderColor: '#4f46e5',
+          lineColor: '#38bdf8',
+          secondaryColor: '#1e1b4b',
+          tertiaryColor: '#0f172a',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }
+      });
+    }
+
+    // Dynamic Mermaid Renderer Helper with Fallback
+    async function renderMermaidInContainer(container) {
+      if (typeof mermaid === 'undefined' || !container) return;
+      const codeBlocks = container.querySelectorAll('pre code.language-mermaid, pre code.lang-mermaid');
+      for (let i = 0; i < codeBlocks.length; i++) {
+        const codeEl = codeBlocks[i];
+        const preEl = codeEl.parentElement;
+        if (!preEl || preEl.getAttribute('data-mermaid-processed')) continue;
+        preEl.setAttribute('data-mermaid-processed', 'true');
+
+        const rawGraph = codeEl.textContent.trim();
+        if (!rawGraph) continue;
+
+        const diagramId = 'mermaid-' + Math.random().toString(36).substring(2, 9);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'my-4 p-4 rounded-xl bg-slate-950/90 border border-indigo-500/30 overflow-x-auto shadow-xl flex flex-col items-center justify-center';
+
+        const header = document.createElement('div');
+        header.className = 'w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[11px] font-mono text-indigo-300';
+        header.innerHTML = '<span class="flex items-center space-x-1.5"><i data-lucide="network" class="w-3.5 h-3.5 text-brand-400"></i><span class="font-semibold">System Architecture & Execution Dataflow</span></span><span class="text-slate-500 text-[10px]">Mermaid.js SVG</span>';
+        wrapper.appendChild(header);
+
+        const targetDiv = document.createElement('div');
+        targetDiv.id = diagramId;
+        targetDiv.className = 'w-full flex justify-center py-2';
+        wrapper.appendChild(targetDiv);
+
+        try {
+          const { svg } = await mermaid.render(diagramId + '-svg', rawGraph);
+          targetDiv.innerHTML = svg;
+          preEl.replaceWith(wrapper);
+          lucide.createIcons();
+        } catch (err) {
+          console.warn('Mermaid rendering syntax warning, fallback displayed:', err);
+          const fallback = document.createElement('div');
+          fallback.className = 'my-3 rounded-lg border border-amber-500/30 bg-slate-950/90 p-3 text-xs';
+          fallback.innerHTML = `
+            <div class="flex items-center space-x-1.5 text-amber-400 mb-2 font-mono text-[11px]">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+              <span>Architecture Diagram (Syntax Fallback)</span>
+            </div>
+            <pre class="overflow-x-auto text-[11px] font-mono text-slate-300 bg-slate-900/80 p-2.5 rounded border border-slate-800">${escapeHtml(rawGraph)}</pre>
+          `;
+          preEl.replaceWith(fallback);
+          lucide.createIcons();
+        }
+      }
+    }
+
+    // --- Unified Mathematical & Scientific Notation Renderer (KaTeX) ---
+    function renderMarkdownWithMath(markdownText) {
+      if (!markdownText) return '';
+
+      const mathBlocks = [];
+      const mathInlines = [];
+
+      // 1. Protect standalone display math ($$...$$)
+      let protectedText = markdownText.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+        mathBlocks.push(formula);
+        return `%%%MATHBLOCK_${mathBlocks.length - 1}%%%`;
+      });
+
+      // 2. Protect inline math formulas ($...$)
+      protectedText = protectedText.replace(/(^|[^\\])\$(?!\s)([^\$\n]+?)(?<!\s)\$/g, (match, prefix, formula) => {
+        mathInlines.push(formula);
+        return `${prefix}%%%MATHINLINE_${mathInlines.length - 1}%%%`;
+      });
+
+      // 3. Parse Markdown structure safely with marked
+      let parsedHtml = marked.parse(protectedText);
+
+      // 4. Restore display math
+      parsedHtml = parsedHtml.replace(/%%%MATHBLOCK_(\d+)%%%/g, (match, idx) => {
+        const formula = mathBlocks[parseInt(idx, 10)] || '';
+        return `$$${formula}$$`;
+      });
+
+      // 5. Restore inline math
+      parsedHtml = parsedHtml.replace(/%%%MATHINLINE_(\d+)%%%/g, (match, idx) => {
+        const formula = mathInlines[parseInt(idx, 10)] || '';
+        return `$${formula}$`;
+      });
+
+      return DOMPurify.sanitize(parsedHtml);
+    }
+
+    function renderMathInContainer(container) {
+      if (!container || typeof renderMathInElement === 'undefined') return;
+      try {
+        renderMathInElement(container, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false,
+          errorColor: '#f43f5e'
+        });
+      } catch (err) {
+        console.warn('KaTeX math auto-render notice:', err);
+      }
+    }
+
+    window.initKatexAutoRender = function() {
+      document.querySelectorAll('.markdown-body').forEach(container => {
+        renderMathInContainer(container);
+      });
+    };
+
+    // --- Workspace State & LocalStorage Management ---
+    let savedPapers = [];
+    try {
+      savedPapers = JSON.parse(localStorage.getItem('axiom_saved_papers') || '[]');
+    } catch (e) {
+      savedPapers = [];
+    }
+
+    let activeTab = 'discovered'; // 'discovered' | 'saved'
+    let selectedPapersForCompare = new Set();
+    let activeFilters = {
+      year: 'all',
+      source: 'all',
+      pdfOnly: false
+    };
+
+    // Dynamic Paper Limit State
+    let currentPaperLimit = 6;
+    const paperLimitBtns = document.querySelectorAll('.paper-limit-btn');
+    paperLimitBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const limitVal = parseInt(btn.getAttribute('data-limit'));
+        if (!isNaN(limitVal)) {
+          currentPaperLimit = limitVal;
+          paperLimitBtns.forEach(b => {
+            b.className = 'paper-limit-btn px-2 py-0.5 rounded text-[10px] font-semibold text-slate-400 hover:text-white transition';
+          });
+          btn.className = 'paper-limit-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-brand-600 text-white transition shadow';
+          showToast(`Target paper quota set to ${currentPaperLimit}`, 'info');
+        }
+      });
+    });
+
+    // Citation Modal State
+    let activeCitationPaper = null;
+    let activeCitationFormat = 'bibtex';
+
+    // DOM Elements - Workspace & Filters
+    const tabDiscovered = document.getElementById('tab-discovered');
+    const tabSaved = document.getElementById('tab-saved');
+    const tabDiscoveredBadge = document.getElementById('tab-discovered-badge');
+    const tabSavedBadge = document.getElementById('tab-saved-badge');
+    const savedActionsToolbar = document.getElementById('saved-actions-toolbar');
+    const discoveredFilters = document.getElementById('discovered-filters');
+    const filterYear = document.getElementById('filter-year');
+    const filterSource = document.getElementById('filter-source');
+    const filterPdfToggle = document.getElementById('filter-pdf-toggle');
+
+    // DOM Elements - Comparative Matrix
+    const compareBar = document.getElementById('compare-bar');
+    const compareCountText = document.getElementById('compare-count-text');
+    const btnRunCompare = document.getElementById('btn-run-compare');
+    const btnClearSelection = document.getElementById('btn-clear-selection');
+
+    // DOM Elements - Header & Saved Exports
+    const btnExportNotebookLM = document.getElementById('btn-export-notebooklm');
+    const btnExportLitReview = document.getElementById('btn-export-litreview');
+    const btnExportSaved = document.getElementById('btn-export-saved');
+    const btnClearSaved = document.getElementById('btn-clear-saved');
+
+    // DOM Elements - Citation Modal
+    const citationModal = document.getElementById('citation-modal');
+    const citePaperTitle = document.getElementById('cite-paper-title');
+    const citationText = document.getElementById('citation-text');
+    const btnCloseCite = document.getElementById('btn-close-cite');
+    const btnCopyCitationModal = document.getElementById('btn-copy-citation-modal');
+    const citeTabBtns = document.querySelectorAll('.cite-tab-btn');
+
+    // Reset Session
+    btnClearSession.addEventListener('click', () => {
+      if (activeEventSource) {
+        activeEventSource.close();
+        activeEventSource = null;
+      }
+      messagesList.innerHTML = '';
+      welcomeCard.classList.remove('hidden');
+      renderPapers([]);
+      selectedPapersForCompare.clear();
+      updateCompareBar();
+      setFormLoading(false);
+      showToast('Session reset', 'info');
+    });
+
+    // Toast notifications helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-900/90 border-emerald-700 text-emerald-200',
+        error: 'bg-rose-900/90 border-rose-700 text-rose-200',
+        info: 'bg-slate-800/90 border-slate-700 text-slate-200'
+      };
+      toast.className = `pointer-events-auto flex items-center space-x-2 px-4 py-2.5 rounded-xl border text-xs shadow-xl backdrop-blur-md transition duration-300 transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function setFormLoading(isLoading) {
+      if (isLoading) {
+        submitBtn.disabled = true;
+        btnText.textContent = 'Analyzing...';
+      } else {
+        submitBtn.disabled = false;
+        btnText.textContent = 'Research';
+      }
+    }
+
+    // --- Saved Papers Cart Helpers ---
+    function isPaperSaved(id) {
+      return savedPapers.some(p => p.id === id);
+    }
+
+    function toggleSavePaper(paper) {
+      const idx = savedPapers.findIndex(p => p.id === paper.id);
+      if (idx >= 0) {
+        savedPapers.splice(idx, 1);
+        showToast('Paper removed from Saved workspace', 'info');
+      } else {
+        savedPapers.push(paper);
+        showToast('Paper saved to Saved workspace!', 'success');
+      }
+      localStorage.setItem('axiom_saved_papers', JSON.stringify(savedPapers));
+      updateWorkspaceBadges();
+      renderPapersView();
+    }
+
+    function updateWorkspaceBadges() {
+      tabDiscoveredBadge.textContent = currentPapers.length;
+      tabSavedBadge.textContent = savedPapers.length;
+    }
+
+    // Workspace Tabs Switching
+    tabDiscovered.addEventListener('click', () => {
+      activeTab = 'discovered';
+      tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
+      tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
+      savedActionsToolbar.classList.add('hidden');
+      discoveredFilters.classList.remove('hidden');
+      renderPapersView();
+    });
+
+    tabSaved.addEventListener('click', () => {
+      activeTab = 'saved';
+      tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
+      tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
+      savedActionsToolbar.classList.remove('hidden');
+      discoveredFilters.classList.add('hidden');
+      renderPapersView();
+    });
+
+    btnClearSaved.addEventListener('click', () => {
+      if (!savedPapers.length) return;
+      savedPapers = [];
+      localStorage.setItem('axiom_saved_papers', JSON.stringify([]));
+      updateWorkspaceBadges();
+      renderPapersView();
+      showToast('Saved papers cart cleared', 'info');
+    });
+
+    btnExportSaved.addEventListener('click', () => {
+      if (!savedPapers.length) {
+        showToast('No saved papers to export', 'info');
+        return;
+      }
+      exportPapersToNotebookLM(savedPapers, 'Saved Academic Literature Workspace');
+    });
+
+    // --- Faceted Filters Listeners ---
+    filterYear.addEventListener('change', (e) => {
+      activeFilters.year = e.target.value;
+      renderPapersView();
+    });
+
+    filterSource.addEventListener('change', (e) => {
+      activeFilters.source = e.target.value;
+      renderPapersView();
+    });
+
+    filterPdfToggle.addEventListener('click', () => {
+      activeFilters.pdfOnly = !activeFilters.pdfOnly;
+      filterPdfToggle.setAttribute('data-active', activeFilters.pdfOnly ? 'true' : 'false');
+      if (activeFilters.pdfOnly) {
+        filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition cursor-pointer font-medium';
+      } else {
+        filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 transition cursor-pointer font-medium';
+      }
+      renderPapersView();
+    });
+
+    function applyFilters(papers) {
+      return papers.filter(p => {
+        // Year filter
+        if (activeFilters.year === 'recent') {
+          if (!p.year || p.year < 2024) return false;
+        }
+        // Source filter
+        if (activeFilters.source === 'arxiv') {
+          if (!p.source || !p.source.toLowerCase().includes('arxiv')) return false;
+        } else if (activeFilters.source === 'scholar') {
+          if (!p.source || !p.source.toLowerCase().includes('semantic')) return false;
+        } else if (activeFilters.source === 'openalex') {
+          if (!p.source || !p.source.toLowerCase().includes('openalex')) return false;
+        }
+        // PDF filter
+        if (activeFilters.pdfOnly) {
+          const hasPdf = Boolean(p.pdf_url || (p.url && p.url.endsWith('.pdf')));
+          if (!hasPdf) return false;
+        }
+        return true;
+      });
+    }
+
+    // --- Comparative Matrix Selection Logic ---
+    function updateCompareBar() {
+      const count = selectedPapersForCompare.size;
+      compareCountText.textContent = `Selected: ${count}/3`;
+
+      if (count > 0) {
+        compareBar.classList.remove('hidden');
+        compareBar.classList.add('flex');
+        btnRunCompare.disabled = count < 2;
+      } else {
+        compareBar.classList.add('hidden');
+        compareBar.classList.remove('flex');
+        btnRunCompare.disabled = true;
+      }
+
+      // Checkbox state: disable unchecked if count >= 3
+      document.querySelectorAll('.paper-select-cb').forEach(cb => {
+        const pid = cb.getAttribute('data-paper-id');
+        if (count >= 3 && !selectedPapersForCompare.has(pid)) {
+          cb.disabled = true;
+          cb.title = 'Maximum 3 papers can be compared simultaneously';
+        } else {
+          cb.disabled = false;
+          cb.title = 'Select for comparative matrix';
+        }
+      });
+    }
+
+    btnClearSelection.addEventListener('click', () => {
+      selectedPapersForCompare.clear();
+      document.querySelectorAll('.paper-select-cb').forEach(cb => {
+        cb.checked = false;
+      });
+      updateCompareBar();
+    });
+
+    btnRunCompare.addEventListener('click', () => {
+      const pool = activeTab === 'discovered' ? currentPapers : savedPapers;
+      const selectedList = pool.filter(p => selectedPapersForCompare.has(p.id));
+      if (selectedList.length < 2) {
+        showToast('Please select at least 2 papers to compare', 'info');
+        return;
+      }
+      triggerPapersComparison(selectedList);
+    });
+
+    // --- Render Papers (Entrypoint) ---
+    function renderPapers(papers) {
+      currentPapers = papers;
+      updateWorkspaceBadges();
+      renderPapersView();
+    }
+
+    // Render active papers view (Discovered or Saved, with filters applied)
+    function renderPapersView() {
+      const rawPool = activeTab === 'discovered' ? currentPapers : savedPapers;
+      const displayPapers = activeTab === 'discovered' ? applyFilters(rawPool) : rawPool;
+
+      if (paperCountBadge) {
+        paperCountBadge.textContent = `${displayPapers.length} paper${displayPapers.length === 1 ? '' : 's'}`;
+      }
+      updateWorkspaceBadges();
+
+      const placeholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
+      const cardsContainer = document.getElementById('discovered-papers-list') || papersList;
+
+      if (!displayPapers || displayPapers.length === 0) {
+        const emptyMsg = activeTab === 'discovered'
+          ? (currentPapers.length > 0 ? 'No papers match active filter criteria.' : 'No Papers Retrieved Yet')
+          : 'No Saved Papers in Workspace.';
+        const emptySub = activeTab === 'discovered'
+          ? (currentPapers.length > 0 ? 'Try clearing or loosening the Year/Source/PDF filter chips above.' : 'Submit an academic inquiry to concurrently fetch relevant literature from ArXiv, Semantic Scholar, and OpenAlex.')
+          : 'Click the bookmark icon on any paper card to save papers into your persistent workspace.';
+
+        if (cardsContainer && cardsContainer !== placeholder) {
+          cardsContainer.innerHTML = '';
+          cardsContainer.classList.add('hidden');
+          cardsContainer.style.display = 'none';
+        }
+        if (placeholder) {
+          placeholder.classList.remove('hidden');
+          placeholder.style.display = 'flex';
+          const titleEl = document.getElementById('empty-placeholder-title');
+          const descEl = document.getElementById('empty-placeholder-desc');
+          if (titleEl) titleEl.textContent = emptyMsg;
+          if (descEl) descEl.textContent = emptySub;
+        }
+        lucide.createIcons();
+        return;
+      }
+
+      // Hide empty state container
+      if (placeholder) {
+        placeholder.classList.add('hidden');
+        placeholder.style.display = 'none';
+      }
+
+      // Unhide target container for paper cards and populate
+      if (cardsContainer) {
+        cardsContainer.classList.remove('hidden');
+        cardsContainer.style.display = 'block';
+        cardsContainer.innerHTML = '';
+      }
+
+      displayPapers.forEach((p, index) => {
+        const card = document.createElement('div');
+        card.className = 'p-4 rounded-xl bg-white dark:bg-[#0B0F19]/70 border border-slate-200 dark:border-[#1E293B] hover:border-brand-500/50 dark:hover:border-brand-500/50 transition group space-y-3 shadow-xs dark:shadow-sm relative';
+        card.setAttribute('data-paper-id', p.id);
+
+        // Source badge styling
+        let sourceBadgeClass = 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20';
+        const srcLower = (p.source || '').toLowerCase();
+        if (srcLower.includes('&') || srcLower.includes(',')) {
+          sourceBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30';
+        } else if (srcLower.includes('openalex')) {
+          sourceBadgeClass = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30';
+        } else if (srcLower.includes('semantic')) {
+          sourceBadgeClass = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30';
+        } else if (srcLower.includes('arxiv')) {
+          sourceBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30';
+        }
+
+        const codeBadgeHtml = p.code_url
+          ? `<a href="${escapeHtml(p.code_url)}" target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/90 dark:text-emerald-300 dark:border-emerald-500/40 hover:opacity-90 transition shadow-xs"
+                title="Open-Source Implementation Code (GitHub)">
+               <svg class="w-2.5 h-2.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+               <span>Code</span>
+             </a>`
+          : '';
+
+        const yearHtml = p.year ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60">${p.year}</span>` : '';
+        const citationHtml = p.citation_count !== null && p.citation_count !== undefined
+          ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 flex items-center"><i data-lucide="star" class="w-2.5 h-2.5 mr-1 fill-current text-amber-500"></i>${p.citation_count}</span>`
+          : '';
+
+        const authorsStr = p.authors && p.authors.length > 0
+          ? (p.authors.length > 2 ? p.authors.slice(0, 2).join(', ') + ' et al.' : p.authors.join(', '))
+          : 'Authors Unlisted';
+
+        const pdfUrl = p.pdf_url || p.url || `https://arxiv.org/abs/${p.id.replace('arxiv:', '')}`;
+        const isChecked = selectedPapersForCompare.has(p.id);
+        const isSaved = isPaperSaved(p.id);
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <input
+                type="checkbox"
+                class="paper-select-cb accent-brand-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                data-paper-id="${escapeHtml(p.id)}"
+                ${isChecked ? 'checked' : ''}
+                title="Select for comparison"
+              />
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${sourceBadgeClass}">
+                ${escapeHtml(p.source)}
+              </span>
+              ${codeBadgeHtml}
+              ${yearHtml}
+              ${citationHtml}
+            </div>
+            
+            <div class="flex items-center space-x-1.5 shrink-0">
+              <button
+                class="btn-toggle-save p-1 rounded-md transition ${isSaved ? 'text-amber-500 bg-amber-50 dark:bg-amber-500/10 ring-1 ring-amber-500/30' : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'}"
+                title="${isSaved ? 'Remove from Saved' : 'Save Paper'}"
+              >
+                <i data-lucide="bookmark" class="w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}"></i>
+              </button>
+              <span class="text-[11px] font-mono text-slate-400 dark:text-slate-500">#${index + 1}</span>
+            </div>
+          </div>
+
+          <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-300 transition leading-snug line-clamp-2">
+            <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="hover:underline">
+              ${escapeHtml(p.title)}
+            </a>
+          </h4>
+
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+            <i data-lucide="user" class="w-3 h-3 inline mr-1 text-slate-400"></i> ${escapeHtml(authorsStr)}
+          </p>
+
+          ${p.tldr ? `
+            <div class="text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#111827] p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80 leading-relaxed">
+              <span class="font-semibold text-purple-600 dark:text-purple-400">TLDR:</span> ${escapeHtml(p.tldr)}
+            </div>
+          ` : (p.abstract ? `
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+              ${escapeHtml(p.abstract)}
+            </div>
+          ` : '')}
+
+          <!-- Card Action Strip -->
+          <div class="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-[#1E293B] text-[11px] gap-2">
+            <div class="flex items-center space-x-1.5">
+              <a
+                href="${pdfUrl}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center space-x-1 font-semibold px-2 py-0.5 rounded bg-accent-50 text-accent-700 border border-accent-200 dark:bg-accent-500/10 dark:text-accent-400 dark:border-accent-500/20 hover:opacity-80 transition text-[10px]"
+              >
+                <i data-lucide="file-down" class="w-3 h-3"></i>
+                <span>PDF</span>
+              </a>
+
+              <button
+                class="btn-open-cite inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition text-[10px] cursor-pointer"
+                title="Generate Citations"
+              >
+                <i data-lucide="quote" class="w-3 h-3 text-brand-500 dark:text-brand-400"></i>
+                <span>Cite</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="btn-thesis-draft text-[10px] font-semibold text-indigo-600 dark:text-indigo-300 hover:underline flex items-center space-x-1 cursor-pointer"
+              title="Generate 250-word Thesis Proposal section"
+            >
+              <i data-lucide="graduation-cap" class="w-3 h-3"></i>
+              <span>Thesis Draft</span>
+            </button>
+          </div>
+
+          <!-- Analysis Depth Control & Synthesis Action -->
+          <div class="pt-2 border-t border-slate-200 dark:border-[#1E293B] space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center space-x-1">
+                <i data-lucide="sliders" class="w-3 h-3 text-slate-400"></i>
+                <span>Depth:</span>
+              </span>
+              <div class="depth-segmented-control inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px]" data-paper-id="${escapeHtml(p.id)}">
+                <button type="button" class="depth-btn px-2 py-0.5 rounded-md transition font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white" data-depth="quick" title="Quick: ~100w">Quick</button>
+                <button type="button" class="depth-btn px-2 py-0.5 rounded-md transition font-medium bg-brand-600 text-white shadow-xs" data-depth="balanced" title="Balanced: ~300w">Balanced</button>
+                <button type="button" class="depth-btn px-2 py-0.5 rounded-md transition font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white" data-depth="deep" title="Deep Dive: ~700w">Deep</button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="btn-explain-paper w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 dark:bg-brand-600/20 dark:hover:bg-brand-600/35 dark:text-brand-300 dark:border-brand-500/30 flex items-center justify-center space-x-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+              title="Synthesize paper with DeepSeek"
+            >
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
+              <span class="explain-btn-label">Explain Paper with DeepSeek</span>
+            </button>
+          </div>
+        `;
+
+        // Checkbox Listener
+        const checkbox = card.querySelector('.paper-select-cb');
+        checkbox.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            if (selectedPapersForCompare.size >= 3) {
+              e.target.checked = false;
+              showToast('Maximum 3 papers can be selected for comparison', 'info');
+              return;
+            }
+            selectedPapersForCompare.add(p.id);
+          } else {
+            selectedPapersForCompare.delete(p.id);
+          }
+          updateCompareBar();
+        });
+
+        // Bookmark Toggle Listener
+        card.querySelector('.btn-toggle-save').addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSavePaper(p);
+        });
+
+        // Cite Modal Listener
+        card.querySelector('.btn-open-cite').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCitationModal(p);
+        });
+
+        // Thesis Draft Listener
+        card.querySelector('.btn-thesis-draft').addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerThesisDraft(p);
+        });
+
+        // Segmented Depth Selector Listener
+        let cardDepth = 'balanced';
+        const depthBtns = card.querySelectorAll('.depth-btn');
+        const explainBtnLabel = card.querySelector('.explain-btn-label');
+
+        depthBtns.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cardDepth = btn.getAttribute('data-depth');
+            depthBtns.forEach(b => {
+              if (b.getAttribute('data-depth') === cardDepth) {
+                b.className = 'depth-btn px-2 py-0.5 rounded-md transition font-medium bg-brand-600 text-white shadow-sm';
+              } else {
+                b.className = 'depth-btn px-2 py-0.5 rounded-md transition font-medium text-slate-400 hover:text-slate-200';
+              }
+            });
+            if (explainBtnLabel) {
+              if (cardDepth === 'quick') {
+                explainBtnLabel.textContent = 'Quick Synthesis (~100w)';
+              } else if (cardDepth === 'deep') {
+                explainBtnLabel.textContent = 'Deep Dive (~700w)';
+              } else {
+                explainBtnLabel.textContent = 'Explain Paper with DeepSeek';
+              }
+            }
+          });
+        });
+
+        // Explain Paper with DeepSeek Listener
+        const explainBtn = card.querySelector('.btn-explain-paper');
+        explainBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerSinglePaperAnalysis(p, explainBtn, card, cardDepth);
+        });
+
+        cardsContainer.appendChild(card);
+      });
+
+      updateCompareBar();
+      lucide.createIcons();
+    }
+
+    // --- Academic Citation Modal Management ---
+    function openCitationModal(paper) {
+      if (!paper) return;
+      activeCitationPaper = paper;
+      citePaperTitle.textContent = paper.title;
+      citationModal.classList.remove('hidden');
+      updateCitationView();
+    }
+
+    function generateBibTeX(paper) {
+      const firstAuthor = (paper.authors && paper.authors.length > 0)
+        ? paper.authors[0].split(' ').pop().toLowerCase().replace(/[^a-z0-9]/g, '')
+        : 'academic';
+      const year = paper.year || 2024;
+      const firstWord = (paper.title || 'paper').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 8);
+      const citeKey = `${firstAuthor}${year}${firstWord}`;
+      const authorsBib = (paper.authors && paper.authors.length > 0) ? paper.authors.join(' and ') : 'Unlisted';
+      const link = paper.pdf_url || paper.url || (paper.id ? `https://arxiv.org/abs/${paper.id.replace('arxiv:', '')}` : 'https://semanticscholar.org');
+      const isArxiv = (paper.source && paper.source.includes('ArXiv')) || (paper.id && paper.id.includes('arxiv'));
+
+      const openB = '{' + '{';
+      const closeB = '}' + '}';
+      if (isArxiv) {
+        const arxivId = paper.id ? paper.id.replace('arxiv:', '') : '';
+        return `@article{${citeKey},
+  title=${openB}${paper.title}${closeB},
+  author={${authorsBib}},
+  journal={arXiv preprint arXiv:${arxivId}},
+  year={${year}},
+  url={${link}}
+}`;
+      } else {
+        return `@article{${citeKey},
+  title=${openB}${paper.title}${closeB},
+  author={${authorsBib}},
+  journal={Semantic Scholar},
+  year={${year}},
+  url={${link}}
+}`;
+      }
+    }
+
+    function generateIEEE(paper) {
+      const authorsStr = (paper.authors && paper.authors.length > 0)
+        ? (paper.authors.length > 3 ? paper.authors.slice(0, 3).join(', ') + ' et al.' : paper.authors.join(', '))
+        : 'Author Unlisted';
+      const year = paper.year ? `, ${paper.year}` : '';
+      const link = paper.pdf_url || paper.url || '#';
+      return `[1] ${authorsStr}, "${paper.title}," ${paper.source}${year}. [Online]. Available: ${link}`;
+    }
+
+    function generateAPA(paper) {
+      let authorsStr = 'Author Unlisted';
+      if (paper.authors && paper.authors.length > 0) {
+        if (paper.authors.length === 1) {
+          authorsStr = paper.authors[0];
+        } else if (paper.authors.length === 2) {
+          authorsStr = `${paper.authors[0]} & ${paper.authors[1]}`;
+        } else {
+          authorsStr = `${paper.authors[0]} et al.`;
+        }
+      }
+      const yearStr = paper.year ? `(${paper.year})` : '(n.d.)';
+      const link = paper.pdf_url || paper.url || '#';
+      return `${authorsStr} ${yearStr}. ${paper.title}. ${paper.source}. ${link}`;
+    }
+
+    function updateCitationView() {
+      if (!activeCitationPaper) return;
+      if (activeCitationFormat === 'bibtex') {
+        citationText.value = generateBibTeX(activeCitationPaper);
+      } else if (activeCitationFormat === 'ieee') {
+        citationText.value = generateIEEE(activeCitationPaper);
+      } else if (activeCitationFormat === 'apa') {
+        citationText.value = generateAPA(activeCitationPaper);
+      }
+
+      citeTabBtns.forEach(btn => {
+        if (btn.getAttribute('data-format') === activeCitationFormat) {
+          btn.className = 'cite-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white transition cursor-pointer';
+        } else {
+          btn.className = 'cite-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer';
+        }
+      });
+    }
+
+    citeTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeCitationFormat = btn.getAttribute('data-format');
+        updateCitationView();
+      });
+    });
+
+    btnCloseCite.addEventListener('click', () => {
+      citationModal.classList.add('hidden');
+    });
+
+    btnCopyCitationModal.addEventListener('click', () => {
+      if (!citationText.value) return;
+      navigator.clipboard.writeText(citationText.value).then(() => {
+        showToast(`${activeCitationFormat.toUpperCase()} citation copied to clipboard!`, 'success');
+      });
+    });
+
+    // --- Architecture Diagram Modal Management ---
+    const diagramModal = document.getElementById('diagram-modal');
+    const diagramModalTitle = document.getElementById('diagram-modal-title');
+    const diagramModalViewport = document.getElementById('diagram-modal-viewport');
+    const btnCloseDiagramModal = document.getElementById('btn-close-diagram-modal');
+    const btnDownloadDiagramModal = document.getElementById('btn-download-diagram-modal');
+
+    let activeModalSvg = '';
+    let activeModalTitle = '';
+
+    if (btnCloseDiagramModal) {
+      btnCloseDiagramModal.addEventListener('click', () => {
+        if (diagramModal) diagramModal.classList.add('hidden');
+      });
+    }
+
+    if (diagramModal) {
+      diagramModal.addEventListener('click', (e) => {
+        if (e.target === diagramModal) {
+          diagramModal.classList.add('hidden');
+        }
+      });
+    }
+
+    if (btnDownloadDiagramModal) {
+      btnDownloadDiagramModal.addEventListener('click', () => {
+        if (!activeModalSvg) return;
+        downloadSvgFile(activeModalSvg, activeModalTitle);
+      });
+    }
+
+    function openDiagramModal(title, svgMarkup) {
+      activeModalSvg = svgMarkup;
+      activeModalTitle = title || 'architecture';
+      if (diagramModalTitle) {
+        diagramModalTitle.textContent = `${title} - Architecture`;
+      }
+      if (diagramModalViewport) {
+        diagramModalViewport.innerHTML = svgMarkup;
+        const svgEl = diagramModalViewport.querySelector('svg');
+        if (svgEl) {
+          svgEl.style.maxWidth = '100%';
+          svgEl.style.height = 'auto';
+        }
+      }
+      if (diagramModal) {
+        diagramModal.classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    function downloadSvgFile(svgContent, paperTitle) {
+      const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cleanTitle = (paperTitle || 'paper').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+      a.download = `${cleanTitle}-architecture.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Architecture SVG downloaded successfully!', 'success');
+    }
+
+    // --- On-Demand Thesis Proposal Generator ---
+    async function triggerThesisDraft(paper) {
+      if (!paper) return;
+
+      const proposalBlock = document.createElement('div');
+      proposalBlock.className = 'space-y-4 pt-2';
+
+      // User prompt bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = 'flex items-start space-x-3 justify-end';
+      userBubble.innerHTML = `
+        <div class="max-w-xl bg-indigo-950/80 border border-indigo-700/60 text-indigo-200 px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm text-xs leading-relaxed flex items-center space-x-2">
+          <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
+          <span class="font-medium truncate">Thesis proposal draft requested: <strong class="text-white">${escapeHtml(paper.title)}</strong></span>
+        </div>
+        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+        </div>
+      `;
+      proposalBlock.appendChild(userBubble);
+
+      // Assistant container
+      const assistantContainer = document.createElement('div');
+      assistantContainer.className = 'flex items-start space-x-3';
+      assistantContainer.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-brand-500 flex items-center justify-center text-white shrink-0 shadow-md">
+          <i data-lucide="graduation-cap" class="w-4 h-4"></i>
+        </div>
+
+        <div class="flex-1 min-w-0 space-y-3">
+          <div class="bg-slate-900/85 border border-slate-800/90 rounded-xl p-5 shadow-sm space-y-3 relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                    Academic Thesis Proposal Draft
+                  </span>
+                  <span class="text-[11px] font-mono text-slate-500 proposal-timer">0s</span>
+                </div>
+                <h4 class="text-xs font-semibold text-slate-300">Target Paper: ${escapeHtml(paper.title)}</h4>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button class="btn-print-proposal flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Print or Save as PDF">
+                  <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+                  <span>PDF / Print</span>
+                </button>
+                <button class="btn-copy-proposal flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Proposal">
+                  <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                  <span>Copy</span>
+                </button>
+                <button class="btn-download-proposal flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Export .md">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>Export</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Status Banner -->
+            <div class="proposal-status-banner flex items-center space-x-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-800/40">
+              <svg class="animate-spin w-3 h-3 text-indigo-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="status-text">Formulating Problem Statement, Delta Methodology, & Evaluation Metrics...</span>
+            </div>
+
+            <div class="markdown-body prose-academic text-sm text-slate-200 min-h-[60px]"></div>
+          </div>
+        </div>
+      `;
+      proposalBlock.appendChild(assistantContainer);
+      messagesList.appendChild(proposalBlock);
+      lucide.createIcons();
+      feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+
+      const timerEl = assistantContainer.querySelector('.proposal-timer');
+      const statusBanner = assistantContainer.querySelector('.proposal-status-banner');
+      const markdownBody = assistantContainer.querySelector('.markdown-body');
+      const btnPrintProposal = assistantContainer.querySelector('.btn-print-proposal');
+      const btnCopyProposal = assistantContainer.querySelector('.btn-copy-proposal');
+      const btnDownloadProposal = assistantContainer.querySelector('.btn-download-proposal');
+
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        timerEl.textContent = `${elapsed}s`;
+      }, 500);
+
+      let accumulatedMarkdown = '';
+
+      try {
+        const res = await authenticatedFetch('/api/thesis/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paper: paper,
+            inquiry: currentInquiry || ''
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+
+          for (const block of parts) {
+            if (!block.trim()) continue;
+            const dataLine = block.split('\n').find(l => l.startsWith('data: '));
+            if (!dataLine) continue;
+
+            try {
+              const data = JSON.parse(dataLine.slice(6));
+              if (data.type === 'token') {
+                accumulatedMarkdown += data.content;
+                markdownBody.innerHTML = renderMarkdownWithMath(accumulatedMarkdown);
+                renderMathInContainer(markdownBody);
+                feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+              } else if (data.type === 'done') {
+                statusBanner.className = 'proposal-status-banner flex items-center space-x-2 text-xs font-mono text-emerald-300 bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40';
+                statusBanner.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i><span>Thesis Proposal Section Complete</span>`;
+                lucide.createIcons();
+                renderMathInContainer(markdownBody);
+              }
+            } catch (err) {}
+          }
+        }
+
+        clearInterval(timerInterval);
+        await renderMermaidInContainer(markdownBody);
+        renderMathInContainer(markdownBody);
+        showToast('Thesis proposal generated successfully!', 'success');
+
+      } catch (err) {
+        clearInterval(timerInterval);
+        statusBanner.className = 'proposal-status-banner flex items-center space-x-2 text-xs font-mono text-rose-300 bg-rose-950/40 p-2 rounded-lg border border-rose-800/40';
+        statusBanner.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3 text-rose-400"></i><span>Drafting error: ${escapeHtml(err.message)}</span>`;
+        lucide.createIcons();
+        showToast('Failed to draft proposal: ' + err.message, 'error');
+      } finally {
+        if (btnPrintProposal) {
+          btnPrintProposal.addEventListener('click', () => {
+            window.print();
+          });
+        }
+
+        btnCopyProposal.addEventListener('click', () => {
+          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+            showToast('Proposal draft copied to clipboard!', 'success');
+          });
+        });
+
+        btnDownloadProposal.addEventListener('click', () => {
+          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Thesis_Proposal_${Date.now()}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Proposal downloaded as Markdown', 'success');
+        });
+      }
+    }
+
+    // --- On-Demand Multi-Paper Comparative Matrix ---
+    async function triggerPapersComparison(papers) {
+      if (!papers || papers.length < 2) return;
+
+      const compareBlock = document.createElement('div');
+      compareBlock.className = 'space-y-4 pt-2';
+
+      // User prompt bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = 'flex items-start space-x-3 justify-end';
+      const titlesSummary = papers.map(p => `"${escapeHtml(p.title.slice(0, 30))}..."`).join(' vs ');
+      userBubble.innerHTML = `
+        <div class="max-w-xl bg-purple-950/80 border border-purple-700/60 text-purple-200 px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm text-xs leading-relaxed flex items-center space-x-2">
+          <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+          <span class="font-medium truncate">Comparative Matrix requested: <strong class="text-white">${titlesSummary}</strong></span>
+        </div>
+        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+        </div>
+      `;
+      compareBlock.appendChild(userBubble);
+
+      // Assistant container
+      const assistantContainer = document.createElement('div');
+      assistantContainer.className = 'flex items-start space-x-3';
+      assistantContainer.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shrink-0 shadow-md">
+          <i data-lucide="columns-2" class="w-4 h-4"></i>
+        </div>
+
+        <div class="flex-1 min-w-0 space-y-3">
+          <div class="bg-slate-900/85 border border-slate-800/90 rounded-xl p-5 shadow-sm space-y-3 relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                    Comparative Systems Analysis Matrix
+                  </span>
+                  <span class="text-[11px] font-mono text-slate-500 compare-timer">0s</span>
+                </div>
+                <h4 class="text-xs font-semibold text-slate-300 mt-1">Cross-Examining ${papers.length} Selected Papers</h4>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button class="btn-print-compare flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Print or Save as PDF">
+                  <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+                  <span>PDF / Print</span>
+                </button>
+                <button class="btn-copy-compare flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Matrix">
+                  <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                  <span>Copy</span>
+                </button>
+                <button class="btn-download-compare flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Export .md">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>Export</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Status Banner -->
+            <div class="compare-status-banner flex items-center space-x-2 text-xs font-mono text-purple-300 bg-purple-950/40 p-2.5 rounded-lg border border-purple-800/40">
+              <svg class="animate-spin w-3 h-3 text-purple-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="status-text">Contrasting Architecture, Cloud Stack, Scalability, and Trade-offs...</span>
+            </div>
+
+            <div class="markdown-body prose-academic text-sm text-slate-200 min-h-[60px]"></div>
+          </div>
+        </div>
+      `;
+      compareBlock.appendChild(assistantContainer);
+      messagesList.appendChild(compareBlock);
+      lucide.createIcons();
+      feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+
+      const timerEl = assistantContainer.querySelector('.compare-timer');
+      const statusBanner = assistantContainer.querySelector('.compare-status-banner');
+      const markdownBody = assistantContainer.querySelector('.markdown-body');
+      const btnPrintCompare = assistantContainer.querySelector('.btn-print-compare');
+      const btnCopyCompare = assistantContainer.querySelector('.btn-copy-compare');
+      const btnDownloadCompare = assistantContainer.querySelector('.btn-download-compare');
+
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        timerEl.textContent = `${elapsed}s`;
+      }, 500);
+
+      let accumulatedMarkdown = '';
+
+      try {
+        const res = await authenticatedFetch('/api/papers/compare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            papers: papers,
+            inquiry: currentInquiry || ''
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+
+          for (const block of parts) {
+            if (!block.trim()) continue;
+            const dataLine = block.split('\n').find(l => l.startsWith('data: '));
+            if (!dataLine) continue;
+
+            try {
+              const data = JSON.parse(dataLine.slice(6));
+              if (data.type === 'token') {
+                accumulatedMarkdown += data.content;
+                markdownBody.innerHTML = renderMarkdownWithMath(accumulatedMarkdown);
+                renderMathInContainer(markdownBody);
+                feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+              } else if (data.type === 'done') {
+                statusBanner.className = 'compare-status-banner flex items-center space-x-2 text-xs font-mono text-emerald-300 bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40';
+                statusBanner.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i><span>Comparative Systems Matrix Complete</span>`;
+                lucide.createIcons();
+                renderMathInContainer(markdownBody);
+              }
+            } catch (err) {}
+          }
+        }
+
+        clearInterval(timerInterval);
+        await renderMermaidInContainer(markdownBody);
+        renderMathInContainer(markdownBody);
+        showToast('Comparative Matrix generated successfully!', 'success');
+
+      } catch (err) {
+        clearInterval(timerInterval);
+        statusBanner.className = 'compare-status-banner flex items-center space-x-2 text-xs font-mono text-rose-300 bg-rose-950/40 p-2 rounded-lg border border-rose-800/40';
+        statusBanner.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3 text-rose-400"></i><span>Comparison error: ${escapeHtml(err.message)}</span>`;
+        lucide.createIcons();
+        showToast('Failed to compare papers: ' + err.message, 'error');
+      } finally {
+        if (btnPrintCompare) {
+          btnPrintCompare.addEventListener('click', () => {
+            window.print();
+          });
+        }
+
+        btnCopyCompare.addEventListener('click', () => {
+          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+            showToast('Comparative matrix copied to clipboard!', 'success');
+          });
+        });
+
+        btnDownloadCompare.addEventListener('click', () => {
+          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Comparative_Matrix_${Date.now()}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Comparative Matrix downloaded as Markdown', 'success');
+        });
+      }
+    }
+
+    // --- On-Demand Deep Single Paper Analysis with DeepSeek & Mermaid ---
+    async function triggerSinglePaperAnalysis(paper, btn, card, depth = 'balanced') {
+      if (!paper) return;
+
+      const depthLabel = (depth || 'balanced').toLowerCase();
+      const depthFormatted = depthLabel.charAt(0).toUpperCase() + depthLabel.slice(1);
+
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="animate-spin w-3.5 h-3.5 text-brand-400 mr-1.5 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Synthesizing (${depthFormatted})...</span>
+      `;
+      card.classList.add('border-brand-500/80', 'ring-1', 'ring-brand-500/40', 'bg-brand-950/40');
+
+      const paperAnalysisBlock = document.createElement('div');
+      paperAnalysisBlock.className = 'space-y-4 pt-2';
+
+      const userBubble = document.createElement('div');
+      userBubble.className = 'flex items-start space-x-3 justify-end';
+      userBubble.innerHTML = `
+        <div class="max-w-xl bg-slate-800 border border-slate-700/80 text-slate-200 px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm text-xs leading-relaxed flex items-center space-x-2">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-400 shrink-0"></i>
+          <span class="font-medium truncate">${depthFormatted} synthesis requested: <strong class="text-white">${escapeHtml(paper.title)}</strong></span>
+        </div>
+        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+        </div>
+      `;
+      paperAnalysisBlock.appendChild(userBubble);
+
+      const assistantContainer = document.createElement('div');
+      assistantContainer.className = 'flex items-start space-x-3';
+      const pdfUrl = paper.pdf_url || paper.url || `https://arxiv.org/abs/${paper.id.replace('arxiv:', '')}`;
+      const authorsStr = paper.authors && paper.authors.length > 0
+        ? (paper.authors.length > 2 ? paper.authors.slice(0, 2).join(', ') + ' et al.' : paper.authors.join(', '))
+        : 'Authors Unlisted';
+
+      assistantContainer.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-accent-500 flex items-center justify-center text-white shrink-0 shadow-md">
+          <i data-lucide="brain" class="w-4 h-4"></i>
+        </div>
+
+        <div class="flex-1 min-w-0 space-y-3">
+          <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-5 shadow-sm space-y-3 relative">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800/80 gap-2">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                    DeepSeek ${depthLabel.toUpperCase()} Synthesis
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700/60">${paper.year || 'Academic Paper'}</span>
+                  <span class="text-[11px] font-mono text-slate-500 paper-timer">0s</span>
+                </div>
+                <h3 class="text-sm font-bold text-white leading-snug">
+                  <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-brand-300 hover:underline">
+                    ${escapeHtml(paper.title)}
+                  </a>
+                </h3>
+                <p class="text-xs text-slate-400">
+                  <span>${escapeHtml(authorsStr)}</span> &bull; 
+                  <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="text-accent-400 hover:underline inline-flex items-center">
+                    [PDF Access] <i data-lucide="external-link" class="w-2.5 h-2.5 ml-1"></i>
+                  </a>
+                </p>
+              </div>
+              <div class="flex items-center space-x-1.5 shrink-0 flex-wrap gap-y-1">
+                <button class="btn-generate-diagram flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30 transition cursor-pointer" title="Generate Professional Architecture Diagram via Kroki">
+                  <i data-lucide="network" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>📐 Architecture Diagram</span>
+                </button>
+                <button class="btn-draft-thesis-header flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 transition" title="Draft Thesis Abstract">
+                  <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
+                  <span>Thesis Draft</span>
+                </button>
+                <button class="btn-print-paper-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Print or Save as PDF">
+                  <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+                  <span>PDF / Print</span>
+                </button>
+                <button class="btn-copy-paper-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Breakdown">
+                  <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                  <span>Copy</span>
+                </button>
+                <button class="btn-download-paper-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Export .md">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>Export</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Status Banner -->
+            <div class="status-banner flex items-center space-x-2 text-xs font-mono text-brand-300 bg-brand-950/40 p-2.5 rounded-lg border border-brand-800/40">
+              <svg class="animate-spin w-3 h-3 text-brand-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="status-text">Reasoning with DeepSeek (${depthLabel.toUpperCase()} depth): Streaming synthesis...</span>
+            </div>
+
+            <div class="markdown-body prose-academic text-sm text-slate-200 min-h-[60px]"></div>
+
+            <!-- Action Bar with Generate Architecture Diagram Button -->
+            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              <button class="btn-generate-diagram-footer flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600/30 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shadow-sm" title="Generate Professional Architecture Diagram via Kroki">
+                <i data-lucide="network" class="w-4 h-4 text-emerald-400"></i>
+                <span class="btn-diagram-text">📐 Generate Architecture Diagram</span>
+              </button>
+              <span class="text-[10px] text-slate-500 font-mono">On-Demand Kroki SVG Engine</span>
+            </div>
+
+            <!-- Architecture Diagram Section (Expandable) -->
+            <div class="diagram-section hidden mt-3 pt-3 border-t border-slate-800/80 space-y-3">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
+                    <i data-lucide="cpu" class="w-3 h-3 mr-1"></i>
+                    <span>System Architecture (Kroki SVG)</span>
+                  </span>
+                  <span class="text-[10px] text-slate-500 font-mono">PlantUML Engine</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button class="btn-diagram-fullscreen flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Open High-Resolution Modal">
+                    <i data-lucide="maximize-2" class="w-3 h-3"></i>
+                    <span>Full View / Modal</span>
+                  </button>
+                  <button class="btn-diagram-download flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Download SVG">
+                    <i data-lucide="download" class="w-3 h-3"></i>
+                    <span>Download SVG</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Loading State Banner -->
+              <div class="diagram-loading-banner hidden flex items-center space-x-2 text-xs font-mono text-emerald-300 bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/40">
+                <svg class="animate-spin w-3.5 h-3.5 text-emerald-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Generating system architecture via Kroki...</span>
+              </div>
+
+              <!-- Diagram SVG Viewer -->
+              <div class="diagram-svg-container bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 overflow-x-auto flex items-center justify-center min-h-[140px]"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      paperAnalysisBlock.appendChild(assistantContainer);
+      messagesList.appendChild(paperAnalysisBlock);
+      lucide.createIcons();
+      feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+
+      const paperTimer = assistantContainer.querySelector('.paper-timer');
+      const statusBanner = assistantContainer.querySelector('.status-banner');
+      const statusText = assistantContainer.querySelector('.status-text');
+      const markdownBody = assistantContainer.querySelector('.markdown-body');
+      const btnDraftThesisHeader = assistantContainer.querySelector('.btn-draft-thesis-header');
+      const btnPrintPaper = assistantContainer.querySelector('.btn-print-paper-report');
+      const btnCopyPaper = assistantContainer.querySelector('.btn-copy-paper-report');
+      const btnDownloadPaper = assistantContainer.querySelector('.btn-download-paper-report');
+
+      // Diagram section elements
+      const diagramSection = assistantContainer.querySelector('.diagram-section');
+      const diagramLoadingBanner = assistantContainer.querySelector('.diagram-loading-banner');
+      const diagramSvgContainer = assistantContainer.querySelector('.diagram-svg-container');
+      const btnDiagramFullscreen = assistantContainer.querySelector('.btn-diagram-fullscreen');
+      const btnDiagramDownload = assistantContainer.querySelector('.btn-diagram-download');
+      const diagramActionBtns = assistantContainer.querySelectorAll('.btn-generate-diagram, .btn-generate-diagram-footer');
+
+      let renderedSvgMarkup = '';
+
+      async function requestArchitectureDiagram() {
+        diagramActionBtns.forEach(btnEl => {
+          btnEl.disabled = true;
+          btnEl.innerHTML = `
+            <svg class="animate-spin w-3.5 h-3.5 text-emerald-400 mr-1.5 inline shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Generating system architecture via Kroki...</span>
+          `;
+        });
+
+        diagramSection.classList.remove('hidden');
+        diagramLoadingBanner.classList.remove('hidden');
+        diagramSvgContainer.innerHTML = '';
+        diagramSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        try {
+          showToast('Requesting PlantUML architecture & Kroki SVG...', 'info');
+          const res = await authenticatedFetch('/api/paper/diagram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: paper.title,
+              abstract: paper.abstract || '',
+              tldr: paper.tldr || ''
+            })
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}: Diagram generation failed, please retry.`);
+          }
+
+          const data = await res.json();
+          if (!data.svg) throw new Error('Diagram generation failed, please retry.');
+
+          renderedSvgMarkup = data.svg;
+          diagramSvgContainer.innerHTML = data.svg;
+          const svgEl = diagramSvgContainer.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.maxWidth = '100%';
+            svgEl.style.height = 'auto';
+          }
+
+          diagramLoadingBanner.classList.add('hidden');
+          diagramActionBtns.forEach(btnEl => {
+            btnEl.disabled = false;
+            btnEl.innerHTML = `
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>📐 Regenerate Diagram</span>
+            `;
+          });
+          lucide.createIcons();
+          showToast('Architecture diagram rendered successfully!', 'success');
+        } catch (err) {
+          console.error('Architecture diagram error:', err);
+          diagramLoadingBanner.classList.add('hidden');
+          diagramSvgContainer.innerHTML = `
+            <div class="text-xs text-rose-400 p-3 rounded-lg bg-rose-950/40 border border-rose-800/40 flex items-center space-x-2">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+              <span>${escapeHtml(err.message || 'Diagram generation failed, please retry.')}</span>
+            </div>
+          `;
+          diagramActionBtns.forEach(btnEl => {
+            btnEl.disabled = false;
+            btnEl.innerHTML = `
+              <i data-lucide="network" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>📐 Generate Architecture Diagram</span>
+            `;
+          });
+          lucide.createIcons();
+          showToast(err.message || 'Diagram generation failed, please retry.', 'error');
+        }
+      }
+
+      diagramActionBtns.forEach(btnEl => {
+        btnEl.addEventListener('click', requestArchitectureDiagram);
+      });
+
+      btnDiagramFullscreen.addEventListener('click', () => {
+        if (!renderedSvgMarkup) return;
+        openDiagramModal(paper.title, renderedSvgMarkup);
+      });
+
+      btnDiagramDownload.addEventListener('click', () => {
+        if (!renderedSvgMarkup) return;
+        downloadSvgFile(renderedSvgMarkup, paper.title);
+      });
+
+      btnDraftThesisHeader.addEventListener('click', () => {
+        triggerThesisDraft(paper);
+      });
+
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        paperTimer.textContent = `${elapsed}s`;
+      }, 500);
+
+      let accumulatedMarkdown = '';
+
+      try {
+        const payload = {
+          paper: paper,
+          inquiry: currentInquiry || '',
+          depth: depthLabel
+        };
+
+        const res = await authenticatedFetch('/api/paper/synthesize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+
+          for (const block of parts) {
+            if (!block.trim()) continue;
+            const dataLine = block.split('\n').find(l => l.startsWith('data: '));
+            if (!dataLine) continue;
+
+            try {
+              const data = JSON.parse(dataLine.slice(6));
+              if (data.type === 'token') {
+                accumulatedMarkdown += data.content;
+                markdownBody.innerHTML = renderMarkdownWithMath(accumulatedMarkdown);
+                renderMathInContainer(markdownBody);
+                feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+              } else if (data.type === 'status') {
+                statusText.textContent = data.message;
+              } else if (data.type === 'done') {
+                statusBanner.className = 'status-banner flex items-center space-x-2 text-xs font-mono text-emerald-300 bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40';
+                statusBanner.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i><span>DeepSeek [${depthFormatted}] Synthesis Complete</span>`;
+                lucide.createIcons();
+                renderMathInContainer(markdownBody);
+              } else if (data.type === 'error') {
+                statusBanner.className = 'status-banner flex items-center space-x-2 text-xs font-mono text-rose-300 bg-rose-950/40 p-2 rounded-lg border border-rose-800/40';
+                statusBanner.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3 text-rose-400"></i><span>${escapeHtml(data.message)}</span>`;
+                lucide.createIcons();
+              }
+            } catch (jsonErr) {}
+          }
+        }
+
+        clearInterval(timerInterval);
+        // Render Mermaid.js architectural diagrams dynamically if present
+        if (accumulatedMarkdown.includes('```mermaid')) {
+          await renderMermaidInContainer(markdownBody);
+        }
+        renderMathInContainer(markdownBody);
+        showToast(`DeepSeek synthesis for "${paper.title.slice(0, 30)}..." complete!`, 'success');
+
+      } catch (err) {
+        clearInterval(timerInterval);
+        console.error('Paper synthesis failed:', err);
+        statusBanner.className = 'status-banner flex items-center space-x-2 text-xs font-mono text-rose-300 bg-rose-950/40 p-2 rounded-lg border border-rose-800/40';
+        statusBanner.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3 text-rose-400"></i><span>Failed to synthesize paper: ${escapeHtml(err.message)}</span>`;
+        lucide.createIcons();
+        showToast('Paper synthesis error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        let defaultLabel = 'Explain Paper with DeepSeek';
+        if (depthLabel === 'quick') defaultLabel = 'Quick Synthesis (~100w)';
+        else if (depthLabel === 'deep') defaultLabel = 'Deep Dive (~700w)';
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-400"></i><span class="explain-btn-label">${defaultLabel}</span>`;
+        card.classList.remove('border-brand-500/80', 'ring-1', 'ring-brand-500/40', 'bg-brand-950/40');
+        lucide.createIcons();
+
+        if (btnPrintPaper) {
+          btnPrintPaper.addEventListener('click', () => {
+            window.print();
+          });
+        }
+
+        btnCopyPaper.addEventListener('click', () => {
+          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+            showToast('Paper breakdown copied to clipboard!', 'success');
+          });
+        });
+
+        btnDownloadPaper.addEventListener('click', () => {
+          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const cleanTitle = (paper.title || 'analysis').replace(/[^a-zA-Z0-9]/g, '-').slice(0, 40);
+          a.download = `${cleanTitle}-analysis.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Breakdown downloaded as Markdown', 'success');
+        });
+      }
+    }
+
+    // --- Export Handlers (NotebookLM Pack & Literature Review) ---
+    async function exportPapersToNotebookLM(papersToExport, customInquiry) {
+      try {
+        const pool = papersToExport && papersToExport.length > 0 ? papersToExport : currentPapers;
+        if (!pool.length) {
+          showToast('No papers available to export. Run a research inquiry first.', 'info');
+          return;
+        }
+
+        showToast('Generating Google NotebookLM source pack...', 'info');
+        const res = await authenticatedFetch('/api/export/notebooklm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            papers: pool,
+            inquiry: customInquiry || currentInquiry || 'Academic Systems Literature',
+            notes: 'Generated via Axiom Research AI (Engineered by SWMP Labs)'
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Axiom_NotebookLM_Source_Pack_${Date.now()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('NotebookLM Source Pack exported successfully!', 'success');
+      } catch (err) {
+        console.error('Export to NotebookLM failed:', err);
+        showToast('Failed to export to NotebookLM: ' + err.message, 'error');
+      }
+    }
+
+    btnExportNotebookLM.addEventListener('click', () => {
+      exportPapersToNotebookLM(currentPapers, currentInquiry);
+    });
+
+    btnExportLitReview.addEventListener('click', async () => {
+      try {
+        if (!currentPapers.length) {
+          showToast('No papers available to review. Run a research inquiry first.', 'info');
+          return;
+        }
+
+        showToast('Synthesizing IEEE Literature Review...', 'info');
+        const res = await authenticatedFetch('/api/export/literature-review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inquiry: currentInquiry || 'Distributed Systems Architecture',
+            papers: currentPapers,
+            synthesis_content: ''
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Literature_Review_${Date.now()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('IEEE Literature Review downloaded!', 'success');
+      } catch (err) {
+        console.error('Export Literature Review failed:', err);
+        showToast('Failed to export Literature Review: ' + err.message, 'error');
+      }
+    });
+
+    // --- Main Research Form Submit Handler: SSE Stream ---
+    researchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inquiry = queryInput.value.trim();
+      if (!inquiry) return;
+
+      if (!localStorage.getItem('axiom_access_token')) {
+        showAuthGate('Please authenticate with your cohort access code to execute research.');
+        return;
+      }
+
+      welcomeCard.classList.add('hidden');
+      setFormLoading(true);
+
+      if (activeEventSource) {
+        activeEventSource.close();
+      }
+
+      selectedPapersForCompare.clear();
+      updateCompareBar();
+
+      const sessionBlock = document.createElement('div');
+      sessionBlock.className = 'space-y-4';
+
+      const userBubble = document.createElement('div');
+      userBubble.className = 'flex items-start space-x-3 justify-end';
+      userBubble.innerHTML = `
+        <div class="max-w-2xl bg-brand-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm shadow-md text-sm leading-relaxed">
+          <p class="font-medium">${escapeHtml(inquiry)}</p>
+        </div>
+        <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+          <i data-lucide="user" class="w-4 h-4"></i>
+        </div>
+      `;
+      sessionBlock.appendChild(userBubble);
+
+      const assistantContainer = document.createElement('div');
+      assistantContainer.className = 'flex items-start space-x-3';
+      assistantContainer.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-accent-500 flex items-center justify-center text-white shrink-0 shadow-md">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+        </div>
+
+        <div class="flex-1 min-w-0 space-y-3">
+          <div class="status-timeline-card bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 shadow-inner space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-brand-400 animate-ping"></span>
+                <span class="text-xs font-semibold text-white stage-heading">Initializing Academic Pipeline...</span>
+              </div>
+              <span class="text-[11px] font-mono text-slate-500 stage-timer">0s</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[11px]">
+              <div id="step-keywords" class="px-2 py-1 rounded bg-slate-800/60 border border-slate-700/50 text-slate-400 flex items-center space-x-1.5 transition">
+                <i data-lucide="search" class="w-3 h-3 text-slate-500"></i>
+                <span class="truncate">Keywords</span>
+              </div>
+              <div id="step-arxiv" class="px-2 py-1 rounded bg-slate-800/60 border border-slate-700/50 text-slate-400 flex items-center space-x-1.5 transition">
+                <i data-lucide="book-open" class="w-3 h-3 text-slate-500"></i>
+                <span class="truncate">ArXiv</span>
+              </div>
+              <div id="step-ss" class="px-2 py-1 rounded bg-slate-800/60 border border-slate-700/50 text-slate-400 flex items-center space-x-1.5 transition">
+                <i data-lucide="graduation-cap" class="w-3 h-3 text-slate-500"></i>
+                <span class="truncate">Scholar</span>
+              </div>
+              <div id="step-openalex" class="px-2 py-1 rounded bg-slate-800/60 border border-slate-700/50 text-slate-400 flex items-center space-x-1.5 transition">
+                <i data-lucide="globe" class="w-3 h-3 text-slate-500"></i>
+                <span class="truncate">OpenAlex</span>
+              </div>
+              <div id="step-discovery" class="px-2 py-1 rounded bg-slate-800/60 border border-slate-700/50 text-slate-400 flex items-center space-x-1.5 transition">
+                <i data-lucide="layers" class="w-3 h-3 text-slate-500"></i>
+                <span class="truncate">Ranked</span>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-400 stage-detail font-mono text-[11px]">Connecting to academic endpoints...</p>
+          </div>
+
+          <div class="synthesis-card bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-3 relative hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Literature Discovery Overview</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button class="btn-print-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Print or Save as PDF">
+                  <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+                  <span>PDF / Print</span>
+                </button>
+                <button class="btn-copy-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Markdown">
+                  <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                  <span>Copy</span>
+                </button>
+                <button class="btn-download-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Download .md">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>Export</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="markdown-body prose-academic text-sm text-slate-200"></div>
+          </div>
+        </div>
+      `;
+      sessionBlock.appendChild(assistantContainer);
+      messagesList.appendChild(sessionBlock);
+      lucide.createIcons();
+
+      const stageHeading = assistantContainer.querySelector('.stage-heading');
+      const stageDetail = assistantContainer.querySelector('.stage-detail');
+      const stageTimer = assistantContainer.querySelector('.stage-timer');
+      const stepKeywords = assistantContainer.querySelector('#step-keywords');
+      const stepArxiv = assistantContainer.querySelector('#step-arxiv');
+      const stepSS = assistantContainer.querySelector('#step-ss');
+      const stepOpenAlex = assistantContainer.querySelector('#step-openalex');
+      const stepDiscovery = assistantContainer.querySelector('#step-discovery');
+      const synthesisCard = assistantContainer.querySelector('.synthesis-card');
+      const markdownBody = assistantContainer.querySelector('.markdown-body');
+      const btnPrintReport = assistantContainer.querySelector('.btn-print-report');
+      const btnCopyReport = assistantContainer.querySelector('.btn-copy-report');
+      const btnDownloadReport = assistantContainer.querySelector('.btn-download-report');
+
+      feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+      currentInquiry = inquiry;
+
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        stageTimer.textContent = `${elapsed}s`;
+      }, 500);
+
+      let accumulatedMarkdown = '';
+
+      const params = new URLSearchParams({ query: inquiry, limit: currentPaperLimit });
+      const axiomToken = localStorage.getItem('axiom_access_token') || '';
+      if (axiomToken) {
+        params.set('access_code', axiomToken);
+      }
+
+      const eventSource = new EventSource(`/api/research/stream?${params.toString()}`);
+      activeEventSource = eventSource;
+
+      eventSource.onmessage = async (e) => {
+        if (!e.data) return;
+        try {
+          const data = JSON.parse(e.data);
+          const type = data.type;
+
+          if (type === 'status') {
+            const stage = data.stage;
+            stageDetail.textContent = data.message;
+
+            if (stage === 'cache_hit') {
+              stageHeading.textContent = 'Instant Cache Hit (0ms Network Overhead)';
+              stepKeywords.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stepArxiv.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stepSS.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stepOpenAlex.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+            } else if (stage === 'extract_keywords') {
+              stageHeading.textContent = 'Extracting Search Keywords...';
+              stepKeywords.classList.add('bg-brand-500/20', 'border-brand-500/40', 'text-brand-300');
+            } else if (stage === 'keywords_ready') {
+              stageHeading.textContent = 'Target Keywords Extracted';
+              stepKeywords.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+            } else if (stage === 'fetching_arxiv') {
+              stageHeading.textContent = 'Querying ArXiv API (cs.DC, cs.SE, cs.AI, cs.AR)...';
+              stepArxiv.classList.add('bg-brand-500/20', 'border-brand-500/40', 'text-brand-300');
+            } else if (stage === 'fetching_semanticscholar') {
+              stepSS.classList.add('bg-brand-500/20', 'border-brand-500/40', 'text-brand-300');
+            } else if (stage === 'fetching_openalex') {
+              stepOpenAlex.classList.add('bg-brand-500/20', 'border-brand-500/40', 'text-brand-300');
+            } else if (stage === 'discovering_code') {
+              stageHeading.textContent = 'Discovering Implementation Repositories...';
+            } else if (stage === 'deduplicating') {
+              stepArxiv.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stepSS.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stepOpenAlex.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stageHeading.textContent = 'Deduplicating & Prioritizing Papers...';
+            } else if (stage === 'discovery_ready') {
+              stepDiscovery.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+              stageHeading.textContent = 'Literature Discovery Complete';
+              synthesisCard.classList.remove('hidden');
+            }
+          } else if (type === 'papers_ready') {
+            renderPapers(data.papers || []);
+            const placeholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
+            const cardsContainer = document.getElementById('discovered-papers-list') || document.getElementById('papers-list');
+            if (data.papers && data.papers.length > 0) {
+              if (placeholder) {
+                placeholder.classList.add('hidden');
+                placeholder.style.display = 'none';
+              }
+              if (cardsContainer) {
+                cardsContainer.classList.remove('hidden');
+                cardsContainer.style.display = 'block';
+              }
+            }
+            synthesisCard.classList.remove('hidden');
+            const isCached = data.metadata && data.metadata.cache_hit;
+            if (isCached) {
+              showToast(`Retrieved ${data.papers.length} cached papers (<1ms)`, 'success');
+            } else {
+              showToast(`Retrieved ${data.papers.length} high-relevance papers`, 'info');
+            }
+          } else if (type === 'token') {
+            accumulatedMarkdown += data.content;
+            markdownBody.innerHTML = renderMarkdownWithMath(accumulatedMarkdown);
+            renderMathInContainer(markdownBody);
+            feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
+          } else if (type === 'done') {
+            clearInterval(timerInterval);
+            stepDiscovery.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
+            stageHeading.textContent = 'Literature Discovery Complete';
+            stageDetail.textContent = 'All papers retrieved. Click "Explain Paper with DeepSeek" on any paper card in the sidebar to analyze.';
+            setFormLoading(false);
+            eventSource.close();
+            activeEventSource = null;
+            await renderMermaidInContainer(markdownBody);
+            renderMathInContainer(markdownBody);
+            showToast('Literature discovery complete!', 'success');
+          } else if (type === 'error') {
+            clearInterval(timerInterval);
+            stageHeading.textContent = 'Pipeline Notice';
+            stageDetail.textContent = data.message;
+            setFormLoading(false);
+            eventSource.close();
+            activeEventSource = null;
+            showToast(data.message, 'error');
+          }
+        } catch (err) {
+          console.error('Error parsing SSE event:', err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE Error:', err);
+        clearInterval(timerInterval);
+        setFormLoading(false);
+        eventSource.close();
+        activeEventSource = null;
+        stageHeading.textContent = 'Stream Terminated';
+        stageDetail.textContent = 'Connection closed or completed.';
+      };
+
+      if (btnPrintReport) {
+        btnPrintReport.addEventListener('click', () => {
+          window.print();
+        });
+      }
+
+      btnCopyReport.addEventListener('click', () => {
+        navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+          showToast('Full Markdown report copied!', 'success');
+        });
+      });
+
+      btnDownloadReport.addEventListener('click', () => {
+        const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `axiom-research-${Date.now()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Report downloaded as Markdown', 'success');
+      });
+
+      queryInput.value = '';
+      queryInput.style.height = 'auto';
+    });
+
+    // Run Cohort Gate verification on startup
+    initCohortGate();
+  </script>
+</body>
+</html>

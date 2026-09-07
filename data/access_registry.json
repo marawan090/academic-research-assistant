@@ -1,0 +1,98 @@
+{
+  "AXIOM-ROOT-V4HEWT": {
+    "type": "master",
+    "bound_ip": null,
+    "expires_at": null,
+    "created_at": "2026-09-07T18:23:20.674281+00:00"
+  },
+  "AXIOM-ENKT-HRGL": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674293+00:00"
+  },
+  "AXIOM-KN76-4YLC": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674296+00:00"
+  },
+  "AXIOM-VHFM-QNTK": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674299+00:00"
+  },
+  "AXIOM-XV6Q-KA86": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674301+00:00"
+  },
+  "AXIOM-U6QD-KYKS": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674302+00:00"
+  },
+  "AXIOM-8W4H-CVKY": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674304+00:00"
+  },
+  "AXIOM-P964-7GY3": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674305+00:00"
+  },
+  "AXIOM-UX2C-6QNM": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674307+00:00"
+  },
+  "AXIOM-3YZQ-C4SC": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674308+00:00"
+  },
+  "AXIOM-4CLH-RXYU": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674310+00:00"
+  },
+  "AXIOM-JQX3-CQK6": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674313+00:00"
+  },
+  "AXIOM-ETWL-38TV": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674315+00:00"
+  },
+  "AXIOM-QSTE-KHS6": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674316+00:00"
+  },
+  "AXIOM-CBF5-H9N8": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674318+00:00"
+  },
+  "AXIOM-8M93-ZJS4": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2026-10-07",
+    "created_at": "2026-09-07T18:23:20.674319+00:00"
+  }
+}
