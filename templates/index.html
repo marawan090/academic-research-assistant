@@ -1225,25 +1225,29 @@
     }
 
     // Auto-expand textarea
-    queryInput.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = (this.scrollHeight) + 'px';
-    });
+    if (queryInput) {
+      queryInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+      });
 
-    queryInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        researchForm.dispatchEvent(new Event('submit'));
-      }
-    });
+      queryInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (researchForm) researchForm.dispatchEvent(new Event('submit'));
+        }
+      });
+    }
 
     // Starter Chips
     document.querySelectorAll('.starter-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const query = chip.getAttribute('data-query');
-        queryInput.value = query;
-        queryInput.focus();
-        researchForm.dispatchEvent(new Event('submit'));
+        if (queryInput) {
+          queryInput.value = query;
+          queryInput.focus();
+        }
+        if (researchForm) researchForm.dispatchEvent(new Event('submit'));
       });
     });
 
@@ -1445,19 +1449,21 @@
     const citeTabBtns = document.querySelectorAll('.cite-tab-btn');
 
     // Reset Session
-    btnClearSession.addEventListener('click', () => {
-      if (activeEventSource) {
-        activeEventSource.close();
-        activeEventSource = null;
-      }
-      messagesList.innerHTML = '';
-      welcomeCard.classList.remove('hidden');
-      renderPapers([]);
-      selectedPapersForCompare.clear();
-      updateCompareBar();
-      setFormLoading(false);
-      showToast('Session reset', 'info');
-    });
+    if (btnClearSession) {
+      btnClearSession.addEventListener('click', () => {
+        if (activeEventSource) {
+          activeEventSource.close();
+          activeEventSource = null;
+        }
+        if (messagesList) messagesList.innerHTML = '';
+        if (welcomeCard) welcomeCard.classList.remove('hidden');
+        renderPapers([]);
+        selectedPapersForCompare.clear();
+        updateCompareBar();
+        setFormLoading(false);
+        showToast('Session reset', 'info');
+      });
+    }
 
     // Toast notifications helper
     function showToast(message, type = 'info') {
@@ -1512,67 +1518,81 @@
     }
 
     function updateWorkspaceBadges() {
-      tabDiscoveredBadge.textContent = currentPapers.length;
-      tabSavedBadge.textContent = savedPapers.length;
+      if (tabDiscoveredBadge) tabDiscoveredBadge.textContent = currentPapers.length;
+      if (tabSavedBadge) tabSavedBadge.textContent = savedPapers.length;
     }
 
     // Workspace Tabs Switching
-    tabDiscovered.addEventListener('click', () => {
-      activeTab = 'discovered';
-      tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
-      tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
-      savedActionsToolbar.classList.add('hidden');
-      discoveredFilters.classList.remove('hidden');
-      renderPapersView();
-    });
+    if (tabDiscovered) {
+      tabDiscovered.addEventListener('click', () => {
+        activeTab = 'discovered';
+        tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
+        if (tabSaved) tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
+        if (savedActionsToolbar) savedActionsToolbar.classList.add('hidden');
+        if (discoveredFilters) discoveredFilters.classList.remove('hidden');
+        renderPapersView();
+      });
+    }
 
-    tabSaved.addEventListener('click', () => {
-      activeTab = 'saved';
-      tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
-      tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
-      savedActionsToolbar.classList.remove('hidden');
-      discoveredFilters.classList.add('hidden');
-      renderPapersView();
-    });
+    if (tabSaved) {
+      tabSaved.addEventListener('click', () => {
+        activeTab = 'saved';
+        tabSaved.className = 'px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-sm';
+        if (tabDiscovered) tabDiscovered.className = 'px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5';
+        if (savedActionsToolbar) savedActionsToolbar.classList.remove('hidden');
+        if (discoveredFilters) discoveredFilters.classList.add('hidden');
+        renderPapersView();
+      });
+    }
 
-    btnClearSaved.addEventListener('click', () => {
-      if (!savedPapers.length) return;
-      savedPapers = [];
-      localStorage.setItem('axiom_saved_papers', JSON.stringify([]));
-      updateWorkspaceBadges();
-      renderPapersView();
-      showToast('Saved papers cart cleared', 'info');
-    });
+    if (btnClearSaved) {
+      btnClearSaved.addEventListener('click', () => {
+        if (!savedPapers.length) return;
+        savedPapers = [];
+        localStorage.setItem('axiom_saved_papers', JSON.stringify([]));
+        updateWorkspaceBadges();
+        renderPapersView();
+        showToast('Saved papers cart cleared', 'info');
+      });
+    }
 
-    btnExportSaved.addEventListener('click', () => {
-      if (!savedPapers.length) {
-        showToast('No saved papers to export', 'info');
-        return;
-      }
-      exportPapersToNotebookLM(savedPapers, 'Saved Academic Literature Workspace');
-    });
+    if (btnExportSaved) {
+      btnExportSaved.addEventListener('click', () => {
+        if (!savedPapers.length) {
+          showToast('No saved papers to export', 'info');
+          return;
+        }
+        exportPapersToNotebookLM(savedPapers, 'Saved Academic Literature Workspace');
+      });
+    }
 
     // --- Faceted Filters Listeners ---
-    filterYear.addEventListener('change', (e) => {
-      activeFilters.year = e.target.value;
-      renderPapersView();
-    });
+    if (filterYear) {
+      filterYear.addEventListener('change', (e) => {
+        activeFilters.year = e.target.value;
+        renderPapersView();
+      });
+    }
 
-    filterSource.addEventListener('change', (e) => {
-      activeFilters.source = e.target.value;
-      renderPapersView();
-    });
+    if (filterSource) {
+      filterSource.addEventListener('change', (e) => {
+        activeFilters.source = e.target.value;
+        renderPapersView();
+      });
+    }
 
-    filterPdfToggle.addEventListener('click', () => {
-      activeFilters.pdfOnly = !activeFilters.pdfOnly;
-      filterPdfToggle.setAttribute('data-active', activeFilters.pdfOnly ? 'true' : 'false');
-      if (activeFilters.pdfOnly) {
-        filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition cursor-pointer font-medium';
-      } else {
-        filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 transition cursor-pointer font-medium';
-      }
-      renderPapersView();
-    });
+    if (filterPdfToggle) {
+      filterPdfToggle.addEventListener('click', () => {
+        activeFilters.pdfOnly = !activeFilters.pdfOnly;
+        filterPdfToggle.setAttribute('data-active', activeFilters.pdfOnly ? 'true' : 'false');
+        if (activeFilters.pdfOnly) {
+          filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition cursor-pointer font-medium';
+        } else {
+          filterPdfToggle.className = 'flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 transition cursor-pointer font-medium';
+        }
+        renderPapersView();
+      });
+    }
 
     function applyFilters(papers) {
       return papers.filter(p => {
@@ -1600,16 +1620,19 @@
     // --- Comparative Matrix Selection Logic ---
     function updateCompareBar() {
       const count = selectedPapersForCompare.size;
-      compareCountText.textContent = `Selected: ${count}/3`;
+      if (compareCountText) compareCountText.textContent = `Selected: ${count}/3`;
 
-      if (count > 0) {
-        compareBar.classList.remove('hidden');
-        compareBar.classList.add('flex');
+      if (compareBar) {
+        if (count > 0) {
+          compareBar.classList.remove('hidden');
+          compareBar.classList.add('flex');
+        } else {
+          compareBar.classList.add('hidden');
+          compareBar.classList.remove('flex');
+        }
+      }
+      if (btnRunCompare) {
         btnRunCompare.disabled = count < 2;
-      } else {
-        compareBar.classList.add('hidden');
-        compareBar.classList.remove('flex');
-        btnRunCompare.disabled = true;
       }
 
       // Checkbox state: disable unchecked if count >= 3
@@ -1625,23 +1648,27 @@
       });
     }
 
-    btnClearSelection.addEventListener('click', () => {
-      selectedPapersForCompare.clear();
-      document.querySelectorAll('.paper-select-cb').forEach(cb => {
-        cb.checked = false;
+    if (btnClearSelection) {
+      btnClearSelection.addEventListener('click', () => {
+        selectedPapersForCompare.clear();
+        document.querySelectorAll('.paper-select-cb').forEach(cb => {
+          cb.checked = false;
+        });
+        updateCompareBar();
       });
-      updateCompareBar();
-    });
+    }
 
-    btnRunCompare.addEventListener('click', () => {
-      const pool = activeTab === 'discovered' ? currentPapers : savedPapers;
-      const selectedList = pool.filter(p => selectedPapersForCompare.has(p.id));
-      if (selectedList.length < 2) {
-        showToast('Please select at least 2 papers to compare', 'info');
-        return;
-      }
-      triggerPapersComparison(selectedList);
-    });
+    if (btnRunCompare) {
+      btnRunCompare.addEventListener('click', () => {
+        const pool = activeTab === 'discovered' ? currentPapers : savedPapers;
+        const selectedList = pool.filter(p => selectedPapersForCompare.has(p.id));
+        if (selectedList.length < 2) {
+          showToast('Please select at least 2 papers to compare', 'info');
+          return;
+        }
+        triggerPapersComparison(selectedList);
+      });
+    }
 
     // --- Render Papers (Entrypoint) ---
     function renderPapers(papers) {
@@ -1849,37 +1876,48 @@
 
         // Checkbox Listener
         const checkbox = card.querySelector('.paper-select-cb');
-        checkbox.addEventListener('change', (e) => {
-          if (e.target.checked) {
-            if (selectedPapersForCompare.size >= 3) {
-              e.target.checked = false;
-              showToast('Maximum 3 papers can be selected for comparison', 'info');
-              return;
+        if (checkbox) {
+          checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+              if (selectedPapersForCompare.size >= 3) {
+                e.target.checked = false;
+                showToast('Maximum 3 papers can be selected for comparison', 'info');
+                return;
+              }
+              selectedPapersForCompare.add(p.id);
+            } else {
+              selectedPapersForCompare.delete(p.id);
             }
-            selectedPapersForCompare.add(p.id);
-          } else {
-            selectedPapersForCompare.delete(p.id);
-          }
-          updateCompareBar();
-        });
+            updateCompareBar();
+          });
+        }
 
         // Bookmark Toggle Listener
-        card.querySelector('.btn-toggle-save').addEventListener('click', (e) => {
-          e.stopPropagation();
-          toggleSavePaper(p);
-        });
+        const btnToggleSave = card.querySelector('.btn-toggle-save');
+        if (btnToggleSave) {
+          btnToggleSave.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSavePaper(p);
+          });
+        }
 
         // Cite Modal Listener
-        card.querySelector('.btn-open-cite').addEventListener('click', (e) => {
-          e.stopPropagation();
-          openCitationModal(p);
-        });
+        const btnOpenCite = card.querySelector('.btn-open-cite');
+        if (btnOpenCite) {
+          btnOpenCite.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openCitationModal(p);
+          });
+        }
 
         // Thesis Draft Listener
-        card.querySelector('.btn-thesis-draft').addEventListener('click', (e) => {
-          e.stopPropagation();
-          triggerThesisDraft(p);
-        });
+        const btnThesisDraft = card.querySelector('.btn-thesis-draft');
+        if (btnThesisDraft) {
+          btnThesisDraft.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerThesisDraft(p);
+          });
+        }
 
         // Segmented Depth Selector Listener
         let cardDepth = 'balanced';
@@ -1911,10 +1949,12 @@
 
         // Explain Paper with DeepSeek Listener
         const explainBtn = card.querySelector('.btn-explain-paper');
-        explainBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          triggerSinglePaperAnalysis(p, explainBtn, card, cardDepth);
-        });
+        if (explainBtn) {
+          explainBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerSinglePaperAnalysis(p, explainBtn, card, cardDepth);
+          });
+        }
 
         cardsContainer.appendChild(card);
       });
@@ -2016,16 +2056,20 @@
       });
     });
 
-    btnCloseCite.addEventListener('click', () => {
-      citationModal.classList.add('hidden');
-    });
-
-    btnCopyCitationModal.addEventListener('click', () => {
-      if (!citationText.value) return;
-      navigator.clipboard.writeText(citationText.value).then(() => {
-        showToast(`${activeCitationFormat.toUpperCase()} citation copied to clipboard!`, 'success');
+    if (btnCloseCite) {
+      btnCloseCite.addEventListener('click', () => {
+        if (citationModal) citationModal.classList.add('hidden');
       });
-    });
+    }
+
+    if (btnCopyCitationModal) {
+      btnCopyCitationModal.addEventListener('click', () => {
+        if (!citationText || !citationText.value) return;
+        navigator.clipboard.writeText(citationText.value).then(() => {
+          showToast(`${activeCitationFormat.toUpperCase()} citation copied to clipboard!`, 'success');
+        });
+      });
+    }
 
     // --- Architecture Diagram Modal Management ---
     const diagramModal = document.getElementById('diagram-modal');
@@ -2246,24 +2290,28 @@
           });
         }
 
-        btnCopyProposal.addEventListener('click', () => {
-          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
-            showToast('Proposal draft copied to clipboard!', 'success');
+        if (btnCopyProposal) {
+          btnCopyProposal.addEventListener('click', () => {
+            navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+              showToast('Proposal draft copied to clipboard!', 'success');
+            });
           });
-        });
+        }
 
-        btnDownloadProposal.addEventListener('click', () => {
-          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Thesis_Proposal_${Date.now()}.md`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          showToast('Proposal downloaded as Markdown', 'success');
-        });
+        if (btnDownloadProposal) {
+          btnDownloadProposal.addEventListener('click', () => {
+            const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Thesis_Proposal_${Date.now()}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Proposal downloaded as Markdown', 'success');
+          });
+        }
       }
     }
 
@@ -2422,24 +2470,28 @@
           });
         }
 
-        btnCopyCompare.addEventListener('click', () => {
-          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
-            showToast('Comparative matrix copied to clipboard!', 'success');
+        if (btnCopyCompare) {
+          btnCopyCompare.addEventListener('click', () => {
+            navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+              showToast('Comparative matrix copied to clipboard!', 'success');
+            });
           });
-        });
+        }
 
-        btnDownloadCompare.addEventListener('click', () => {
-          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Comparative_Matrix_${Date.now()}.md`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          showToast('Comparative Matrix downloaded as Markdown', 'success');
-        });
+        if (btnDownloadCompare) {
+          btnDownloadCompare.addEventListener('click', () => {
+            const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Comparative_Matrix_${Date.now()}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Comparative Matrix downloaded as Markdown', 'success');
+          });
+        }
       }
     }
 
@@ -2696,19 +2748,25 @@
         btnEl.addEventListener('click', requestArchitectureDiagram);
       });
 
-      btnDiagramFullscreen.addEventListener('click', () => {
-        if (!renderedSvgMarkup) return;
-        openDiagramModal(paper.title, renderedSvgMarkup);
-      });
+      if (btnDiagramFullscreen) {
+        btnDiagramFullscreen.addEventListener('click', () => {
+          if (!renderedSvgMarkup) return;
+          openDiagramModal(paper.title, renderedSvgMarkup);
+        });
+      }
 
-      btnDiagramDownload.addEventListener('click', () => {
-        if (!renderedSvgMarkup) return;
-        downloadSvgFile(renderedSvgMarkup, paper.title);
-      });
+      if (btnDiagramDownload) {
+        btnDiagramDownload.addEventListener('click', () => {
+          if (!renderedSvgMarkup) return;
+          downloadSvgFile(renderedSvgMarkup, paper.title);
+        });
+      }
 
-      btnDraftThesisHeader.addEventListener('click', () => {
-        triggerThesisDraft(paper);
-      });
+      if (btnDraftThesisHeader) {
+        btnDraftThesisHeader.addEventListener('click', () => {
+          triggerThesisDraft(paper);
+        });
+      }
 
       const startTime = Date.now();
       const timerInterval = setInterval(() => {
@@ -2805,25 +2863,29 @@
           });
         }
 
-        btnCopyPaper.addEventListener('click', () => {
-          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
-            showToast('Paper breakdown copied to clipboard!', 'success');
+        if (btnCopyPaper) {
+          btnCopyPaper.addEventListener('click', () => {
+            navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+              showToast('Paper breakdown copied to clipboard!', 'success');
+            });
           });
-        });
+        }
 
-        btnDownloadPaper.addEventListener('click', () => {
-          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          const cleanTitle = (paper.title || 'analysis').replace(/[^a-zA-Z0-9]/g, '-').slice(0, 40);
-          a.download = `${cleanTitle}-analysis.md`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          showToast('Breakdown downloaded as Markdown', 'success');
-        });
+        if (btnDownloadPaper) {
+          btnDownloadPaper.addEventListener('click', () => {
+            const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const cleanTitle = (paper.title || 'analysis').replace(/[^a-zA-Z0-9]/g, '-').slice(0, 40);
+            a.download = `${cleanTitle}-analysis.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Breakdown downloaded as Markdown', 'success');
+          });
+        }
       }
     }
 
@@ -2865,48 +2927,53 @@
       }
     }
 
-    btnExportNotebookLM.addEventListener('click', () => {
-      exportPapersToNotebookLM(currentPapers, currentInquiry);
-    });
+    if (btnExportNotebookLM) {
+      btnExportNotebookLM.addEventListener('click', () => {
+        exportPapersToNotebookLM(currentPapers, currentInquiry);
+      });
+    }
 
-    btnExportLitReview.addEventListener('click', async () => {
-      try {
-        if (!currentPapers.length) {
-          showToast('No papers available to review. Run a research inquiry first.', 'info');
-          return;
+    if (btnExportLitReview) {
+      btnExportLitReview.addEventListener('click', async () => {
+        try {
+          if (!currentPapers.length) {
+            showToast('No papers available to review. Run a research inquiry first.', 'info');
+            return;
+          }
+
+          showToast('Synthesizing IEEE Literature Review...', 'info');
+          const res = await authenticatedFetch('/api/export/literature-review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inquiry: currentInquiry || 'Distributed Systems Architecture',
+              papers: currentPapers,
+              synthesis_content: ''
+            })
+          });
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Literature_Review_${Date.now()}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('IEEE Literature Review downloaded!', 'success');
+        } catch (err) {
+          console.error('Export Literature Review failed:', err);
+          showToast('Failed to export Literature Review: ' + err.message, 'error');
         }
-
-        showToast('Synthesizing IEEE Literature Review...', 'info');
-        const res = await authenticatedFetch('/api/export/literature-review', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inquiry: currentInquiry || 'Distributed Systems Architecture',
-            papers: currentPapers,
-            synthesis_content: ''
-          })
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Literature_Review_${Date.now()}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('IEEE Literature Review downloaded!', 'success');
-      } catch (err) {
-        console.error('Export Literature Review failed:', err);
-        showToast('Failed to export Literature Review: ' + err.message, 'error');
-      }
-    });
+      });
+    }
 
     // --- Main Research Form Submit Handler: SSE Stream ---
-    researchForm.addEventListener('submit', (e) => {
+    if (researchForm) {
+      researchForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const inquiry = queryInput.value.trim();
       if (!inquiry) return;
@@ -3155,28 +3222,35 @@
         });
       }
 
-      btnCopyReport.addEventListener('click', () => {
-        navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
-          showToast('Full Markdown report copied!', 'success');
+      if (btnCopyReport) {
+        btnCopyReport.addEventListener('click', () => {
+          navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
+            showToast('Full Markdown report copied!', 'success');
+          });
         });
-      });
+      }
 
-      btnDownloadReport.addEventListener('click', () => {
-        const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `axiom-research-${Date.now()}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Report downloaded as Markdown', 'success');
-      });
+      if (btnDownloadReport) {
+        btnDownloadReport.addEventListener('click', () => {
+          const blob = new Blob([accumulatedMarkdown], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `axiom-research-${Date.now()}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Report downloaded as Markdown', 'success');
+        });
+      }
 
-      queryInput.value = '';
-      queryInput.style.height = 'auto';
+      if (queryInput) {
+        queryInput.value = '';
+        queryInput.style.height = 'auto';
+      }
     });
+  }
 
     // Run Cohort Gate verification on startup
     initCohortGate();
