@@ -803,11 +803,12 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
 
 
 @app.post("/api/paper/diagram", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/diagram", dependencies=[Depends(verify_axiom_access)])
 async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
     """
     On-demand professional architecture diagram engine using PlantUML & public Kroki API.
     1. Extracts/maps distributed system architecture into PlantUML via DeepSeek.
-    2. Renders into high-resolution SVG via Kroki API.
+    2. Renders into high-resolution SVG via Kroki API with automatic resilient fallback.
     """
     try:
         effective_key = (payload.orcarouter_key or runtime_config["orcarouter_api_key"] or "").strip()
@@ -817,13 +818,22 @@ async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
             tldr=payload.tldr or "",
             custom_api_key=effective_key
         )
-        svg = await llm_service.render_plantuml_kroki(plantuml)
-        return {"svg": svg, "status": "success"}
+        svg = await llm_service.render_plantuml_kroki(
+            plantuml_code=plantuml,
+            paper_title=payload.title,
+            abstract=payload.abstract or "",
+            tldr=payload.tldr or "",
+            enable_fallback=True
+        )
+        return {"svg": svg, "status": "success", "plantuml": plantuml}
     except Exception as e:
         logger.error("Diagram generation failed: %s", str(e), exc_info=True)
         return JSONResponse(
-            status_code=500,
-            content={"error": "Diagram generation failed, please retry."}
+            status_code=502,
+            content={
+                "error": f"Diagram generation failed: {str(e)}",
+                "details": "Kroki diagram service could not render the architecture."
+            }
         )
 
 

@@ -277,6 +277,19 @@
         overflow: visible !important;
       }
       header,
+      #papers-drawer,
+      #papers-list,
+      #discovered-papers-list,
+      #no-papers-placeholder,
+      #welcome-card,
+      #search-form,
+      #starter-chips,
+      .starter-chip,
+      aside,
+      .btn-generate-diagram-footer,
+      .diagram-loading-banner,
+      .btn-diagram-fullscreen,
+      .btn-diagram-download,
       #saved-actions-toolbar,
       #discovered-filters,
       #research-form,
@@ -295,6 +308,15 @@
       #diagram-modal,
       #auth-gate-modal,
       #support-modal {
+        display: none !important;
+      }
+      main {
+        display: block !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      aside {
         display: none !important;
       }
       #feed-container, #messages-list, .markdown-body {
@@ -1379,6 +1401,461 @@
         renderMathInContainer(container);
       });
     };
+
+    // --- Targeted Print Isolation for Paper Synthesis & Diagram ---
+    function printTargetedPaperSynthesis({ paper, depthFormatted, markdownHtml, diagramSvg }) {
+      if (!paper) return;
+      const paperTitle = paper.title || 'Academic Paper Synthesis';
+      const authorsStr = paper.authors && paper.authors.length > 0
+        ? (paper.authors.length > 2 ? paper.authors.slice(0, 2).join(', ') + ' et al.' : paper.authors.join(', '))
+        : 'Authors Unlisted';
+      const year = paper.year || '';
+      const pdfUrl = paper.pdf_url || paper.url || (paper.id ? `https://arxiv.org/abs/${paper.id.replace('arxiv:', '')}` : '');
+      const depthBadge = depthFormatted || 'DeepSeek Synthesis';
+      const hasDiagram = Boolean(diagramSvg && diagramSvg.includes('<svg'));
+
+      const printDocHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(paperTitle)} - Synthesis Report</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 16mm 20mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .print-report-container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 10px 0;
+    }
+    .print-header {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .print-brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .brand-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #4f46e5;
+    }
+    .print-date {
+      font-size: 10px;
+      color: #94a3b8;
+      font-family: ui-monospace, monospace;
+    }
+    .paper-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.35;
+      margin: 0 0 10px 0;
+    }
+    .paper-meta-row {
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-synthesis {
+      background: #eef2ff;
+      color: #4338ca;
+      border: 1px solid #c7d2fe;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-year {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .paper-link {
+      color: #2563eb;
+      text-decoration: none;
+      font-size: 11px;
+    }
+    .synthesis-content {
+      margin-top: 14px;
+    }
+    .synthesis-content h1,
+    .synthesis-content h2,
+    .synthesis-content h3,
+    .synthesis-content h4 {
+      color: #0f172a;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .synthesis-content h1 {
+      font-size: 16px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+    .synthesis-content h2 { font-size: 14px; }
+    .synthesis-content h3 { font-size: 13px; }
+    .synthesis-content p {
+      margin: 0 0 10px 0;
+      color: #1e293b;
+    }
+    .synthesis-content ul, .synthesis-content ol {
+      margin: 0 0 10px 0;
+      padding-left: 20px;
+    }
+    .synthesis-content li {
+      margin-bottom: 4px;
+    }
+    .synthesis-content strong {
+      color: #0f172a;
+      font-weight: 600;
+    }
+    .synthesis-content code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11.5px;
+      background: #f1f5f9;
+      padding: 1.5px 4px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+      color: #0f172a;
+    }
+    .synthesis-content pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      overflow-x: auto;
+      font-size: 11.5px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin: 10px 0;
+    }
+    .synthesis-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 11.5px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .synthesis-content th, .synthesis-content td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .synthesis-content th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    .katex-display {
+      margin: 10px 0 !important;
+      padding: 6px 10px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 6px !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      overflow: visible !important;
+    }
+    .katex {
+      color: #0f172a !important;
+      font-size: 1.05em !important;
+    }
+    .diagram-report-section {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      text-align: center;
+    }
+    .diagram-report-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #059669;
+      margin-bottom: 12px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .diagram-svg-wrapper svg {
+      max-width: 100% !important;
+      height: auto !important;
+      display: block;
+      margin: 0 auto;
+    }
+    .print-footer {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-report-container">
+    <div class="print-header">
+      <div class="print-brand-row">
+        <span class="brand-title">Axiom Research AI &bull; Paper Synthesis Report</span>
+        <span class="print-date">${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+      </div>
+      <h1 class="paper-title">${escapeHtml(paperTitle)}</h1>
+      <div class="paper-meta-row">
+        <span class="badge-synthesis">${escapeHtml(depthBadge)}</span>
+        ${year ? `<span class="badge-year">${escapeHtml(year)}</span>` : ''}
+        <span>${escapeHtml(authorsStr)}</span>
+        ${pdfUrl ? `&bull; <a href="${pdfUrl}" class="paper-link" target="_blank">[PDF Source]</a>` : ''}
+      </div>
+    </div>
+    
+    <div class="synthesis-content">
+      ${markdownHtml || ''}
+    </div>
+    
+    ${hasDiagram ? `
+    <div class="diagram-report-section">
+      <div class="diagram-report-title">
+        <span>📐 Verified System Architecture (Kroki / PlantUML Engine)</span>
+      </div>
+      <div class="diagram-svg-wrapper">
+        ${diagramSvg}
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="print-footer">
+      <span>Generated via Axiom Research AI &bull; SWMP Labs</span>
+      <span>Cohort Access Protected &bull; Confidential Research Memo</span>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'synthesis-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+
+      try {
+        const frameWin = iframe.contentWindow || (iframe.contentDocument && iframe.contentDocument.defaultView);
+        const frameDoc = frameWin ? frameWin.document : (iframe.contentDocument || null);
+        if (frameDoc && typeof frameDoc.open === 'function') {
+          frameDoc.open();
+          frameDoc.write(printDocHtml);
+          frameDoc.close();
+
+          setTimeout(() => {
+            try {
+              if (frameWin && typeof frameWin.print === 'function') {
+                frameWin.focus();
+                frameWin.print();
+              } else {
+                window.print();
+              }
+            } catch (err) {
+              console.warn('Iframe print failed, falling back:', err);
+              const win = window.open('', '_blank', 'width=800,height=900');
+              if (win) {
+                win.document.open();
+                win.document.write(printDocHtml);
+                win.document.close();
+                win.focus();
+                setTimeout(() => { win.print(); }, 250);
+              }
+            } finally {
+              setTimeout(() => {
+                if (iframe && iframe.parentNode) {
+                  iframe.parentNode.removeChild(iframe);
+                }
+              }, 60000);
+            }
+          }, 350);
+        } else {
+          window.print();
+        }
+      } catch (e) {
+        console.error('Targeted print frame exception:', e);
+        window.print();
+      }
+    }
+
+    function printTargetedOverviewReport({ inquiry, markdownHtml }) {
+      const inquiryText = inquiry || 'Academic Research Overview';
+      const printDocHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(inquiryText)} - Research Overview</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 16mm 20mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .print-report-container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 10px 0;
+    }
+    .print-header {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .brand-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #4f46e5;
+    }
+    .inquiry-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.35;
+      margin: 8px 0;
+    }
+    .synthesis-content h1, .synthesis-content h2, .synthesis-content h3 {
+      color: #0f172a;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+    .synthesis-content h1 { font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    .synthesis-content h2 { font-size: 14px; }
+    .synthesis-content p { margin: 0 0 10px 0; color: #1e293b; }
+    .synthesis-content ul, .synthesis-content ol { margin: 0 0 10px 0; padding-left: 20px; }
+    .synthesis-content code { background: #f1f5f9; padding: 2px 4px; border-radius: 3px; font-size: 11.5px; }
+    .synthesis-content pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11.5px; }
+    .katex-display { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 6px; padding: 6px 10px; }
+    .print-footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="print-report-container">
+    <div class="print-header">
+      <div class="brand-title">Axiom Research AI &bull; Literature Discovery Synthesis</div>
+      <div class="inquiry-title">${escapeHtml(inquiryText)}</div>
+    </div>
+    <div class="synthesis-content">
+      ${markdownHtml || ''}
+    </div>
+    <div class="print-footer">
+      <span>Generated via Axiom Research AI &bull; SWMP Labs</span>
+      <span>Cohort Access Active</span>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'overview-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+
+      try {
+        const frameWin = iframe.contentWindow || (iframe.contentDocument && iframe.contentDocument.defaultView);
+        const frameDoc = frameWin ? frameWin.document : (iframe.contentDocument || null);
+        if (frameDoc && typeof frameDoc.open === 'function') {
+          frameDoc.open();
+          frameDoc.write(printDocHtml);
+          frameDoc.close();
+          setTimeout(() => {
+            try {
+              if (frameWin && typeof frameWin.print === 'function') {
+                frameWin.focus();
+                frameWin.print();
+              } else {
+                window.print();
+              }
+            } catch (err) {
+              window.print();
+            } finally {
+              setTimeout(() => {
+                if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+              }, 60000);
+            }
+          }, 350);
+        } else {
+          window.print();
+        }
+      } catch (e) {
+        window.print();
+      }
+    }
 
     // --- Workspace State & LocalStorage Management ---
     let savedPapers = [];
@@ -2572,7 +3049,7 @@
                   <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
                   <span>Thesis Draft</span>
                 </button>
-                <button class="btn-print-paper-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Print or Save as PDF">
+                <button id="btn-print-synthesis" class="btn-print-paper-report btn-print-synthesis flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Print or Save as PDF">
                   <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
                   <span>PDF / Print</span>
                 </button>
@@ -2618,11 +3095,11 @@
                   <span class="text-[10px] text-slate-500 font-mono">PlantUML Engine</span>
                 </div>
                 <div class="flex items-center space-x-2">
-                  <button class="btn-diagram-fullscreen flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Open High-Resolution Modal">
+                  <button class="btn-diagram-fullscreen opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Open High-Resolution Modal" disabled>
                     <i data-lucide="maximize-2" class="w-3 h-3"></i>
                     <span>Full View / Modal</span>
                   </button>
-                  <button class="btn-diagram-download flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Download SVG">
+                  <button class="btn-diagram-download opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Download SVG" disabled>
                     <i data-lucide="download" class="w-3 h-3"></i>
                     <span>Download SVG</span>
                   </button>
@@ -2639,7 +3116,7 @@
               </div>
 
               <!-- Diagram SVG Viewer -->
-              <div class="diagram-svg-container bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 overflow-x-auto flex items-center justify-center min-h-[140px]"></div>
+              <div id="diagram-container" class="diagram-container diagram-svg-container bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 overflow-x-auto flex items-center justify-center min-h-[140px]"></div>
             </div>
           </div>
         </div>
@@ -2654,14 +3131,14 @@
       const statusText = assistantContainer.querySelector('.status-text');
       const markdownBody = assistantContainer.querySelector('.markdown-body');
       const btnDraftThesisHeader = assistantContainer.querySelector('.btn-draft-thesis-header');
-      const btnPrintPaper = assistantContainer.querySelector('.btn-print-paper-report');
+      const btnPrintPaper = assistantContainer.querySelector('.btn-print-paper-report, #btn-print-synthesis, .btn-print-synthesis');
       const btnCopyPaper = assistantContainer.querySelector('.btn-copy-paper-report');
       const btnDownloadPaper = assistantContainer.querySelector('.btn-download-paper-report');
 
       // Diagram section elements
       const diagramSection = assistantContainer.querySelector('.diagram-section');
       const diagramLoadingBanner = assistantContainer.querySelector('.diagram-loading-banner');
-      const diagramSvgContainer = assistantContainer.querySelector('.diagram-svg-container');
+      const diagramSvgContainer = assistantContainer.querySelector('#diagram-container') || assistantContainer.querySelector('.diagram-svg-container');
       const btnDiagramFullscreen = assistantContainer.querySelector('.btn-diagram-fullscreen');
       const btnDiagramDownload = assistantContainer.querySelector('.btn-diagram-download');
       const diagramActionBtns = assistantContainer.querySelectorAll('.btn-generate-diagram, .btn-generate-diagram-footer');
@@ -2680,10 +3157,19 @@
           `;
         });
 
-        diagramSection.classList.remove('hidden');
-        diagramLoadingBanner.classList.remove('hidden');
-        diagramSvgContainer.innerHTML = '';
-        diagramSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (btnDiagramFullscreen) {
+          btnDiagramFullscreen.disabled = true;
+          btnDiagramFullscreen.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        if (btnDiagramDownload) {
+          btnDiagramDownload.disabled = true;
+          btnDiagramDownload.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        if (diagramSection) diagramSection.classList.remove('hidden');
+        if (diagramLoadingBanner) diagramLoadingBanner.classList.remove('hidden');
+        if (diagramSvgContainer) diagramSvgContainer.innerHTML = '';
+        if (diagramSection) diagramSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         try {
           showToast('Requesting PlantUML architecture & Kroki SVG...', 'info');
@@ -2703,17 +3189,30 @@
           }
 
           const data = await res.json();
-          if (!data.svg) throw new Error('Diagram generation failed, please retry.');
-
-          renderedSvgMarkup = data.svg;
-          diagramSvgContainer.innerHTML = data.svg;
-          const svgEl = diagramSvgContainer.querySelector('svg');
-          if (svgEl) {
-            svgEl.style.maxWidth = '100%';
-            svgEl.style.height = 'auto';
+          if (!data.svg || !data.svg.includes('<svg')) {
+            throw new Error('Invalid SVG markup returned from diagram engine.');
           }
 
-          diagramLoadingBanner.classList.add('hidden');
+          renderedSvgMarkup = data.svg;
+          if (diagramSvgContainer) {
+            diagramSvgContainer.innerHTML = data.svg;
+            const svgEl = diagramSvgContainer.querySelector('svg');
+            if (svgEl) {
+              svgEl.style.maxWidth = '100%';
+              svgEl.style.height = 'auto';
+            }
+          }
+
+          if (btnDiagramFullscreen) {
+            btnDiagramFullscreen.disabled = false;
+            btnDiagramFullscreen.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          if (btnDiagramDownload) {
+            btnDiagramDownload.disabled = false;
+            btnDiagramDownload.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+
+          if (diagramLoadingBanner) diagramLoadingBanner.classList.add('hidden');
           diagramActionBtns.forEach(btnEl => {
             btnEl.disabled = false;
             btnEl.innerHTML = `
@@ -2725,13 +3224,23 @@
           showToast('Architecture diagram rendered successfully!', 'success');
         } catch (err) {
           console.error('Architecture diagram error:', err);
-          diagramLoadingBanner.classList.add('hidden');
-          diagramSvgContainer.innerHTML = `
-            <div class="text-xs text-rose-400 p-3 rounded-lg bg-rose-950/40 border border-rose-800/40 flex items-center space-x-2">
-              <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
-              <span>${escapeHtml(err.message || 'Diagram generation failed, please retry.')}</span>
-            </div>
-          `;
+          if (diagramLoadingBanner) diagramLoadingBanner.classList.add('hidden');
+          if (diagramSvgContainer) {
+            diagramSvgContainer.innerHTML = `
+              <div class="text-xs text-rose-400 p-3 rounded-lg bg-rose-950/40 border border-rose-800/40 flex items-center space-x-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                <span>${escapeHtml(err.message || 'Diagram generation failed, please retry.')}</span>
+              </div>
+            `;
+          }
+          if (btnDiagramFullscreen) {
+            btnDiagramFullscreen.disabled = true;
+            btnDiagramFullscreen.classList.add('opacity-50', 'cursor-not-allowed');
+          }
+          if (btnDiagramDownload) {
+            btnDiagramDownload.disabled = true;
+            btnDiagramDownload.classList.add('opacity-50', 'cursor-not-allowed');
+          }
           diagramActionBtns.forEach(btnEl => {
             btnEl.disabled = false;
             btnEl.innerHTML = `
@@ -2750,14 +3259,14 @@
 
       if (btnDiagramFullscreen) {
         btnDiagramFullscreen.addEventListener('click', () => {
-          if (!renderedSvgMarkup) return;
+          if (!renderedSvgMarkup || !renderedSvgMarkup.includes('<svg')) return;
           openDiagramModal(paper.title, renderedSvgMarkup);
         });
       }
 
       if (btnDiagramDownload) {
         btnDiagramDownload.addEventListener('click', () => {
-          if (!renderedSvgMarkup) return;
+          if (!renderedSvgMarkup || !renderedSvgMarkup.includes('<svg')) return;
           downloadSvgFile(renderedSvgMarkup, paper.title);
         });
       }
@@ -2859,7 +3368,13 @@
 
         if (btnPrintPaper) {
           btnPrintPaper.addEventListener('click', () => {
-            window.print();
+            const diagramSvg = renderedSvgMarkup || (diagramSvgContainer ? (diagramSvgContainer.querySelector('svg')?.outerHTML || '') : '');
+            printTargetedPaperSynthesis({
+              paper,
+              depthFormatted,
+              markdownHtml: markdownBody.innerHTML,
+              diagramSvg
+            });
           });
         }
 
@@ -3218,7 +3733,10 @@
 
       if (btnPrintReport) {
         btnPrintReport.addEventListener('click', () => {
-          window.print();
+          printTargetedOverviewReport({
+            inquiry: currentInquiry,
+            markdownHtml: markdownBody.innerHTML
+          });
         });
       }
 

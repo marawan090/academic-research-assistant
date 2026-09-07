@@ -488,6 +488,90 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
 """
 
 
+def sanitize_plantuml(raw: str, default_title: str = "System Architecture") -> str:
+    """
+    Sanitize and validate PlantUML code extracted from LLM responses:
+    1. Removes any surrounding markdown code fences (```plantuml ... ```).
+    2. Strips out conversational preamble and postamble.
+    3. Extracts strictly the content between @startuml and @enduml.
+    4. Guarantees valid @startuml and @enduml boundaries.
+    5. Injects essential dark/modern skinparams if missing.
+    """
+    if not raw or not raw.strip():
+        return ""
+
+    text = raw.strip()
+
+    # Step 1: Locate @startuml and @enduml case-insensitively
+    lower_text = text.lower()
+    start_idx = lower_text.find("@startuml")
+    end_idx = lower_text.rfind("@enduml")
+
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        extracted = text[start_idx : end_idx + len("@enduml")].strip()
+    elif start_idx != -1:
+        extracted = text[start_idx:].strip() + "\n@enduml"
+    elif end_idx != -1:
+        extracted = "@startuml\n" + text[: end_idx + len("@enduml")].strip()
+    else:
+        cleaned = re.sub(r"^```(?:plantuml)?", "", text, flags=re.IGNORECASE | re.MULTILINE)
+        cleaned = re.sub(r"```$", "", cleaned, flags=re.MULTILINE).strip()
+        extracted = f"@startuml\n{cleaned}\n@enduml"
+
+    # Step 2: Clean internal backticks or fences inside the extracted block
+    lines = extracted.splitlines()
+    clean_lines = []
+    has_start = False
+    has_end = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```") or (stripped.endswith("```") and len(stripped) <= 15):
+            continue
+        if stripped.lower().startswith("@startuml"):
+            if not has_start:
+                clean_lines.append("@startuml")
+                has_start = True
+            continue
+        if stripped.lower().startswith("@enduml"):
+            has_end = True
+            continue
+        clean_lines.append(line)
+
+    if not has_start:
+        clean_lines.insert(0, "@startuml")
+    clean_lines.append("@enduml")
+
+    body_content = "\n".join(clean_lines[1:-1])
+
+    # Step 3: Inject robust skinparams / theme configuration if missing
+    skinparam_block = []
+    if "skinparam monochrome" not in body_content.lower():
+        skinparam_block.append("skinparam monochrome false")
+    if "skinparam shadowing" not in body_content.lower():
+        skinparam_block.append("skinparam shadowing false")
+    if "skinparam roundcorner" not in body_content.lower():
+        skinparam_block.append("skinparam roundcorner 10")
+    if "skinparam defaultfontname" not in body_content.lower():
+        skinparam_block.append('skinparam defaultFontName "Inter", "Helvetica", sans-serif')
+    if "skinparam defaultfontsize" not in body_content.lower():
+        skinparam_block.append("skinparam defaultFontSize 12")
+    if "skinparam arrowcolor" not in body_content.lower():
+        skinparam_block.append("skinparam ArrowColor #6366f1")
+    if "skinparam arrowthickness" not in body_content.lower():
+        skinparam_block.append("skinparam ArrowThickness 1.5")
+    if "skinparam componentstyle" not in body_content.lower():
+        skinparam_block.append("skinparam componentStyle uml2")
+
+    if skinparam_block:
+        injected = "\n".join(skinparam_block)
+        result = f"@startuml\n{injected}\n{body_content}\n@enduml"
+    else:
+        result = f"@startuml\n{body_content}\n@enduml"
+
+    return result.strip()
+
+
 class ResearchLLMService:
     """Service wrapping OrcaRouter's OpenAI-compatible API for research synthesis."""
 
@@ -1288,7 +1372,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
         client = self._get_client(custom_api_key)
         if client is None:
             logger.info("No OrcaRouter API key provided. Using fallback PlantUML generation.")
-            fallback = self.generate_fallback_plantuml(title, abstract, tldr)
+            fallback = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
             synthesis_cache.set(cache_key, fallback)
             return fallback
 
@@ -1317,37 +1401,39 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                     secondary_model=SECONDARY_MODEL,
                 )
             content = (response.choices[0].message.content or "").strip()
-
-            # Clean up markdown code blocks if the model wrapped output in ```plantuml
-            clean_code = re.sub(r"^```(?:plantuml)?\s*", "", content, flags=re.IGNORECASE)
-            clean_code = re.sub(r"\s*```$", "", clean_code).strip()
-
-            # Extract strictly between @startuml and @enduml
-            start_idx = clean_code.find("@startuml")
-            end_idx = clean_code.rfind("@enduml")
-            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                clean_code = clean_code[start_idx : end_idx + len("@enduml")].strip()
-            elif "@startuml" not in clean_code:
-                clean_code = f"@startuml\n{clean_code}\n@enduml"
-
+            clean_code = sanitize_plantuml(content, default_title=title)
+            if not clean_code or len(clean_code.strip().splitlines()) < 3:
+                clean_code = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
             synthesis_cache.set(cache_key, clean_code)
             return clean_code
 
         except Exception as e:
             logger.error("Error generating PlantUML via DeepSeek: %s", str(e), exc_info=True)
-            fallback = self.generate_fallback_plantuml(title, abstract, tldr)
+            fallback = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
             synthesis_cache.set(cache_key, fallback)
             return fallback
 
-    async def render_plantuml_kroki(self, plantuml_code: str) -> str:
+    async def render_plantuml_kroki(
+        self,
+        plantuml_code: str,
+        paper_title: str = "",
+        abstract: str = "",
+        tldr: str = "",
+        enable_fallback: bool = True
+    ) -> str:
         """
         Asynchronously POST PlantUML plain text to Kroki public service to obtain SVG markup.
         Endpoint: https://kroki.io/plantuml/svg
         Reuses pooled shared HTTP client and caches rendered SVG for 1 hour.
+        Logs exact Kroki error response body on non-200 status and seamlessly falls back to
+        guaranteed-valid PlantUML architecture.
         """
-        clean_code = plantuml_code.strip()
-        if not clean_code.startswith("@startuml"):
-            clean_code = f"@startuml\n{clean_code}\n@enduml"
+        clean_code = sanitize_plantuml(plantuml_code, default_title=paper_title)
+        if not clean_code or len(clean_code.strip().splitlines()) < 3:
+            clean_code = sanitize_plantuml(
+                self.generate_fallback_plantuml(paper_title or "System Architecture", abstract, tldr),
+                default_title=paper_title
+            )
 
         cache_key = f"kroki_svg:{clean_code}"
         cached = synthesis_cache.get(cache_key)
@@ -1357,21 +1443,53 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
 
         kroki_url = "https://kroki.io/plantuml/svg"
         http_client = get_shared_http_client()
-        response = await http_client.post(
-            kroki_url,
-            content=clean_code.encode("utf-8"),
-            headers={"Content-Type": "text/plain; charset=utf-8"}
+
+        try:
+            response = await http_client.post(
+                kroki_url,
+                content=clean_code.encode("utf-8"),
+                headers={"Content-Type": "text/plain; charset=utf-8"},
+                timeout=12.0
+            )
+            if response.status_code == 200 and "<svg" in response.text:
+                svg_content = response.text
+                synthesis_cache.set(cache_key, svg_content)
+                return svg_content
+
+            logger.error(
+                "Kroki API non-200 response (HTTP %d): %s\n--- PLANTUML SENT ---\n%s",
+                response.status_code,
+                response.text[:500],
+                clean_code
+            )
+        except Exception as http_err:
+            logger.error("Kroki HTTP request exception: %s", str(http_err), exc_info=True)
+
+        # Fallback rendering if the primary generated diagram produced a Kroki error or exception
+        if enable_fallback:
+            logger.warning("Attempting Kroki rendering with sanitized fallback architecture diagram...")
+            fallback_plantuml = sanitize_plantuml(
+                self.generate_fallback_plantuml(paper_title or "System Architecture", abstract, tldr),
+                default_title=paper_title
+            )
+            try:
+                fb_resp = await http_client.post(
+                    kroki_url,
+                    content=fallback_plantuml.encode("utf-8"),
+                    headers={"Content-Type": "text/plain; charset=utf-8"},
+                    timeout=10.0
+                )
+                if fb_resp.status_code == 200 and "<svg" in fb_resp.text:
+                    svg_content = fb_resp.text
+                    synthesis_cache.set(cache_key, svg_content)
+                    return svg_content
+                logger.error("Fallback Kroki rendering also failed (HTTP %d): %s", fb_resp.status_code, fb_resp.text[:200])
+            except Exception as fb_err:
+                logger.error("Fallback Kroki connection failed: %s", str(fb_err), exc_info=True)
+
+        raise RuntimeError(
+            "Kroki diagram rendering failed. Please retry in a few moments."
         )
-        if response.status_code != 200:
-            logger.error("Kroki API error (status %d): %s", response.status_code, response.text[:200])
-            raise RuntimeError(f"Kroki returned HTTP {response.status_code}: {response.text[:100]}")
-
-        svg_content = response.text
-        if "<svg" not in svg_content:
-            raise RuntimeError("Invalid SVG markup returned from Kroki")
-
-        synthesis_cache.set(cache_key, svg_content)
-        return svg_content
 
 
 LLMService = ResearchLLMService
