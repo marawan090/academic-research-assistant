@@ -21,6 +21,8 @@ logger = logging.getLogger("academic_assistant.search")
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 SEMANTIC_SCHOLAR_API_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 OPENALEX_API_URL = "https://api.openalex.org/works"
+OPENALEX_AUTHORS_URL = "https://api.openalex.org/authors"
+OPENALEX_INSTITUTIONS_URL = "https://api.openalex.org/institutions"
 TARGET_ARXIV_CATEGORIES = "(cat:cs.DC OR cat:cs.SE OR cat:cs.AI OR cat:cs.AR)"
 
 
@@ -695,6 +697,131 @@ def reconstruct_openalex_abstract(inverted_index: Optional[Dict[str, List[int]]]
     return " ".join(word for _, word in pos_word_pairs)
 
 
+# Dedicated in-memory cache for resolved OpenAlex entity IDs (1-hour TTL)
+_entity_resolution_cache: Dict[str, Tuple[Tuple[str, str], float]] = {}
+_entity_cache_lock = threading.Lock()
+
+
+def get_cached_entity_id(cache_key: str, ttl: float = 3600.0) -> Optional[Tuple[str, str]]:
+    with _entity_cache_lock:
+        if cache_key in _entity_resolution_cache:
+            val, ts = _entity_resolution_cache[cache_key]
+            if time.time() - ts < ttl:
+                return val
+            else:
+                del _entity_resolution_cache[cache_key]
+    return None
+
+
+def set_cached_entity_id(cache_key: str, val: Tuple[str, str]) -> None:
+    with _entity_cache_lock:
+        _entity_resolution_cache[cache_key] = (val, time.time())
+
+
+async def resolve_openalex_author_id(
+    name: str,
+    client: Optional[httpx.AsyncClient] = None,
+    timeout: float = 10.0
+) -> Optional[Tuple[str, str]]:
+    """
+    Step 1 of Author Resolution:
+    Query GET https://api.openalex.org/authors?search={encoded_name}&per-page=1
+    Returns (author_id, display_name) if found, else None.
+    """
+    clean_name = (name or "").strip()
+    if not clean_name:
+        return None
+
+    cache_key = f"openalex_author_resolve:{clean_name.lower()}"
+    cached = get_cached_entity_id(cache_key)
+    if cached is not None:
+        return cached
+
+    http_client = client or get_shared_http_client()
+    headers = {
+        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "Accept": "application/json",
+    }
+    params = {
+        "search": clean_name,
+        "per-page": 1,
+        "select": "id,display_name,works_count"
+    }
+    try:
+        async with openalex_limiter:
+            resp = await http_client.get(
+                OPENALEX_AUTHORS_URL,
+                params=params,
+                headers=headers,
+                timeout=timeout
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            results = data.get("results", [])
+            if results and isinstance(results[0], dict) and results[0].get("id"):
+                author_id = str(results[0]["id"]).strip()
+                disp_name = (results[0].get("display_name") or clean_name).strip()
+                res = (author_id, disp_name)
+                set_cached_entity_id(cache_key, res)
+                logger.info("Resolved author entity %r -> ID: %s (%s)", clean_name, author_id, disp_name)
+                return res
+    except Exception as e:
+        logger.warning("OpenAlex author lookup failed for %r: %s", clean_name, str(e))
+    return None
+
+
+async def resolve_openalex_institution_id(
+    name: str,
+    client: Optional[httpx.AsyncClient] = None,
+    timeout: float = 10.0
+) -> Optional[Tuple[str, str]]:
+    """
+    Step 1 of Institution Resolution:
+    Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1
+    Returns (institution_id, display_name) if found, else None.
+    """
+    clean_name = (name or "").strip()
+    if not clean_name:
+        return None
+
+    cache_key = f"openalex_inst_resolve:{clean_name.lower()}"
+    cached = get_cached_entity_id(cache_key)
+    if cached is not None:
+        return cached
+
+    http_client = client or get_shared_http_client()
+    headers = {
+        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "Accept": "application/json",
+    }
+    params = {
+        "search": clean_name,
+        "per-page": 1,
+        "select": "id,display_name,works_count,country_code"
+    }
+    try:
+        async with openalex_limiter:
+            resp = await http_client.get(
+                OPENALEX_INSTITUTIONS_URL,
+                params=params,
+                headers=headers,
+                timeout=timeout
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            results = data.get("results", [])
+            if results and isinstance(results[0], dict) and results[0].get("id"):
+                inst_id = str(results[0]["id"]).strip()
+                disp_name = (results[0].get("display_name") or clean_name).strip()
+                res = (inst_id, disp_name)
+                set_cached_entity_id(cache_key, res)
+                logger.info("Resolved institution entity %r -> ID: %s (%s)", clean_name, inst_id, disp_name)
+                return res
+    except Exception as e:
+        logger.warning("OpenAlex institution lookup failed for %r: %s", clean_name, str(e))
+    return None
+
+
 async def fetch_openalex_papers(
     keywords: str,
     client: httpx.AsyncClient,
@@ -713,9 +840,18 @@ async def fetch_openalex_papers(
 
     filter_parts = ["has_fulltext:true"]
     if author and author.strip():
-        filter_parts.append(f"raw_author_name.search:{author.strip()}")
+        auth_res = await resolve_openalex_author_id(author.strip(), client=client, timeout=timeout)
+        if auth_res:
+            filter_parts.append(f"authorships.author.id:{auth_res[0]}")
+        else:
+            filter_parts.append(f"raw_author_name.search:{author.strip()}")
+
     if institution and institution.strip():
-        filter_parts.append(f"raw_affiliation_strings.search:{institution.strip()}")
+        inst_res = await resolve_openalex_institution_id(institution.strip(), client=client, timeout=timeout)
+        if inst_res:
+            filter_parts.append(f"institutions.id:{inst_res[0]}")
+        else:
+            filter_parts.append(f"raw_affiliation_strings.search:{institution.strip()}")
 
     if not clean_kw and len(filter_parts) == 1:
         return papers
@@ -827,12 +963,19 @@ async def fetch_entity_papers(
 ) -> List[Paper]:
     """
     Dedicated endpoint logic to query ALL works by a specific researcher or affiliated with an institution
-    without requiring a topic inquiry.
-    - If entity_type == 'author':
-      Query: https://api.openalex.org/works?filter=raw_author_name.search:{name}&sort=cited_by_count:desc&per_page={limit}
-    - If entity_type == 'institution':
-      Query: https://api.openalex.org/works?filter=authorships.institutions.display_name.search:{name}&sort=publication_year:desc,cited_by_count:desc&per_page={limit}
-      (With automatic fallback to raw_affiliation_strings.search:{name} if rejected by OpenAlex).
+    without requiring a topic inquiry using robust OpenAlex Entity Resolution:
+
+    1. Author Resolution Strategy:
+       - Step 1: Query author lookup: GET https://api.openalex.org/authors?search={encoded_name}&per-page=1
+       - Step 2: If found, extract author OpenAlex ID (authors.id) and fetch works:
+         GET https://api.openalex.org/works?filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={limit}
+       - Fallback: If no direct author entity matched or 0 works returned, fallback to filter=raw_author_name.search:{encoded_name}.
+
+    2. Institution Resolution Strategy:
+       - Step 1: Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1
+       - Step 2: Fetch works via filter=institutions.id:{inst_id}&sort=publication_year:desc,cited_by_count:desc&per-page={limit}
+       - Fallback: filter=raw_affiliation_strings.search:{encoded_name}.
+
     Returns standardized Paper list with authors, institutions, citations, and PDF links.
     """
     clean_name = (name or "").strip()
@@ -903,34 +1046,72 @@ async def fetch_entity_papers(
         )
 
     if entity_type_clean == "author":
-        params = {
-            "filter": f"raw_author_name.search:{clean_name}",
-            "sort": "cited_by_count:desc",
-            "per-page": effective_limit,
-            "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
-        }
-        try:
-            async with openalex_limiter:
-                resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
-            if resp.status_code == 200:
-                data = resp.json()
-                for item in data.get("results", []):
-                    p = _parse_openalex_item(item)
-                    if p:
-                        papers.append(p)
-            else:
-                logger.warning("OpenAlex author search returned status %d: %s", resp.status_code, resp.text[:200])
-        except Exception as e:
-            logger.warning("Error fetching author works from OpenAlex: %s", str(e))
+        # Step 1: Query author lookup: GET https://api.openalex.org/authors?search={clean_name}&per-page=1
+        author_res = await resolve_openalex_author_id(clean_name, client=http_client, timeout=timeout)
+        works_fetched = False
+
+        if author_res:
+            author_id, disp_name = author_res
+            # Step 2: Fetch works: filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={limit}
+            params = {
+                "filter": f"authorships.author.id:{author_id}",
+                "sort": "cited_by_count:desc",
+                "per-page": effective_limit,
+                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
+            }
+            try:
+                async with openalex_limiter:
+                    resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for item in data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            if disp_name and disp_name not in p.authors:
+                                p.authors.insert(0, disp_name)
+                            papers.append(p)
+                    if papers:
+                        works_fetched = True
+                else:
+                    logger.warning("OpenAlex author works for %s returned status %d: %s",
+                                   author_id, resp.status_code, resp.text[:200])
+            except Exception as e:
+                logger.warning("Error fetching works for author ID %s: %s", author_id, str(e))
+
+        # Fallback: If no direct author entity matched or 0 works returned, fallback to raw_author_name.search
+        if not works_fetched:
+            logger.info("Falling back to raw_author_name.search for author %r", clean_name)
+            fallback_params = {
+                "filter": f"raw_author_name.search:{clean_name}",
+                "sort": "cited_by_count:desc",
+                "per-page": effective_limit,
+                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
+            }
+            try:
+                async with openalex_limiter:
+                    fb_resp = await http_client.get(OPENALEX_API_URL, params=fallback_params, headers=headers, timeout=timeout)
+                if fb_resp.status_code == 200:
+                    fb_data = fb_resp.json()
+                    for item in fb_data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            papers.append(p)
+                else:
+                    logger.warning("OpenAlex author fallback returned status %d: %s",
+                                   fb_resp.status_code, fb_resp.text[:200])
+            except Exception as fb_err:
+                logger.warning("Error in OpenAlex author fallback for %r: %s", clean_name, str(fb_err))
 
     elif entity_type_clean == "institution":
-        candidate_filters = [
-            f"authorships.institutions.display_name.search:{clean_name}",
-            f"raw_affiliation_strings.search:{clean_name}"
-        ]
-        for filt in candidate_filters:
+        # Step 1: Query institution lookup: GET https://api.openalex.org/institutions?search={clean_name}&per-page=1
+        inst_res = await resolve_openalex_institution_id(clean_name, client=http_client, timeout=timeout)
+        works_fetched = False
+
+        if inst_res:
+            inst_id, disp_name = inst_res
+            # Step 2: Fetch works via filter=institutions.id:{inst_id}&sort=publication_year:desc,cited_by_count:desc&per-page={limit}
             params = {
-                "filter": filt,
+                "filter": f"institutions.id:{inst_id}",
                 "sort": "publication_year:desc,cited_by_count:desc",
                 "per-page": effective_limit,
                 "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
@@ -940,15 +1121,43 @@ async def fetch_entity_papers(
                     resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
                 if resp.status_code == 200:
                     data = resp.json()
-                    results = data.get("results", [])
-                    if results:
-                        for item in results:
-                            p = _parse_openalex_item(item)
-                            if p:
-                                papers.append(p)
-                        break
+                    for item in data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            if disp_name and disp_name not in p.institutions:
+                                p.institutions.append(disp_name)
+                            papers.append(p)
+                    if papers:
+                        works_fetched = True
+                else:
+                    logger.warning("OpenAlex institution works for %s returned status %d: %s",
+                                   inst_id, resp.status_code, resp.text[:200])
             except Exception as e:
-                logger.warning("OpenAlex query with filter %r failed: %s", filt, str(e))
+                logger.warning("Error fetching works for institution ID %s: %s", inst_id, str(e))
+
+        # Fallback: filter=raw_affiliation_strings.search:{clean_name}
+        if not works_fetched:
+            logger.info("Falling back to raw_affiliation_strings.search for institution %r", clean_name)
+            fallback_params = {
+                "filter": f"raw_affiliation_strings.search:{clean_name}",
+                "sort": "publication_year:desc,cited_by_count:desc",
+                "per-page": effective_limit,
+                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
+            }
+            try:
+                async with openalex_limiter:
+                    fb_resp = await http_client.get(OPENALEX_API_URL, params=fallback_params, headers=headers, timeout=timeout)
+                if fb_resp.status_code == 200:
+                    fb_data = fb_resp.json()
+                    for item in fb_data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            papers.append(p)
+                else:
+                    logger.warning("OpenAlex institution fallback returned status %d: %s",
+                                   fb_resp.status_code, fb_resp.text[:200])
+            except Exception as fb_err:
+                logger.warning("Error in OpenAlex institution fallback for %r: %s", clean_name, str(fb_err))
 
     if papers:
         await discover_paper_code_urls(papers, http_client)
