@@ -556,7 +556,7 @@
           <button id="tab-discovered" class="px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-xs cursor-pointer">
             <i data-lucide="layers" class="w-3.5 h-3.5"></i>
             <span>Discovered</span>
-            <span id="tab-discovered-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-700 text-white ml-1">0</span>
+            <span id="tab-discovered-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-700 text-white ml-1"><span id="discovered-count">0</span></span>
             <span id="paper-count-badge" class="hidden">0 papers</span>
           </button>
           <button id="tab-saved" class="px-2.5 py-1 rounded-lg font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition flex items-center space-x-1.5 cursor-pointer">
@@ -1395,6 +1395,8 @@
     // Runtime state
     let activeEventSource = null;
     let currentPapers = [];
+    let discoveredPapers = [];
+    window.discoveredPapers = [];
     let currentInquiry = '';
 
     function escapeHtml(str) {
@@ -2260,7 +2262,11 @@
     }
 
     function updateWorkspaceBadges() {
-      if (tabDiscoveredBadge) tabDiscoveredBadge.textContent = currentPapers.length;
+      const count = (typeof discoveredPapers !== 'undefined' && Array.isArray(discoveredPapers) && discoveredPapers.length) ? discoveredPapers.length : currentPapers.length;
+      if (tabDiscoveredBadge) tabDiscoveredBadge.textContent = count;
+      const discoveredCountEl = document.getElementById('discovered-count');
+      if (discoveredCountEl) discoveredCountEl.textContent = count;
+      if (paperCountBadge) paperCountBadge.textContent = `${count} paper${count === 1 ? '' : 's'}`;
       if (tabSavedBadge) tabSavedBadge.textContent = savedPapers.length;
     }
 
@@ -2422,20 +2428,33 @@
 
     // --- Render Papers (Entrypoint) ---
     function renderPapers(papers) {
-      currentPapers = papers;
+      const pList = Array.isArray(papers) ? papers : [];
+      discoveredPapers = pList;
+      window.discoveredPapers = pList;
+      currentPapers = pList;
       currentPage = 1;
+      activeTab = 'discovered';
       updateWorkspaceBadges();
-      renderPapersView();
+      renderPapersView(discoveredPapers);
     }
 
     // Render active papers view (Discovered or Saved, with filters & DOM pagination applied)
-    function renderPapersView() {
+    function renderPapersView(papersOverride) {
+      if (Array.isArray(papersOverride)) {
+        discoveredPapers = papersOverride;
+        window.discoveredPapers = papersOverride;
+        currentPapers = papersOverride;
+        activeTab = 'discovered';
+      }
       const rawPool = activeTab === 'discovered' ? currentPapers : savedPapers;
       const displayPapers = activeTab === 'discovered' ? applyFilters(rawPool) : rawPool;
 
       if (paperCountBadge) {
         paperCountBadge.textContent = `${displayPapers.length} paper${displayPapers.length === 1 ? '' : 's'}`;
       }
+      const discCountEl = document.getElementById('discovered-count');
+      if (discCountEl) discCountEl.textContent = currentPapers.length;
+      if (tabDiscoveredBadge) tabDiscoveredBadge.textContent = currentPapers.length;
       updateWorkspaceBadges();
 
       // Real-time Instant Match Counter
@@ -4229,9 +4248,50 @@
         try {
           const data = JSON.parse(e.data);
           const type = data.type;
+          const stage = data.stage;
 
-          if (type === 'status') {
-            const stage = data.stage;
+          if (type === 'papers_ready' || stage === 'papers_ready' || (Array.isArray(data.papers) && data.papers.length > 0)) {
+            const payloadPapers = data.papers || [];
+            discoveredPapers = payloadPapers;
+            window.discoveredPapers = payloadPapers;
+            currentPapers = payloadPapers;
+            currentPage = 1;
+            activeTab = 'discovered';
+
+            // Update badge count (#discovered-count or equivalent)
+            const discCountEl = document.getElementById('discovered-count');
+            if (discCountEl) discCountEl.textContent = payloadPapers.length;
+            const tabBadge = document.getElementById('tab-discovered-badge');
+            if (tabBadge) tabBadge.textContent = payloadPapers.length;
+            const countBadge = document.getElementById('paper-count-badge');
+            if (countBadge) countBadge.textContent = `${payloadPapers.length} paper${payloadPapers.length === 1 ? '' : 's'}`;
+            updateWorkspaceBadges();
+
+            // Explicitly invoke renderPapersView(discoveredPapers)
+            renderPapersView(discoveredPapers);
+
+            const placeholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
+            const cardsContainer = document.getElementById('discovered-papers-list') || document.getElementById('papers-list');
+            if (payloadPapers.length > 0) {
+              if (placeholder) {
+                placeholder.classList.add('hidden');
+                placeholder.style.display = 'none';
+              }
+              if (cardsContainer) {
+                cardsContainer.classList.remove('hidden');
+                cardsContainer.style.display = 'block';
+              }
+            }
+            if (synthesisCard) {
+              synthesisCard.classList.remove('hidden');
+            }
+            const isCached = data.metadata && data.metadata.cache_hit;
+            if (isCached) {
+              showToast(`Retrieved ${payloadPapers.length} cached papers (<1ms)`, 'success');
+            } else {
+              showToast(`Retrieved ${payloadPapers.length} high-relevance papers`, 'info');
+            }
+          } else if (type === 'status') {
             stageDetail.textContent = data.message;
 
             if (stage === 'cache_hit') {
@@ -4264,27 +4324,6 @@
               stepDiscovery.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
               stageHeading.textContent = 'Literature Discovery Complete';
               synthesisCard.classList.remove('hidden');
-            }
-          } else if (type === 'papers_ready') {
-            renderPapers(data.papers || []);
-            const placeholder = document.getElementById('no-papers-placeholder') || document.getElementById('papers-empty-placeholder');
-            const cardsContainer = document.getElementById('discovered-papers-list') || document.getElementById('papers-list');
-            if (data.papers && data.papers.length > 0) {
-              if (placeholder) {
-                placeholder.classList.add('hidden');
-                placeholder.style.display = 'none';
-              }
-              if (cardsContainer) {
-                cardsContainer.classList.remove('hidden');
-                cardsContainer.style.display = 'block';
-              }
-            }
-            synthesisCard.classList.remove('hidden');
-            const isCached = data.metadata && data.metadata.cache_hit;
-            if (isCached) {
-              showToast(`Retrieved ${data.papers.length} cached papers (<1ms)`, 'success');
-            } else {
-              showToast(`Retrieved ${data.papers.length} high-relevance papers`, 'info');
             }
           } else if (type === 'token') {
             accumulatedMarkdown += data.content;

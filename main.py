@@ -648,18 +648,27 @@ async def research_stream_endpoint(
                 clean_mode = search_mode.lower().strip()
                 entity_cache_key = f"entity:{clean_mode}:{query.strip().lower()}:{limit}"
                 cached_entity = search_cache.get(entity_cache_key)
-                if cached_entity is not None:
+                if cached_entity is not None and cached_entity[0]:
                     cached_papers, cached_meta = cached_entity
+                    cached_slice = cached_papers[:limit]
+                    papers_payload = [p.dict() if hasattr(p, "dict") else (p.model_dump() if hasattr(p, "model_dump") else p) for p in cached_slice]
                     yield sse_event({"type": "status", "stage": "cache_hit", "message": f"Instant cache hit: Retrieving pre-indexed {clean_mode} publications (0ms network calls)..."})
                     await asyncio.sleep(0.04)
                     yield sse_event({"type": "status", "stage": "keywords_ready", "keywords": query, "message": f"Target {clean_mode}: '{query}' (from cache)"})
                     await asyncio.sleep(0.04)
-                    yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in cached_papers[:limit]], "metadata": cached_meta, "message": f"Retrieved {len(cached_papers[:limit])} cached publications for {query}."})
+                    yield sse_event({
+                        "type": "papers_ready",
+                        "stage": "papers_ready",
+                        "count": len(cached_slice),
+                        "papers": papers_payload,
+                        "metadata": cached_meta,
+                        "message": f"Retrieved {len(cached_slice)} cached publications for {query}."
+                    })
                     await asyncio.sleep(0.04)
                     yield sse_event({"type": "status", "stage": "discovery_ready", "message": f"{clean_mode.capitalize()} literature discovery complete (cache hit)."})
                     entity_summary = (
                         f"### {clean_mode.capitalize()} Profile: {query} (Cached)\n\n"
-                        f"- **Discovered Publications**: **{len(cached_papers[:limit])}** works retrieved from cache.\n"
+                        f"- **Discovered Publications**: **{len(cached_slice)}** works retrieved from cache.\n"
                         f"- **Ranking Metric**: Sorted by academic citation impact and code availability.\n"
                         f"- **Sidebar Available**: Publications are loaded in the **Discovered Papers** sidebar with affiliations and open-access links.\n\n"
                         f"> [!TIP]\n"
@@ -680,7 +689,15 @@ async def research_stream_endpoint(
                 await asyncio.sleep(0.04)
 
                 entity_meta = {"entity_type": clean_mode, "name": query, "final_count": len(entity_papers), "openalex_count": len(entity_papers)}
-                yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in entity_papers], "metadata": entity_meta, "message": f"Discovered {len(entity_papers)} works by {query} ranked by citations."})
+                papers_payload = [p.dict() if hasattr(p, "dict") else (p.model_dump() if hasattr(p, "model_dump") else p) for p in entity_papers]
+                yield sse_event({
+                    "type": "papers_ready",
+                    "stage": "papers_ready",
+                    "count": len(entity_papers),
+                    "papers": papers_payload,
+                    "metadata": entity_meta,
+                    "message": f"Discovered {len(entity_papers)} works by {query} ranked by citations."
+                })
                 await asyncio.sleep(0.04)
 
                 yield sse_event({"type": "status", "stage": "discovery_ready", "message": f"{clean_mode.capitalize()} literature discovery complete."})
@@ -717,7 +734,14 @@ async def research_stream_endpoint(
                 yield sse_event(payload)
                 await asyncio.sleep(0.04)
 
-                yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in selected_papers], "metadata": cached_meta, "message": f"Retrieved {len(selected_papers)} cached high-relevance papers."})
+                yield sse_event({
+                    "type": "papers_ready",
+                    "stage": "papers_ready",
+                    "count": len(selected_papers),
+                    "papers": [p.dict() if hasattr(p, "dict") else p.model_dump() for p in selected_papers],
+                    "metadata": cached_meta,
+                    "message": f"Retrieved {len(selected_papers)} cached high-relevance papers."
+                })
                 await asyncio.sleep(0.04)
 
                 yield sse_event({"type": "status", "stage": "discovery_ready", "message": "Literature discovery complete (cache hit). Ready for on-demand analysis."})
@@ -835,7 +859,14 @@ async def research_stream_endpoint(
             search_cache.set(cache_key, final_papers, metadata)
 
             # Stage 4: Emit papers_ready event
-            yield sse_event({"type": "papers_ready", "papers": [p.model_dump() for p in final_papers], "metadata": metadata, "message": f"Discovered {len(final_papers)} high-relevance papers across multi-source repositories."})
+            yield sse_event({
+                "type": "papers_ready",
+                "stage": "papers_ready",
+                "count": len(final_papers),
+                "papers": [p.dict() if hasattr(p, "dict") else p.model_dump() for p in final_papers],
+                "metadata": metadata,
+                "message": f"Discovered {len(final_papers)} high-relevance papers across multi-source repositories."
+            })
             await asyncio.sleep(0.05)
 
             # Stage 5: Search Overview Summary

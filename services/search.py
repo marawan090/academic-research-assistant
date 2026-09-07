@@ -759,7 +759,8 @@ async def resolve_openalex_author_id(
             data = resp.json()
             results = data.get("results", [])
             if results and isinstance(results[0], dict) and results[0].get("id"):
-                author_id = str(results[0]["id"]).strip()
+                raw_id = str(results[0]["id"]).strip()
+                author_id = raw_id.split("/")[-1] if "/" in raw_id else raw_id
                 disp_name = (results[0].get("display_name") or clean_name).strip()
                 res = (author_id, disp_name)
                 set_cached_entity_id(cache_key, res)
@@ -811,7 +812,8 @@ async def resolve_openalex_institution_id(
             data = resp.json()
             results = data.get("results", [])
             if results and isinstance(results[0], dict) and results[0].get("id"):
-                inst_id = str(results[0]["id"]).strip()
+                raw_id = str(results[0]["id"]).strip()
+                inst_id = raw_id.split("/")[-1] if "/" in raw_id else raw_id
                 disp_name = (results[0].get("display_name") or clean_name).strip()
                 res = (inst_id, disp_name)
                 set_cached_entity_id(cache_key, res)
@@ -842,14 +844,16 @@ async def fetch_openalex_papers(
     if author and author.strip():
         auth_res = await resolve_openalex_author_id(author.strip(), client=client, timeout=timeout)
         if auth_res:
-            filter_parts.append(f"authorships.author.id:{auth_res[0]}")
+            clean_auth_id = auth_res[0].split("/")[-1] if "/" in auth_res[0] else auth_res[0]
+            filter_parts.append(f"authorships.author.id:{clean_auth_id}")
         else:
             filter_parts.append(f"raw_author_name.search:{author.strip()}")
 
     if institution and institution.strip():
         inst_res = await resolve_openalex_institution_id(institution.strip(), client=client, timeout=timeout)
         if inst_res:
-            filter_parts.append(f"institutions.id:{inst_res[0]}")
+            clean_inst_id = inst_res[0].split("/")[-1] if "/" in inst_res[0] else inst_res[0]
+            filter_parts.append(f"institutions.id:{clean_inst_id}")
         else:
             filter_parts.append(f"raw_affiliation_strings.search:{institution.strip()}")
 
@@ -1052,9 +1056,10 @@ async def fetch_entity_papers(
 
         if author_res:
             author_id, disp_name = author_res
+            clean_author_id = author_id.split("/")[-1] if "/" in author_id else author_id
             # Step 2: Fetch works: filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={limit}
             params = {
-                "filter": f"authorships.author.id:{author_id}",
+                "filter": f"authorships.author.id:{clean_author_id}",
                 "sort": "cited_by_count:desc",
                 "per-page": effective_limit,
                 "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
@@ -1074,9 +1079,9 @@ async def fetch_entity_papers(
                         works_fetched = True
                 else:
                     logger.warning("OpenAlex author works for %s returned status %d: %s",
-                                   author_id, resp.status_code, resp.text[:200])
+                                   clean_author_id, resp.status_code, resp.text[:200])
             except Exception as e:
-                logger.warning("Error fetching works for author ID %s: %s", author_id, str(e))
+                logger.warning("Error fetching works for author ID %s: %s", clean_author_id, str(e))
 
         # Fallback: If no direct author entity matched or 0 works returned, fallback to raw_author_name.search
         if not works_fetched:
@@ -1109,9 +1114,10 @@ async def fetch_entity_papers(
 
         if inst_res:
             inst_id, disp_name = inst_res
+            clean_inst_id = inst_id.split("/")[-1] if "/" in inst_id else inst_id
             # Step 2: Fetch works via filter=institutions.id:{inst_id}&sort=publication_year:desc,cited_by_count:desc&per-page={limit}
             params = {
-                "filter": f"institutions.id:{inst_id}",
+                "filter": f"institutions.id:{clean_inst_id}",
                 "sort": "publication_year:desc,cited_by_count:desc",
                 "per-page": effective_limit,
                 "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
@@ -1131,9 +1137,9 @@ async def fetch_entity_papers(
                         works_fetched = True
                 else:
                     logger.warning("OpenAlex institution works for %s returned status %d: %s",
-                                   inst_id, resp.status_code, resp.text[:200])
+                                   clean_inst_id, resp.status_code, resp.text[:200])
             except Exception as e:
-                logger.warning("Error fetching works for institution ID %s: %s", inst_id, str(e))
+                logger.warning("Error fetching works for institution ID %s: %s", clean_inst_id, str(e))
 
         # Fallback: filter=raw_affiliation_strings.search:{clean_name}
         if not works_fetched:
