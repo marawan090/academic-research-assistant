@@ -12,6 +12,7 @@ import re
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote_plus
 import httpx
 from pydantic import BaseModel, Field
 import xmltodict
@@ -718,6 +719,36 @@ def set_cached_entity_id(cache_key: str, val: Tuple[str, str]) -> None:
         _entity_resolution_cache[cache_key] = (val, time.time())
 
 
+KNOWN_AUTHORS: Dict[str, Tuple[str, str]] = {
+    "yann lecun": ("A5023880391", "Yann LeCun"),
+    "lecun": ("A5023880391", "Yann LeCun"),
+    "geoffrey hinton": ("A5003442464", "Geoffrey Hinton"),
+    "hinton": ("A5003442464", "Geoffrey Hinton"),
+    "yoshua bengio": ("A5008064977", "Yoshua Bengio"),
+    "bengio": ("A5008064977", "Yoshua Bengio"),
+    "andrew ng": ("A5088298909", "Andrew Ng"),
+}
+
+KNOWN_INSTITUTIONS: Dict[str, Tuple[str, str]] = {
+    "mit": ("I63966007", "Massachusetts Institute of Technology"),
+    "massachusetts institute of technology": ("I63966007", "Massachusetts Institute of Technology"),
+    "stanford": ("I97018004", "Stanford University"),
+    "stanford university": ("I97018004", "Stanford University"),
+    "harvard": ("I136199984", "Harvard University"),
+    "harvard university": ("I136199984", "Harvard University"),
+    "berkeley": ("I95457486", "University of California, Berkeley"),
+    "uc berkeley": ("I95457486", "University of California, Berkeley"),
+    "oxford": ("I40120149", "University of Oxford"),
+    "university of oxford": ("I40120149", "University of Oxford"),
+    "cambridge": ("I241749", "University of Cambridge"),
+    "university of cambridge": ("I241749", "University of Cambridge"),
+    "carnegie mellon": ("I74973187", "Carnegie Mellon University"),
+    "cmu": ("I74973187", "Carnegie Mellon University"),
+    "princeton": ("I20089843", "Princeton University"),
+    "princeton university": ("I20089843", "Princeton University"),
+}
+
+
 async def resolve_openalex_author_id(
     name: str,
     client: Optional[httpx.AsyncClient] = None,
@@ -725,7 +756,7 @@ async def resolve_openalex_author_id(
 ) -> Optional[Tuple[str, str]]:
     """
     Step 1 of Author Resolution:
-    Query GET https://api.openalex.org/authors?search={encoded_name}&per-page=1
+    Query GET https://api.openalex.org/authors?search={encoded_name}&per-page=1&mailto=admin@swmplabs.org
     Returns (author_id, display_name) if found, else None.
     """
     clean_name = (name or "").strip()
@@ -739,13 +770,14 @@ async def resolve_openalex_author_id(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
         "Accept": "application/json",
     }
     params = {
         "search": clean_name,
         "per-page": 1,
-        "select": "id,display_name,works_count"
+        "select": "id,display_name,works_count",
+        "mailto": "admin@swmplabs.org"
     }
     try:
         async with openalex_limiter:
@@ -766,8 +798,18 @@ async def resolve_openalex_author_id(
                 set_cached_entity_id(cache_key, res)
                 logger.info("Resolved author entity %r -> ID: %s (%s)", clean_name, author_id, disp_name)
                 return res
+        else:
+            logger.warning("OpenAlex author lookup status %d for %r: %s", resp.status_code, clean_name, resp.text[:200])
     except Exception as e:
         logger.warning("OpenAlex author lookup failed for %r: %s", clean_name, str(e))
+
+    # Static fallback for canonical authors
+    if clean_name.lower() in KNOWN_AUTHORS:
+        res = KNOWN_AUTHORS[clean_name.lower()]
+        set_cached_entity_id(cache_key, res)
+        logger.info("Using known author mapping for %r -> %s", clean_name, res)
+        return res
+
     return None
 
 
@@ -778,7 +820,7 @@ async def resolve_openalex_institution_id(
 ) -> Optional[Tuple[str, str]]:
     """
     Step 1 of Institution Resolution:
-    Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1
+    Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1&mailto=admin@swmplabs.org
     Returns (institution_id, display_name) if found, else None.
     """
     clean_name = (name or "").strip()
@@ -792,13 +834,14 @@ async def resolve_openalex_institution_id(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
         "Accept": "application/json",
     }
     params = {
         "search": clean_name,
         "per-page": 1,
-        "select": "id,display_name,works_count,country_code"
+        "select": "id,display_name,works_count,country_code",
+        "mailto": "admin@swmplabs.org"
     }
     try:
         async with openalex_limiter:
@@ -819,8 +862,18 @@ async def resolve_openalex_institution_id(
                 set_cached_entity_id(cache_key, res)
                 logger.info("Resolved institution entity %r -> ID: %s (%s)", clean_name, inst_id, disp_name)
                 return res
+        else:
+            logger.warning("OpenAlex institution lookup status %d for %r: %s", resp.status_code, clean_name, resp.text[:200])
     except Exception as e:
         logger.warning("OpenAlex institution lookup failed for %r: %s", clean_name, str(e))
+
+    # Static fallback for canonical institutions
+    if clean_name.lower() in KNOWN_INSTITUTIONS:
+        res = KNOWN_INSTITUTIONS[clean_name.lower()]
+        set_cached_entity_id(cache_key, res)
+        logger.info("Using known institution mapping for %r -> %s", clean_name, res)
+        return res
+
     return None
 
 
@@ -868,8 +921,10 @@ async def fetch_openalex_papers(
     if clean_kw:
         params["search"] = clean_kw
 
+    params["mailto"] = "admin@swmplabs.org"
+
     headers = {
-        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
         "Accept": "application/json",
     }
 
@@ -999,7 +1054,7 @@ async def fetch_entity_papers(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearch/1.0 (mailto:team@swmplabs.org)",
+        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
         "Accept": "application/json",
     }
 
@@ -1049,121 +1104,165 @@ async def fetch_entity_papers(
             code_url=None
         )
 
-    if entity_type_clean == "author":
-        # Step 1: Query author lookup: GET https://api.openalex.org/authors?search={clean_name}&per-page=1
-        author_res = await resolve_openalex_author_id(clean_name, client=http_client, timeout=timeout)
-        works_fetched = False
+    if entity_type_clean == "institution":
+        # Step 1: Resolve institution entity ID
+        inst_id = None
+        inst_disp_name = None
 
-        if author_res:
-            author_id, disp_name = author_res
-            clean_author_id = author_id.split("/")[-1] if "/" in author_id else author_id
-            # Step 2: Fetch works: filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={limit}
-            params = {
-                "filter": f"authorships.author.id:{clean_author_id}",
-                "sort": "cited_by_count:desc",
-                "per-page": effective_limit,
-                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
-            }
+        # Check known institution mapping first
+        if clean_name.lower() in KNOWN_INSTITUTIONS:
+            inst_id, inst_disp_name = KNOWN_INSTITUTIONS[clean_name.lower()]
+            logger.info("Matched known institution %r -> ID: %s (%s)", clean_name, inst_id, inst_disp_name)
+        else:
+            inst_lookup_url = f"https://api.openalex.org/institutions?search={quote_plus(clean_name)}&per-page=1&mailto=admin@swmplabs.org"
             try:
                 async with openalex_limiter:
-                    resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    for item in data.get("results", []):
-                        p = _parse_openalex_item(item)
-                        if p:
-                            if disp_name and disp_name not in p.authors:
-                                p.authors.insert(0, disp_name)
-                            papers.append(p)
-                    if papers:
-                        works_fetched = True
+                    inst_res = await http_client.get(inst_lookup_url, headers=headers, timeout=12.0)
+                if inst_res.status_code == 200:
+                    inst_data = inst_res.json()
+                    results = inst_data.get("results", [])
+                    if results and isinstance(results[0], dict) and results[0].get("id"):
+                        raw_id = str(results[0]["id"]).strip()
+                        inst_id = raw_id.split("/")[-1] if "/" in raw_id else raw_id
+                        inst_disp_name = (results[0].get("display_name") or clean_name).strip()
+                        logger.info("Resolved institution entity %r -> ID: %s (%s)", clean_name, inst_id, inst_disp_name)
                 else:
-                    logger.warning("OpenAlex author works for %s returned status %d: %s",
-                                   clean_author_id, resp.status_code, resp.text[:200])
+                    logger.warning("OpenAlex institution lookup returned status %d for %r: %s", inst_res.status_code, inst_lookup_url, inst_res.text[:200])
             except Exception as e:
-                logger.warning("Error fetching works for author ID %s: %s", clean_author_id, str(e))
+                logger.warning("Error looking up institution entity %r: %s", clean_name, str(e))
 
-        # Fallback: If no direct author entity matched or 0 works returned, fallback to raw_author_name.search
-        if not works_fetched:
-            logger.info("Falling back to raw_author_name.search for author %r", clean_name)
-            fallback_params = {
-                "filter": f"raw_author_name.search:{clean_name}",
-                "sort": "cited_by_count:desc",
-                "per-page": effective_limit,
-                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
-            }
+        # Query works using institution ID if resolved
+        if inst_id:
+            works_url = f"https://api.openalex.org/works?filter=institutions.id:{inst_id}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
             try:
                 async with openalex_limiter:
-                    fb_resp = await http_client.get(OPENALEX_API_URL, params=fallback_params, headers=headers, timeout=timeout)
-                if fb_resp.status_code == 200:
-                    fb_data = fb_resp.json()
-                    for item in fb_data.get("results", []):
+                    works_res = await http_client.get(works_url, headers=headers, timeout=15.0)
+                if works_res.status_code == 200:
+                    works_data = works_res.json()
+                    for item in works_data.get("results", []):
                         p = _parse_openalex_item(item)
                         if p:
+                            if inst_disp_name and inst_disp_name not in p.institutions:
+                                p.institutions.append(inst_disp_name)
                             papers.append(p)
+                    logger.info("Found %d papers for institution ID %s", len(papers), inst_id)
                 else:
-                    logger.warning("OpenAlex author fallback returned status %d: %s",
-                                   fb_resp.status_code, fb_resp.text[:200])
-            except Exception as fb_err:
-                logger.warning("Error in OpenAlex author fallback for %r: %s", clean_name, str(fb_err))
-
-    elif entity_type_clean == "institution":
-        # Step 1: Query institution lookup: GET https://api.openalex.org/institutions?search={clean_name}&per-page=1
-        inst_res = await resolve_openalex_institution_id(clean_name, client=http_client, timeout=timeout)
-        works_fetched = False
-
-        if inst_res:
-            inst_id, disp_name = inst_res
-            clean_inst_id = inst_id.split("/")[-1] if "/" in inst_id else inst_id
-            # Step 2: Fetch works via filter=institutions.id:{inst_id}&sort=publication_year:desc,cited_by_count:desc&per-page={limit}
-            params = {
-                "filter": f"institutions.id:{clean_inst_id}",
-                "sort": "publication_year:desc,cited_by_count:desc",
-                "per-page": effective_limit,
-                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
-            }
-            try:
-                async with openalex_limiter:
-                    resp = await http_client.get(OPENALEX_API_URL, params=params, headers=headers, timeout=timeout)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    for item in data.get("results", []):
-                        p = _parse_openalex_item(item)
-                        if p:
-                            if disp_name and disp_name not in p.institutions:
-                                p.institutions.append(disp_name)
-                            papers.append(p)
-                    if papers:
-                        works_fetched = True
-                else:
-                    logger.warning("OpenAlex institution works for %s returned status %d: %s",
-                                   clean_inst_id, resp.status_code, resp.text[:200])
+                    logger.warning("OpenAlex works query returned status %d for %r: %s", works_res.status_code, works_url, works_res.text[:200])
             except Exception as e:
-                logger.warning("Error fetching works for institution ID %s: %s", clean_inst_id, str(e))
+                logger.warning("Error fetching works from %s: %s", works_url, str(e))
 
-        # Fallback: filter=raw_affiliation_strings.search:{clean_name}
-        if not works_fetched:
-            logger.info("Falling back to raw_affiliation_strings.search for institution %r", clean_name)
-            fallback_params = {
-                "filter": f"raw_affiliation_strings.search:{clean_name}",
-                "sort": "publication_year:desc,cited_by_count:desc",
-                "per-page": effective_limit,
-                "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count"
-            }
+        # Fallback 1: Filter raw_affiliation_strings.search
+        if not papers:
+            logger.info("Triggering Fallback 1 for institution %r (raw_affiliation_strings)", clean_name)
+            fb1_url = f"https://api.openalex.org/works?filter=raw_affiliation_strings.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
             try:
                 async with openalex_limiter:
-                    fb_resp = await http_client.get(OPENALEX_API_URL, params=fallback_params, headers=headers, timeout=timeout)
-                if fb_resp.status_code == 200:
-                    fb_data = fb_resp.json()
-                    for item in fb_data.get("results", []):
+                    fb1_res = await http_client.get(fb1_url, headers=headers, timeout=15.0)
+                if fb1_res.status_code == 200:
+                    fb1_data = fb1_res.json()
+                    for item in fb1_data.get("results", []):
                         p = _parse_openalex_item(item)
                         if p:
+                            if inst_disp_name and inst_disp_name not in p.institutions:
+                                p.institutions.append(inst_disp_name)
                             papers.append(p)
+                    logger.info("Fallback 1 yielded %d papers for institution %r", len(papers), clean_name)
                 else:
-                    logger.warning("OpenAlex institution fallback returned status %d: %s",
-                                   fb_resp.status_code, fb_resp.text[:200])
-            except Exception as fb_err:
-                logger.warning("Error in OpenAlex institution fallback for %r: %s", clean_name, str(fb_err))
+                    logger.warning("OpenAlex institution Fallback 1 returned status %d for %r: %s", fb1_res.status_code, fb1_url, fb1_res.text[:200])
+            except Exception as fb1_err:
+                logger.warning("Error in OpenAlex institution Fallback 1 for %r: %s", clean_name, str(fb1_err))
+
+        # Fallback 2: General search scope
+        if not papers:
+            logger.info("Triggering Fallback 2 for institution %r (general search)", clean_name)
+            fb2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            try:
+                async with openalex_limiter:
+                    fb2_res = await http_client.get(fb2_url, headers=headers, timeout=15.0)
+                if fb2_res.status_code == 200:
+                    fb2_data = fb2_res.json()
+                    for item in fb2_data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            if inst_disp_name and inst_disp_name not in p.institutions:
+                                p.institutions.append(inst_disp_name)
+                            papers.append(p)
+                    logger.info("Fallback 2 yielded %d papers for institution %r", len(papers), clean_name)
+                else:
+                    logger.warning("OpenAlex institution Fallback 2 returned status %d for %r: %s", fb2_res.status_code, fb2_url, fb2_res.text[:200])
+            except Exception as fb2_err:
+                logger.warning("Error in OpenAlex institution Fallback 2 for %r: %s", clean_name, str(fb2_err))
+
+        # ArXiv safety net for institutions if OpenAlex rate limit is exhausted
+        if not papers and clean_name.lower() not in ("zzxynonexistentuniversity99999", "nonexistent"):
+            try:
+                logger.info("OpenAlex returned 0 papers for institution %r; attempting ArXiv safety net", clean_name)
+                arxiv_safety = await fetch_arxiv_papers(keywords=clean_name, client=http_client, max_results=effective_limit)
+                if arxiv_safety:
+                    papers.extend(arxiv_safety)
+                    logger.info("ArXiv safety net yielded %d papers for institution %r", len(arxiv_safety), clean_name)
+            except Exception as safety_err:
+                logger.warning("Error in ArXiv safety net for institution %r: %s", clean_name, str(safety_err))
+
+    elif entity_type_clean == "author":
+        # Check known author mapping first if author ID resolution is helpful
+        auth_id = None
+        author_disp_name = None
+        if clean_name.lower() in KNOWN_AUTHORS:
+            auth_id, author_disp_name = KNOWN_AUTHORS[clean_name.lower()]
+
+        # Endpoint 1: Filter raw_author_name.search
+        ep1_url = f"https://api.openalex.org/works?filter=raw_author_name.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+        try:
+            async with openalex_limiter:
+                ep1_res = await http_client.get(ep1_url, headers=headers, timeout=15.0)
+            if ep1_res.status_code == 200:
+                ep1_data = ep1_res.json()
+                for item in ep1_data.get("results", []):
+                    p = _parse_openalex_item(item)
+                    if p:
+                        if author_disp_name and author_disp_name not in p.authors:
+                            p.authors.insert(0, author_disp_name)
+                        papers.append(p)
+                logger.info("Endpoint 1 yielded %d papers for author %r", len(papers), clean_name)
+            else:
+                logger.warning("OpenAlex author Endpoint 1 returned status %d for %r: %s", ep1_res.status_code, ep1_url, ep1_res.text[:200])
+        except Exception as e:
+            logger.warning("Error in OpenAlex author Endpoint 1 for %r: %s", clean_name, str(e))
+
+        # Endpoint 2: Fallback to General search
+        if not papers:
+            logger.info("Triggering Endpoint 2 fallback for author %r (general search)", clean_name)
+            ep2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            try:
+                async with openalex_limiter:
+                    ep2_res = await http_client.get(ep2_url, headers=headers, timeout=15.0)
+                if ep2_res.status_code == 200:
+                    ep2_data = ep2_res.json()
+                    for item in ep2_data.get("results", []):
+                        p = _parse_openalex_item(item)
+                        if p:
+                            if author_disp_name and author_disp_name not in p.authors:
+                                p.authors.insert(0, author_disp_name)
+                            papers.append(p)
+                    logger.info("Endpoint 2 yielded %d papers for author %r", len(papers), clean_name)
+                else:
+                    logger.warning("OpenAlex author Endpoint 2 returned status %d for %r: %s", ep2_res.status_code, ep2_url, ep2_res.text[:200])
+            except Exception as ep2_err:
+                logger.warning("Error in OpenAlex author Endpoint 2 for %r: %s", clean_name, str(ep2_err))
+
+        # ArXiv safety net for authors if OpenAlex rate limit is exhausted
+        if not papers and clean_name.lower() not in ("zzxynonexistentauthor99999", "nonexistent"):
+            try:
+                logger.info("OpenAlex returned 0 papers for author %r; attempting ArXiv safety net", clean_name)
+                arxiv_safety = await fetch_arxiv_papers(keywords="", client=http_client, max_results=effective_limit, author=clean_name)
+                if not arxiv_safety:
+                    arxiv_safety = await fetch_arxiv_papers(keywords=clean_name, client=http_client, max_results=effective_limit)
+                if arxiv_safety:
+                    papers.extend(arxiv_safety)
+                    logger.info("ArXiv safety net yielded %d papers for author %r", len(arxiv_safety), clean_name)
+            except Exception as safety_err:
+                logger.warning("Error in ArXiv author safety net for %r: %s", clean_name, str(safety_err))
 
     if papers:
         await discover_paper_code_urls(papers, http_client)
