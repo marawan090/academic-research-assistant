@@ -45,6 +45,8 @@ from services.llm import (
     llm_semaphore,
     OutreachEmailRequest,
     generate_outreach_email,
+    ComparePapersRequest,
+    generate_compare_matrix,
 )
 
 # Configure logging
@@ -498,6 +500,12 @@ async def health_check():
         "semantic_scholar_configured": bool(runtime_config["semantic_scholar_api_key"]),
         "orcarouter_base_url": runtime_config["orcarouter_base_url"],
     }
+
+
+@app.get("/api/health")
+async def api_health_check():
+    """Lightweight server health-check endpoint that responds instantly."""
+    return {"status": "online", "version": "1.0.0"}
 
 
 @app.post("/api/config", dependencies=[Depends(verify_axiom_access)])
@@ -1116,6 +1124,49 @@ async def papers_compare_endpoint(payload: PapersCompareRequest):
             "X-Accel-Buffering": "no",
         }
     )
+
+
+@app.post("/api/paper/compare-matrix", dependencies=[Depends(verify_axiom_access)])
+async def paper_compare_matrix_endpoint(payload: ComparePapersRequest):
+    """
+    Authoritative cross-paper trade-off matrix endpoint.
+    Generates a structured Markdown table comparing 2 to 4 papers across 5 required dimensions:
+    1. Fundamental Problem Addressed
+    2. Core Architectural Mechanism
+    3. Key Assumptions & Constraints
+    4. Performance / Complexity Ceiling
+    5. Engineering Trade-offs & Failure Modes
+    """
+    if len(payload.papers) < 2 or len(payload.papers) > 4:
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide between 2 and 4 papers for comparison matrix."
+        )
+
+    for i, p in enumerate(payload.papers):
+        if not isinstance(p, dict) or not (p.get("title") or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Paper at index {i} must be a valid dictionary with a non-empty 'title'."
+            )
+
+    effective_key = (payload.orcarouter_key or runtime_config["orcarouter_api_key"] or "").strip()
+
+    try:
+        matrix_md = await llm_service.generate_compare_matrix(
+            papers=payload.papers,
+            custom_api_key=effective_key
+        )
+        return {
+            "status": "success",
+            "markdown": matrix_md,
+            "paper_count": len(payload.papers)
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error("Error in compare-matrix endpoint: %s", str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate trade-off matrix: {str(e)}")
 
 
 @app.post("/api/export/notebooklm", dependencies=[Depends(verify_axiom_access)])

@@ -268,6 +268,60 @@
       border-color: #1e293b;
     }
 
+    /* Trade-off Matrix Table Styling */
+    .tradeoff-matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      margin: 1rem 0;
+    }
+    .tradeoff-matrix-table th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      border: 1px solid #cbd5e1;
+      white-space: nowrap;
+    }
+    .dark .tradeoff-matrix-table th {
+      background-color: #0f172a;
+      color: #f8fafc;
+      border-color: #334155;
+    }
+    .tradeoff-matrix-table td {
+      padding: 0.75rem 1rem;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    .dark .tradeoff-matrix-table td {
+      border-color: #1e293b;
+    }
+    .tradeoff-matrix-table tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .dark .tradeoff-matrix-table tr:nth-child(even) {
+      background-color: rgba(30, 41, 59, 0.45);
+    }
+    .tradeoff-matrix-table tr:nth-child(odd) {
+      background-color: #ffffff;
+    }
+    .dark .tradeoff-matrix-table tr:nth-child(odd) {
+      background-color: rgba(15, 23, 42, 0.3);
+    }
+    .tradeoff-matrix-table td:first-child {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 700;
+      color: #4f46e5;
+      background-color: #f1f5f9;
+      min-width: 170px;
+    }
+    .dark .tradeoff-matrix-table td:first-child {
+      color: #818cf8;
+      background-color: rgba(15, 23, 42, 0.7);
+    }
+
     /* Print Media Styles */
     @media print {
       body {
@@ -277,6 +331,7 @@
         overflow: visible !important;
       }
       header,
+      #cold-start-banner,
       #papers-drawer,
       #papers-list,
       #discovered-papers-list,
@@ -307,6 +362,7 @@
       #citation-modal,
       #diagram-modal,
       #outreach-modal,
+      #compare-matrix-modal,
       #auth-gate-modal,
       #support-modal {
         display: none !important;
@@ -378,6 +434,12 @@
 
 <body class="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-150">
 
+  <!-- Cold-Start Wakeup Banner (Render Free Tier spin-up notice) -->
+  <div id="cold-start-banner" class="hidden bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-center text-xs font-medium text-amber-800 dark:text-amber-300 flex items-center justify-center space-x-2 transition-all duration-300 z-50">
+    <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block"></span>
+    <span id="cold-start-banner-text">Waking up compute engine on Render Free Tier... Requests may take up to 45s initially.</span>
+  </div>
+
   <!-- Top Navigation Header (Minimalist & Clutter-Free) -->
   <header class="flex-none border-b border-slate-200 dark:border-[#1E293B] bg-white/90 dark:bg-[#0B0F19]/90 backdrop-blur-md z-30 px-4 lg:px-6 py-3">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -395,10 +457,10 @@
       <!-- Right Header Actions (Status Pill, Theme Toggle, Support Button ONLY) -->
       <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
         
-        <!-- Status Pill: Cohort Access Active -->
-        <div title="Axiom Engine: Online (Cohort Access Active)" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
-          <span class="font-semibold tracking-wide">● Cohort Access Active</span>
+        <!-- Status Badge: Server Health & Cold Start Indicator -->
+        <div id="server-status-badge" title="Axiom Engine Health Status" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors">
+          <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="server-status-text" class="font-semibold tracking-wide">Engine: Active</span>
         </div>
 
         <!-- Dark / Light Mode Switcher Toggle -->
@@ -629,18 +691,18 @@
           </button>
         </div>
 
-        <!-- Comparative Matrix Action Bar (Appears when 1 or more papers checked) -->
+        <!-- Comparative Matrix Action Bar (Appears when 2 or more papers checked) -->
         <div id="compare-bar" class="hidden items-center justify-between bg-gradient-to-r from-brand-950/90 to-indigo-950/90 border border-brand-500/40 p-2 rounded-xl text-xs shadow-md">
           <div class="flex items-center space-x-2">
             <span class="w-2 h-2 rounded-full bg-brand-400 animate-pulse"></span>
-            <span class="font-semibold text-brand-200" id="compare-count-text">Selected: 0/3</span>
+            <span class="font-semibold text-brand-200" id="compare-count-text">2 Papers Selected</span>
           </div>
           <div class="flex items-center space-x-1.5">
-            <button id="btn-run-compare" class="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white font-semibold shadow transition flex items-center space-x-1" disabled>
+            <button id="btn-run-compare" class="px-3 py-1 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold shadow transition flex items-center space-x-1.5 cursor-pointer" disabled>
               <i data-lucide="columns-2" class="w-3.5 h-3.5"></i>
-              <span>Compare Approaches</span>
+              <span>Compare Trade-off Matrix 📊</span>
             </button>
-            <button id="btn-clear-selection" class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition" title="Clear selection">
+            <button id="btn-clear-selection" class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer" title="Clear selection">
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -895,6 +957,68 @@
             <span>↗️</span>
             <span>Open in Mail Client</span>
           </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Cross-Paper Trade-off Matrix Modal -->
+  <div id="compare-matrix-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 hidden">
+    <div class="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-6xl w-full p-5 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-slate-800 dark:text-slate-100 flex flex-col max-h-[92vh]">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5 gap-2 shrink-0">
+        <div class="min-w-0">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">📊</span>
+            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+              Cross-Paper Trade-off Matrix
+            </h3>
+            <span id="matrix-paper-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+              2 Papers
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Contrasting Architectural Bottlenecks, Bounds, Complexity Ceilings, and Failure Modes
+          </p>
+        </div>
+        <button id="btn-close-matrix-modal" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0 cursor-pointer" title="Close Matrix Modal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Loading State (visible during generation) -->
+      <div id="matrix-loading-indicator" class="hidden flex-col items-center justify-center py-12 space-y-3">
+        <svg class="animate-spin w-8 h-8 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span class="text-xs font-mono text-slate-600 dark:text-slate-300">Synthesizing multi-dimensional engineering trade-offs...</span>
+      </div>
+
+      <!-- Matrix Table Scrollable Viewport -->
+      <div id="matrix-viewport" class="flex-1 overflow-x-auto overflow-y-auto min-h-0 border border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50 dark:bg-slate-950/60 p-3 sm:p-5">
+        <div id="matrix-content-area" class="prose-academic text-sm text-slate-900 dark:text-slate-100">
+          <!-- Rendered Markdown Table Injected Dynamically -->
+        </div>
+      </div>
+
+      <!-- Action Buttons Footer -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 text-xs shrink-0">
+        <span class="text-[11px] text-slate-500 hidden sm:inline">5 Core Evaluated Dimensions: Problem, Architecture, Constraints, Bounds, Trade-offs</span>
+        <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+          <button id="btn-copy-matrix-md" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition cursor-pointer">
+            <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+            <span id="copy-matrix-label">📋 Copy Markdown</span>
+          </button>
+          <button id="btn-print-matrix" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs border border-slate-700 transition cursor-pointer" title="Print or Save as PDF">
+            <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+            <span>🖨️ Print / PDF Table</span>
+          </button>
+          <button id="btn-footer-close-matrix" class="px-3.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer">
+            ✕ Close
+          </button>
         </div>
       </div>
 
@@ -2177,6 +2301,17 @@
     const compareCountText = document.getElementById('compare-count-text');
     const btnRunCompare = document.getElementById('btn-run-compare');
     const btnClearSelection = document.getElementById('btn-clear-selection');
+    const compareMatrixModal = document.getElementById('compare-matrix-modal');
+    const matrixPaperCountBadge = document.getElementById('matrix-paper-count-badge');
+    const matrixLoadingIndicator = document.getElementById('matrix-loading-indicator');
+    const matrixViewport = document.getElementById('matrix-viewport');
+    const matrixContentArea = document.getElementById('matrix-content-area');
+    const btnCloseMatrixModal = document.getElementById('btn-close-matrix-modal');
+    const btnFooterCloseMatrix = document.getElementById('btn-footer-close-matrix');
+    const btnCopyMatrixMd = document.getElementById('btn-copy-matrix-md');
+    const btnPrintMatrix = document.getElementById('btn-print-matrix');
+    const copyMatrixLabel = document.getElementById('copy-matrix-label');
+    let currentMatrixMarkdown = '';
 
     // DOM Elements - Header & Saved Exports
     const btnExportNotebookLM = document.getElementById('btn-export-notebooklm');
@@ -2374,12 +2509,16 @@
     }
 
     // --- Comparative Matrix Selection Logic ---
+    const MAX_COMPARE_PAPERS = 4;
+
     function updateCompareBar() {
       const count = selectedPapersForCompare.size;
-      if (compareCountText) compareCountText.textContent = `Selected: ${count}/3`;
+      if (compareCountText) {
+        compareCountText.textContent = `${count} Paper${count === 1 ? '' : 's'} Selected`;
+      }
 
       if (compareBar) {
-        if (count > 0) {
+        if (count >= 2) {
           compareBar.classList.remove('hidden');
           compareBar.classList.add('flex');
         } else {
@@ -2391,12 +2530,12 @@
         btnRunCompare.disabled = count < 2;
       }
 
-      // Checkbox state: disable unchecked if count >= 3
+      // Checkbox state: disable unchecked if count >= 4
       document.querySelectorAll('.paper-select-cb').forEach(cb => {
         const pid = cb.getAttribute('data-paper-id');
-        if (count >= 3 && !selectedPapersForCompare.has(pid)) {
+        if (count >= MAX_COMPARE_PAPERS && !selectedPapersForCompare.has(pid)) {
           cb.disabled = true;
-          cb.title = 'Maximum 3 papers can be compared simultaneously';
+          cb.title = `Maximum ${MAX_COMPARE_PAPERS} papers can be compared simultaneously`;
         } else {
           cb.disabled = false;
           cb.title = 'Select for comparative matrix';
@@ -2409,6 +2548,7 @@
         selectedPapersForCompare.clear();
         document.querySelectorAll('.paper-select-cb').forEach(cb => {
           cb.checked = false;
+          cb.disabled = false;
         });
         updateCompareBar();
       });
@@ -2422,7 +2562,11 @@
           showToast('Please select at least 2 papers to compare', 'info');
           return;
         }
-        triggerPapersComparison(selectedList);
+        if (selectedList.length > MAX_COMPARE_PAPERS) {
+          showToast(`Maximum ${MAX_COMPARE_PAPERS} papers can be compared simultaneously`, 'warning');
+          return;
+        }
+        openCompareMatrixModal(selectedList);
       });
     }
 
@@ -2565,13 +2709,17 @@
         card.innerHTML = `
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <input
-                type="checkbox"
-                class="paper-select-cb accent-brand-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
-                data-paper-id="${escapeHtml(p.id)}"
-                ${isChecked ? 'checked' : ''}
-                title="Select for comparison"
-              />
+              <label class="flex items-center space-x-1.5 cursor-pointer select-none text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400" title="Compare this paper">
+                <input
+                  type="checkbox"
+                  class="paper-select-cb accent-brand-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                  data-paper-id="${escapeHtml(p.id)}"
+                  ${isChecked ? 'checked' : ''}
+                  ${!isChecked && selectedPapersForCompare.size >= MAX_COMPARE_PAPERS ? 'disabled' : ''}
+                  title="Select for comparison matrix"
+                />
+                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Compare</span>
+              </label>
               <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${sourceBadgeClass}">
                 ${escapeHtml(p.source)}
               </span>
@@ -2688,9 +2836,9 @@
         if (checkbox) {
           checkbox.addEventListener('change', (e) => {
             if (e.target.checked) {
-              if (selectedPapersForCompare.size >= 3) {
+              if (selectedPapersForCompare.size >= MAX_COMPARE_PAPERS) {
                 e.target.checked = false;
-                showToast('Maximum 3 papers can be selected for comparison', 'info');
+                showToast(`Maximum ${MAX_COMPARE_PAPERS} papers can be selected for comparison`, 'info');
                 return;
               }
               selectedPapersForCompare.add(p.id);
@@ -3091,8 +3239,13 @@
 
     if (typeof document !== 'undefined' && document.addEventListener) {
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && outreachModal && !outreachModal.classList.contains('hidden')) {
-          closeOutreachModal();
+        if (e.key === 'Escape') {
+          if (compareMatrixModal && !compareMatrixModal.classList.contains('hidden')) {
+            closeCompareMatrixModal();
+          }
+          if (outreachModal && !outreachModal.classList.contains('hidden')) {
+            closeOutreachModal();
+          }
         }
       });
     }
@@ -3197,6 +3350,326 @@
           openOutreachModal(currentDiscoveredPapers[0]);
         }
       });
+    }
+
+    // --- Cross-Paper Trade-off Matrix Modal & Execution Logic ---
+    function closeCompareMatrixModal() {
+      if (compareMatrixModal) {
+        compareMatrixModal.classList.add('hidden');
+      }
+    }
+
+    if (btnCloseMatrixModal) {
+      btnCloseMatrixModal.addEventListener('click', closeCompareMatrixModal);
+    }
+    if (btnFooterCloseMatrix) {
+      btnFooterCloseMatrix.addEventListener('click', closeCompareMatrixModal);
+    }
+    if (compareMatrixModal) {
+      compareMatrixModal.addEventListener('click', (e) => {
+        if (e.target === compareMatrixModal) {
+          closeCompareMatrixModal();
+        }
+      });
+    }
+
+    if (btnCopyMatrixMd) {
+      btnCopyMatrixMd.addEventListener('click', () => {
+        if (!currentMatrixMarkdown) {
+          showToast('No matrix markdown to copy', 'info');
+          return;
+        }
+        navigator.clipboard.writeText(currentMatrixMarkdown).then(() => {
+          if (copyMatrixLabel) {
+            const orig = copyMatrixLabel.textContent;
+            copyMatrixLabel.textContent = '✓ Copied!';
+            setTimeout(() => { copyMatrixLabel.textContent = orig; }, 1800);
+          }
+          showToast('Trade-off Matrix Markdown copied to clipboard!', 'success');
+        }).catch(err => {
+          console.error('Clipboard copy failed:', err);
+          showToast('Failed to copy matrix markdown', 'error');
+        });
+      });
+    }
+
+    function printTargetedMatrixTable({ inquiry, matrixHtml }) {
+      const titleText = inquiry || 'Cross-Paper Trade-off Matrix';
+      const printDocHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(titleText)} - Axiom Research AI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 12mm 15mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      font-size: 10pt !important;
+      line-height: 1.45 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .print-title {
+      font-size: 15pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 3px 0;
+    }
+    .print-sub {
+      font-size: 8.5pt;
+      color: #64748b;
+      margin: 0;
+    }
+    .print-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8pt;
+      font-weight: 600;
+      color: #4f46e5;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 8.5pt !important;
+      margin: 0 0 14px 0 !important;
+      page-break-inside: auto !important;
+    }
+    thead {
+      display: table-header-group !important;
+    }
+    tr {
+      page-break-inside: avoid !important;
+      page-break-after: auto !important;
+    }
+    th, td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 8px 10px !important;
+      text-align: left !important;
+      vertical-align: top !important;
+    }
+    th {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+      font-weight: 700 !important;
+    }
+    tbody tr:nth-child(even) {
+      background-color: #f8fafc !important;
+    }
+    td:first-child {
+      font-family: 'JetBrains Mono', monospace !important;
+      font-weight: 600 !important;
+      color: #1e293b !important;
+      width: 18% !important;
+      background-color: #f8fafc !important;
+    }
+    .katex {
+      font-size: 1.05em !important;
+    }
+    .print-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 6px;
+      font-size: 7.5pt;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <div>
+      <div class="print-badge">Axiom Research AI · Comparative Systems Analysis</div>
+      <h1 class="print-title">${escapeHtml(titleText)}</h1>
+      <p class="print-sub">Contrasting Architectural Bottlenecks, Bounds, Complexity Ceilings, and Failure Modes</p>
+    </div>
+    <div style="text-align: right; font-size: 8pt; color: #64748b;">
+      Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+    </div>
+  </div>
+  <div class="matrix-table-wrap">
+    ${matrixHtml}
+  </div>
+  <div class="print-footer">
+    <span>Axiom Research Engine · Cross-Paper Engineering Trade-offs</span>
+    <span>Evaluation Matrix: 5 Structural Dimensions</span>
+  </div>
+</body>
+</html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'matrix-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+
+      try {
+        const frameWin = iframe.contentWindow || (iframe.contentDocument && iframe.contentDocument.defaultView);
+        const frameDoc = frameWin ? frameWin.document : (iframe.contentDocument || null);
+        if (frameDoc && typeof frameDoc.open === 'function') {
+          frameDoc.open();
+          frameDoc.write(printDocHtml);
+          frameDoc.close();
+
+          setTimeout(() => {
+            try {
+              if (frameWin && typeof frameWin.print === 'function') {
+                frameWin.focus();
+                frameWin.print();
+              } else {
+                window.print();
+              }
+            } catch (err) {
+              console.warn('Matrix iframe print failed, falling back:', err);
+              const win = window.open('', '_blank', 'width=1000,height=800');
+              if (win) {
+                win.document.open();
+                win.document.write(printDocHtml);
+                win.document.close();
+                win.focus();
+                setTimeout(() => { win.print(); }, 250);
+              }
+            } finally {
+              setTimeout(() => {
+                if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+              }, 60000);
+            }
+          }, 350);
+        } else {
+          window.print();
+        }
+      } catch (e) {
+        console.error('Matrix print frame exception:', e);
+        window.print();
+      }
+    }
+
+    if (btnPrintMatrix) {
+      btnPrintMatrix.addEventListener('click', () => {
+        if (!matrixContentArea || !matrixContentArea.innerHTML.trim()) {
+          showToast('No matrix content to print', 'info');
+          return;
+        }
+        printTargetedMatrixTable({
+          inquiry: 'Cross-Paper Trade-off Matrix',
+          matrixHtml: matrixContentArea.innerHTML
+        });
+      });
+    }
+
+    async function openCompareMatrixModal(papers) {
+      if (!Array.isArray(papers) || papers.length < 2) {
+        showToast('Please select at least 2 papers to compare', 'warning');
+        return;
+      }
+      if (papers.length > MAX_COMPARE_PAPERS) {
+        showToast(`Maximum ${MAX_COMPARE_PAPERS} papers can be compared simultaneously`, 'warning');
+        return;
+      }
+
+      currentMatrixMarkdown = '';
+      if (matrixPaperCountBadge) {
+        matrixPaperCountBadge.textContent = `${papers.length} Papers`;
+      }
+
+      if (compareMatrixModal) {
+        compareMatrixModal.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+      }
+
+      if (matrixLoadingIndicator) {
+        matrixLoadingIndicator.classList.remove('hidden');
+        matrixLoadingIndicator.classList.add('flex');
+      }
+      if (matrixViewport) {
+        matrixViewport.classList.add('hidden');
+      }
+      if (matrixContentArea) {
+        matrixContentArea.innerHTML = '';
+      }
+
+      const payloadPapers = papers.map(p => ({
+        id: p.id || '',
+        title: p.title || '',
+        authors: Array.isArray(p.authors) ? p.authors : (p.authors ? [p.authors] : []),
+        abstract: p.abstract || p.tldr || '',
+        published: p.published || (p.year ? `${p.year}-01-01` : ''),
+        year: p.year || (p.published ? p.published.slice(0, 4) : ''),
+        source: p.source || 'arxiv',
+        url: p.pdf_url || p.url || ''
+      }));
+
+      try {
+        const res = await authenticatedFetch('/api/paper/compare-matrix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ papers: payloadPapers })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        currentMatrixMarkdown = data.markdown || '';
+
+        if (matrixContentArea) {
+          matrixContentArea.innerHTML = renderMarkdownWithMath(currentMatrixMarkdown);
+          matrixContentArea.querySelectorAll('table').forEach(tbl => {
+            tbl.classList.add('tradeoff-matrix-table');
+          });
+          renderMathInContainer(matrixContentArea);
+        }
+        showToast('Trade-off matrix generated successfully!', 'success');
+      } catch (err) {
+        console.error('Cross-Paper Trade-off Matrix generation error:', err);
+        showToast(`Error generating matrix: ${err.message}`, 'error');
+        if (matrixContentArea) {
+          matrixContentArea.innerHTML = `
+            <div class="p-6 text-center space-y-2">
+              <div class="text-rose-500 font-semibold text-sm">Failed to synthesize trade-off matrix</div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 font-mono">${escapeHtml(err.message)}</p>
+            </div>
+          `;
+        }
+      } finally {
+        if (matrixLoadingIndicator) {
+          matrixLoadingIndicator.classList.add('hidden');
+          matrixLoadingIndicator.classList.remove('flex');
+        }
+        if (matrixViewport) {
+          matrixViewport.classList.remove('hidden');
+        }
+        if (window.lucide) lucide.createIcons();
+      }
     }
 
     // --- On-Demand Thesis Proposal Generator ---
@@ -4404,8 +4877,54 @@
     });
   }
 
-    // Run Cohort Gate verification on startup
+    // --- Server Health & Render Cold-Start Warmup Logic ---
+    function initServerHealthCheck() {
+      const badge = document.getElementById('server-status-badge');
+      const dot = document.getElementById('server-status-dot');
+      const text = document.getElementById('server-status-text');
+      const banner = document.getElementById('cold-start-banner');
+
+      // Set connecting state initially on page load
+      if (dot) dot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      if (text) text.textContent = 'Engine: Connecting...';
+      if (badge) {
+        badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 shadow-xs transition-colors';
+        badge.title = 'Axiom Engine: Connecting...';
+      }
+
+      let isResolved = false;
+      // Show warmup notification banner if Render instance spin-up takes longer than 3 seconds
+      const coldStartTimer = setTimeout(() => {
+        if (!isResolved && banner) {
+          banner.classList.remove('hidden');
+        }
+      }, 3000);
+
+      fetch('/api/health')
+        .then(res => {
+          if (!res.ok) throw new Error(`Health status: ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          isResolved = true;
+          clearTimeout(coldStartTimer);
+          if (banner) banner.classList.add('hidden');
+
+          if (dot) dot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+          if (text) text.textContent = 'Engine: Active';
+          if (badge) {
+            badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors';
+            badge.title = 'Axiom Engine: Active (Cold-Start Ready)';
+          }
+        })
+        .catch(err => {
+          console.warn('Server health check delayed or offline:', err);
+        });
+    }
+
+    // Run Cohort Gate verification and Server Health check on startup
     initCohortGate();
+    initServerHealthCheck();
   </script>
 </body>
 </html>
