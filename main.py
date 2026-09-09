@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dotenv import load_dotenv
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
@@ -332,7 +332,7 @@ async def verify_axiom_access(
     return key
  
  
-MASTER_ADMIN_KEYS: Set[str] = {"AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"}
+MASTER_ADMIN_KEYS: set[str] = {"AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"}
 
 
 def extract_request_access_key(request: Request) -> Optional[str]:
