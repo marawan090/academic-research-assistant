@@ -322,6 +322,47 @@
       background-color: rgba(15, 23, 42, 0.7);
     }
 
+    /* Interactive Product Tour Styles */
+    #axiom-tour-container {
+      position: fixed;
+      inset: 0;
+      z-index: 99990;
+      pointer-events: none;
+    }
+    #axiom-tour-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 99991;
+      background: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      pointer-events: auto;
+      transition: opacity 0.25s ease-out;
+    }
+    #axiom-tour-spotlight {
+      position: fixed;
+      z-index: 99992;
+      border-radius: 14px;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.75), 0 0 20px rgba(99, 102, 241, 0.45);
+      border: 2px solid #6366f1;
+      transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  left 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #axiom-tour-popover {
+      position: fixed;
+      z-index: 99995;
+      pointer-events: auto;
+      transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  left 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.2s ease,
+                  transform 0.2s ease;
+      max-width: 390px;
+      width: calc(100vw - 32px);
+    }
+
     /* Print Media Styles */
     @media print {
       body {
@@ -332,6 +373,10 @@
       }
       header,
       #cold-start-banner,
+      #axiom-tour-container,
+      #axiom-tour-backdrop,
+      #axiom-tour-spotlight,
+      #axiom-tour-popover,
       #papers-drawer,
       #papers-list,
       #discovered-papers-list,
@@ -458,10 +503,16 @@
       <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
         
         <!-- Status Badge: Server Health & Cold Start Indicator -->
-        <div id="server-status-badge" title="Axiom Engine Health Status" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors">
+        <div id="server-status-badge" class="cohort-status-pill system-health-indicator flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors" title="Axiom Engine Health Status">
           <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span id="server-status-text" class="font-semibold tracking-wide">Engine: Active</span>
         </div>
+
+        <!-- Interactive Product Tour Trigger Button -->
+        <button id="btn-start-tour" class="flex items-center space-x-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition shadow-xs cursor-pointer text-xs font-medium" title="Quick Product Tour / Guided Walkthrough">
+          <i data-lucide="compass" class="w-4 h-4 text-brand-500 dark:text-brand-400"></i>
+          <span class="hidden md:inline">Tour</span>
+        </button>
 
         <!-- Dark / Light Mode Switcher Toggle -->
         <button id="btn-theme-toggle" class="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition cursor-pointer" title="Toggle Dark / Light Mode">
@@ -487,7 +538,7 @@
   <main class="flex-1 flex overflow-hidden max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 gap-4 lg:gap-6 min-h-0">
 
     <!-- LEFT COLUMN: Chat Feed & Synthesis Display -->
-    <section class="flex-1 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl relative min-w-0 transition-colors">
+    <section id="analysis-pane" class="flex-1 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl relative min-w-0 transition-colors">
       
       <!-- Feed Scrollable Area -->
       <div id="feed-container" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
@@ -559,7 +610,7 @@
         </div>
 
         <form id="research-form" class="relative">
-          <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 rounded-xl transition shadow-xs">
+          <div id="search-input" class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 rounded-xl transition shadow-xs">
             <textarea
               id="query-input"
               rows="2"
@@ -3240,6 +3291,10 @@
     if (typeof document !== 'undefined' && document.addEventListener) {
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+          if (typeof isTourActive !== 'undefined' && isTourActive) {
+            completeTour();
+            return;
+          }
           if (compareMatrixModal && !compareMatrixModal.classList.contains('hidden')) {
             closeCompareMatrixModal();
           }
@@ -4922,9 +4977,353 @@
         });
     }
 
-    // Run Cohort Gate verification and Server Health check on startup
+    // --- Interactive Onboarding Product Tour Engine (Zero-Dependency) ---
+    let currentTourStep = 0;
+    let isTourActive = false;
+    let tourRepositionTimer = null;
+
+    const TOUR_STEPS = [
+      {
+        selector: '#server-status-badge',
+        altSelector: '.cohort-status-pill, .system-health-indicator',
+        title: 'Authentication & System State',
+        content: 'Verify your active Cohort session key and monitor live engine responsiveness on the cloud pipeline.',
+        preferredPos: 'bottom'
+      },
+      {
+        selector: '#search-input',
+        altSelector: '#research-form, #query-input',
+        title: 'Unified Literature Search',
+        content: 'Query across arXiv and OpenAlex concurrently. Filter seamlessly by research topic, specific author name, or university lab.',
+        preferredPos: 'bottom'
+      },
+      {
+        selector: '#papers-drawer',
+        altSelector: 'aside#papers-drawer',
+        title: 'Paper Discovery & Direct PDF Access',
+        content: 'Review retrieved papers ranked by citation signals. Inspect abstracts, jump directly to open-access PDFs, or select papers for comparison.',
+        preferredPos: 'left'
+      },
+      {
+        selector: '#analysis-pane',
+        altSelector: '#feed-container, #welcome-card',
+        title: 'Architectural Extraction & PlantUML',
+        content: 'Skip generic summaries. Axiom isolates concrete engineering bottlenecks, system assumptions, and automatically renders PlantUML topologies.',
+        preferredPos: 'right'
+      },
+      {
+        selector: '#compare-bar',
+        altSelector: '#btn-run-compare, #papers-drawer',
+        title: 'Trade-off Matrix & Export Tools',
+        content: 'Select multiple papers to generate side-by-side engineering comparison tables, or generate 1-click cold email templates for lab outreach.',
+        preferredPos: 'top',
+        onEnter: () => {
+          const cbar = document.getElementById('compare-bar');
+          if (cbar && cbar.classList.contains('hidden')) {
+            cbar.classList.remove('hidden');
+            cbar.classList.add('flex');
+            cbar.dataset.tourPreview = 'true';
+            const countText = document.getElementById('compare-count-text');
+            if (countText) {
+              countText.dataset.origText = countText.textContent;
+              countText.textContent = '2 Papers Selected (Tour Preview)';
+            }
+          }
+        },
+        onLeave: () => {
+          const cbar = document.getElementById('compare-bar');
+          if (cbar && cbar.dataset.tourPreview === 'true') {
+            delete cbar.dataset.tourPreview;
+            const countText = document.getElementById('compare-count-text');
+            if (countText && countText.dataset.origText !== undefined) {
+              countText.textContent = countText.dataset.origText;
+              delete countText.dataset.origText;
+            }
+            if (typeof updateCompareBar === 'function') {
+              updateCompareBar();
+            }
+          }
+        }
+      }
+    ];
+
+    function handleTourReposition() {
+      if (!isTourActive) return;
+      if (tourRepositionTimer) cancelAnimationFrame(tourRepositionTimer);
+      tourRepositionTimer = requestAnimationFrame(() => {
+        positionTourElements(currentTourStep);
+      });
+    }
+
+    function buildTourDOM() {
+      if (document.getElementById('axiom-tour-container')) return;
+
+      const container = document.createElement('div');
+      container.id = 'axiom-tour-container';
+      container.innerHTML = `
+        <div id="axiom-tour-backdrop"></div>
+        <div id="axiom-tour-spotlight"></div>
+        <div id="axiom-tour-popover" class="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl p-4 sm:p-5 space-y-3.5 text-slate-800 dark:text-slate-100">
+          <div class="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <div class="flex items-center space-x-2">
+              <span class="text-sm">🧭</span>
+              <span id="tour-step-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+                Step 1 of 5
+              </span>
+            </div>
+            <button id="btn-tour-close" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Exit Tour (Esc)">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 id="tour-step-title" class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              Authentication & System State
+            </h4>
+            <p id="tour-step-content" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Verify your active Cohort session key and monitor live engine responsiveness on the cloud pipeline.
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <button id="btn-tour-skip" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium text-xs transition cursor-pointer" title="Dismiss Walkthrough">
+              Skip Tour (تخطي)
+            </button>
+            <div class="flex items-center space-x-2">
+              <button id="btn-tour-prev" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-200 dark:border-slate-700 transition cursor-pointer hidden">
+                Back
+              </button>
+              <button id="btn-tour-next" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-sm transition flex items-center space-x-1 cursor-pointer">
+                <span id="tour-next-label">Next</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(container);
+
+      // Event listeners
+      const backdrop = document.getElementById('axiom-tour-backdrop');
+      if (backdrop) backdrop.addEventListener('click', completeTour);
+
+      const closeBtn = document.getElementById('btn-tour-close');
+      if (closeBtn) closeBtn.addEventListener('click', completeTour);
+
+      const skipBtn = document.getElementById('btn-tour-skip');
+      if (skipBtn) skipBtn.addEventListener('click', completeTour);
+
+      const prevBtn = document.getElementById('btn-tour-prev');
+      if (prevBtn) prevBtn.addEventListener('click', prevTourStep);
+
+      const nextBtn = document.getElementById('btn-tour-next');
+      if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+          if (currentTourStep >= TOUR_STEPS.length - 1) {
+            completeTour();
+          } else {
+            nextTourStep();
+          }
+        });
+      }
+
+      window.addEventListener('resize', handleTourReposition);
+      window.addEventListener('scroll', handleTourReposition, true);
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function positionTourElements(stepIndex) {
+      if (!isTourActive) return;
+      const step = TOUR_STEPS[stepIndex];
+      if (!step) return;
+
+      const targetEl = document.querySelector(step.selector) ||
+                       (step.altSelector ? document.querySelector(step.altSelector) : null);
+      if (!targetEl) return;
+
+      const spotlight = document.getElementById('axiom-tour-spotlight');
+      const popover = document.getElementById('axiom-tour-popover');
+      if (!spotlight || !popover) return;
+
+      const rect = targetEl.getBoundingClientRect();
+      const pad = 6;
+
+      // Spotlight placement
+      spotlight.style.top = `${Math.max(0, rect.top - pad)}px`;
+      spotlight.style.left = `${Math.max(0, rect.left - pad)}px`;
+      spotlight.style.width = `${rect.width + pad * 2}px`;
+      spotlight.style.height = `${rect.height + pad * 2}px`;
+
+      // Popover placement
+      const popWidth = Math.min(390, window.innerWidth - 32);
+      popover.style.width = `${popWidth}px`;
+      const popHeight = popover.offsetHeight || 190;
+
+      let top = 0;
+      let left = 0;
+
+      const pos = step.preferredPos || 'bottom';
+      if (pos === 'bottom') {
+        top = rect.bottom + 14;
+        left = rect.left + (rect.width - popWidth) / 2;
+        if (top + popHeight > window.innerHeight - 16) {
+          top = rect.top - popHeight - 14;
+        }
+      } else if (pos === 'top') {
+        top = rect.top - popHeight - 14;
+        left = rect.left + (rect.width - popWidth) / 2;
+        if (top < 16) {
+          top = rect.bottom + 14;
+        }
+      } else if (pos === 'left') {
+        left = rect.left - popWidth - 14;
+        top = rect.top + (rect.height - popHeight) / 2;
+        if (left < 16) {
+          left = rect.left + (rect.width - popWidth) / 2;
+          top = rect.bottom + 14;
+        }
+      } else if (pos === 'right') {
+        left = rect.right + 14;
+        top = rect.top + (rect.height - popHeight) / 2;
+        if (left + popWidth > window.innerWidth - 16) {
+          left = rect.left + (rect.width - popWidth) / 2;
+          top = rect.bottom + 14;
+        }
+      }
+
+      // Constrain inside viewport bounds
+      left = Math.max(16, Math.min(window.innerWidth - popWidth - 16, left));
+      top = Math.max(16, Math.min(window.innerHeight - popHeight - 16, top));
+
+      popover.style.top = `${top}px`;
+      popover.style.left = `${left}px`;
+    }
+
+    function renderTourStep(stepIndex) {
+      if (stepIndex < 0 || stepIndex >= TOUR_STEPS.length) {
+        completeTour();
+        return;
+      }
+
+      // Handle onLeave of previous step if defined
+      TOUR_STEPS.forEach((s, idx) => {
+        if (idx !== stepIndex && typeof s.onLeave === 'function') {
+          s.onLeave();
+        }
+      });
+
+      currentTourStep = stepIndex;
+      const step = TOUR_STEPS[stepIndex];
+
+      // Handle onEnter of current step
+      if (typeof step.onEnter === 'function') {
+        step.onEnter();
+      }
+
+      const targetEl = document.querySelector(step.selector) ||
+                       (step.altSelector ? document.querySelector(step.altSelector) : null);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+
+      const badge = document.getElementById('tour-step-badge');
+      if (badge) badge.textContent = `Step ${stepIndex + 1} of ${TOUR_STEPS.length}`;
+
+      const titleEl = document.getElementById('tour-step-title');
+      if (titleEl) titleEl.textContent = step.title;
+
+      const contentEl = document.getElementById('tour-step-content');
+      if (contentEl) contentEl.textContent = step.content;
+
+      const prevBtn = document.getElementById('btn-tour-prev');
+      if (prevBtn) {
+        if (stepIndex === 0) {
+          prevBtn.classList.add('hidden');
+        } else {
+          prevBtn.classList.remove('hidden');
+        }
+      }
+
+      const nextLabel = document.getElementById('tour-next-label');
+      if (nextLabel) {
+        nextLabel.textContent = (stepIndex === TOUR_STEPS.length - 1) ? 'Finish (إنهاء)' : 'Next';
+      }
+
+      positionTourElements(stepIndex);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function nextTourStep() {
+      if (currentTourStep < TOUR_STEPS.length - 1) {
+        renderTourStep(currentTourStep + 1);
+      } else {
+        completeTour();
+      }
+    }
+
+    function prevTourStep() {
+      if (currentTourStep > 0) {
+        renderTourStep(currentTourStep - 1);
+      }
+    }
+
+    function cleanupTourDOM() {
+      TOUR_STEPS.forEach(s => {
+        if (typeof s.onLeave === 'function') {
+          s.onLeave();
+        }
+      });
+
+      const container = document.getElementById('axiom-tour-container');
+      if (container && container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+
+      window.removeEventListener('resize', handleTourReposition);
+      window.removeEventListener('scroll', handleTourReposition, true);
+      isTourActive = false;
+    }
+
+    function completeTour() {
+      localStorage.setItem('axiom_tour_completed', 'true');
+      cleanupTourDOM();
+      showToast('Product tour completed! Click "Tour" in the top bar to restart anytime.', 'info');
+    }
+
+    function startProductTour(force = false) {
+      if (!force && localStorage.getItem('axiom_tour_completed')) {
+        return;
+      }
+      cleanupTourDOM();
+      currentTourStep = 0;
+      isTourActive = true;
+      buildTourDOM();
+      // Allow DOM to settle before calculating bounding box
+      setTimeout(() => {
+        renderTourStep(0);
+      }, 60);
+    }
+
+    function initOnboardingTour() {
+      const hasSeenTour = localStorage.getItem('axiom_tour_completed');
+      if (!hasSeenTour) {
+        setTimeout(() => startProductTour(false), 800);
+      }
+
+      const btnStart = document.getElementById('btn-start-tour');
+      if (btnStart) {
+        btnStart.addEventListener('click', () => {
+          startProductTour(true);
+        });
+      }
+    }
+
+    // Run Cohort Gate verification, Server Health check, and Onboarding Tour on startup
     initCohortGate();
     initServerHealthCheck();
+    initOnboardingTour();
   </script>
 </body>
 </html>
