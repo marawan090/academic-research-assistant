@@ -595,7 +595,17 @@
           ? `<button onclick="toggleBlock('ip', '${escapeHtml(u.client_ip)}', false)" class="px-2 py-1 rounded bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] font-semibold transition cursor-pointer">Unban IP</button>`
           : `<button onclick="toggleBlock('ip', '${escapeHtml(u.client_ip)}', true)" class="px-2 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-[10px] font-semibold transition cursor-pointer">Ban IP</button>`;
 
-        const keyBanBtn = (u.access_key && u.access_key !== 'ANONYMOUS')
+        const isAnon = (!u.access_key || u.access_key === 'ANONYMOUS' || u.access_key === 'UNAUTHENTICATED / VISITOR');
+        let keyBadge = '';
+        if (isAnon) {
+          keyBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">UNAUTHENTICATED / VISITOR</span>';
+        } else if (u.access_key.includes('MASTER') || u.access_key.includes('ROOT')) {
+          keyBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">${escapeHtml(u.access_key)}</span>`;
+        } else {
+          keyBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-brand-500/15 text-brand-300 border border-brand-500/30">${escapeHtml(u.access_key)}</span>`;
+        }
+
+        const keyBanBtn = (!isAnon)
           ? (u.is_key_banned
               ? `<button onclick="toggleBlock('key', '${escapeHtml(u.access_key)}', false)" class="px-2 py-1 rounded bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] font-semibold transition cursor-pointer">Restore Key</button>`
               : `<button onclick="toggleBlock('key', '${escapeHtml(u.access_key)}', true)" class="px-2 py-1 rounded bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50 text-[10px] font-semibold transition cursor-pointer">Revoke Key</button>`)
@@ -605,7 +615,7 @@
           <tr class="hover:bg-slate-900/50 transition">
             <td class="p-3 whitespace-nowrap">${statusBadge}</td>
             <td class="p-3 font-mono font-medium text-slate-200">${escapeHtml(u.client_ip)}</td>
-            <td class="p-3 font-mono text-slate-300">${escapeHtml(u.access_key)}</td>
+            <td class="p-3 font-mono">${keyBadge}</td>
             <td class="p-3 font-mono text-[11px] text-brand-400 font-semibold">${escapeHtml(u.last_action)}</td>
             <td class="p-3 text-slate-400 max-w-xs truncate" title="${escapeHtml(u.last_query)}">${escapeHtml(u.last_query || '—')}</td>
             <td class="p-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">${u.seconds_ago}s ago</td>
@@ -661,12 +671,21 @@
         const isErr = ev.status_code >= 400;
         const statusClass = isErr ? 'text-rose-400 font-bold' : 'text-emerald-400';
 
+        let eventKeyBadge = '';
+        if (!ev.access_key || ev.access_key === 'ANONYMOUS' || ev.access_key === 'UNAUTHENTICATED / VISITOR') {
+          eventKeyBadge = '<span class="text-slate-500 text-[10px] font-mono">UNAUTHENTICATED</span>';
+        } else if (ev.access_key.includes('MASTER') || ev.access_key.includes('ROOT')) {
+          eventKeyBadge = `<span class="text-amber-300 text-[10px] font-mono font-bold">${escapeHtml(ev.access_key)}</span>`;
+        } else {
+          eventKeyBadge = `<span class="text-brand-300 text-[10px] font-mono font-semibold">${escapeHtml(ev.access_key)}</span>`;
+        }
+
         return `
           <tr class="hover:bg-slate-900/50 transition">
             <td class="p-2.5 text-slate-500 whitespace-nowrap">${timePart}</td>
             <td class="p-2.5 text-brand-400 font-semibold whitespace-nowrap">${escapeHtml(ev.action_type)}</td>
             <td class="p-2.5 text-slate-300 whitespace-nowrap">${escapeHtml(ev.client_ip)}</td>
-            <td class="p-2.5 text-slate-400 whitespace-nowrap">${escapeHtml(ev.access_key)}</td>
+            <td class="p-2.5 whitespace-nowrap">${eventKeyBadge}</td>
             <td class="p-2.5 text-slate-400 max-w-[180px] truncate" title="${escapeHtml(ev.query_preview)}">${escapeHtml(ev.query_preview || '—')}</td>
             <td class="p-2.5 ${statusClass}">${ev.status_code}</td>
             <td class="p-2.5 text-slate-500">${ev.latency_ms}ms</td>

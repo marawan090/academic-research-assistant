@@ -35,6 +35,7 @@ class TelemetryManager:
         self.banned_ips: Set[str] = set()
         self.banned_keys: Set[str] = set()
         self.broadcast: Dict[str, Any] = {
+            "id": "",
             "message": "",
             "active": False,
             "updated_at": ""
@@ -140,7 +141,11 @@ class TelemetryManager:
         now = time.time()
         now_iso = datetime.now(timezone.utc).isoformat()
         clean_ip = (client_ip or "127.0.0.1").strip()
-        clean_key = (access_key or "ANONYMOUS").strip()
+        raw_k = (access_key or "").strip()
+        if not raw_k or raw_k.upper() in ("NONE", "NULL", "ANONYMOUS", "UNAUTHENTICATED"):
+            clean_key = "UNAUTHENTICATED / VISITOR"
+        else:
+            clean_key = raw_k
         safe_query = (query_preview or "").strip()
         if len(safe_query) > 120:
             safe_query = safe_query[:117] + "..."
@@ -222,7 +227,7 @@ class TelemetryManager:
                         "last_query": data["last_query"],
                         "user_agent": data["user_agent"],
                         "is_ip_banned": data["client_ip"] in self.banned_ips,
-                        "is_key_banned": data["access_key"] in self.banned_keys and data["access_key"] != "ANONYMOUS"
+                        "is_key_banned": data["access_key"] in self.banned_keys and data["access_key"] not in ("ANONYMOUS", "UNAUTHENTICATED / VISITOR")
                     })
 
         # Sort with online users first, then by recency
@@ -247,7 +252,7 @@ class TelemetryManager:
         with self._lock:
             if clean_ip in self.banned_ips:
                 return True, f"IP address {clean_ip} has been blacklisted by administrator."
-            if clean_key and clean_key in self.banned_keys and clean_key != "ANONYMOUS":
+            if clean_key and clean_key in self.banned_keys and clean_key not in ("ANONYMOUS", "UNAUTHENTICATED / VISITOR"):
                 return True, f"Access key {clean_key} has been revoked by administrator."
 
         return False, ""
@@ -300,14 +305,18 @@ class TelemetryManager:
     def set_broadcast(self, message: str, active: bool = True) -> Dict[str, Any]:
         """Sets or toggles the system-wide announcement broadcast banner."""
         with self._lock:
+            msg = (message or "").strip()
+            is_active = bool(active and msg)
+            bc_id = f"bc-{int(time.time() * 1000)}" if is_active else ""
             self.broadcast = {
-                "message": (message or "").strip(),
-                "active": bool(active and (message or "").strip()),
+                "id": bc_id,
+                "message": msg,
+                "active": is_active,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             self._save_state()
 
-        logger.info("Admin broadcast updated: active=%s, message=%s", self.broadcast["active"], self.broadcast["message"])
+        logger.info("Admin broadcast updated: active=%s, id=%s, message=%s", self.broadcast["active"], self.broadcast.get("id", ""), self.broadcast["message"])
         return {
             "status": "success",
             "broadcast": self.broadcast
@@ -316,7 +325,10 @@ class TelemetryManager:
     def get_broadcast(self) -> Dict[str, Any]:
         """Returns the current broadcast configuration."""
         with self._lock:
-            return dict(self.broadcast)
+            bc = dict(self.broadcast)
+            if bc.get("active") and not bc.get("id"):
+                bc["id"] = f"bc-{int(time.time() * 1000)}"
+            return bc
 
     def set_limits(self, global_hourly: int = 0, key_hourly: int = 0) -> Dict[str, Any]:
         """Sets dynamic rate limits."""

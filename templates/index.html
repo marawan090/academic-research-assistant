@@ -479,7 +479,48 @@
 
 <body class="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-150">
 
-  <!-- Global System Broadcast Alert Banner -->
+  <!-- Broadcast Alert Modal (Stage 1: Centered Screen Focus) -->
+  <div id="broadcast-modal-backdrop" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300">
+    <div class="relative w-full max-w-lg bg-slate-900 border border-indigo-500/40 rounded-2xl shadow-2xl overflow-hidden p-6">
+      <!-- Glow ambient background -->
+      <div class="absolute -top-16 -left-16 w-36 h-36 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-16 -right-16 w-36 h-36 bg-brand-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Close Button (✕) -->
+      <button id="btn-close-broadcast-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Minimize to Top Banner">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+
+      <!-- Content -->
+      <div class="flex items-start space-x-4">
+        <div class="w-11 h-11 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-400 shadow-inner">
+          <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase tracking-wider">
+              <span>🔔</span>
+              <span>System Announcement</span>
+            </span>
+            <span id="broadcast-modal-time" class="text-[11px] font-mono text-slate-400"></span>
+          </div>
+          <h3 class="text-base font-bold text-white mt-2 mb-2">Important Axiom Notice</h3>
+          <div id="broadcast-modal-text" class="text-sm text-slate-200 leading-relaxed break-words bg-slate-950/60 p-3.5 rounded-xl border border-slate-800"></div>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-end space-x-3">
+        <button id="btn-minimize-broadcast" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer flex items-center space-x-1.5">
+          <span>Acknowledge & Minimize</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Global System Broadcast Alert Banner (Stage 2: Top Announcement Bar) -->
   <div id="admin-broadcast-banner" class="hidden bg-indigo-600 dark:bg-indigo-900 border-b border-indigo-400/30 px-4 py-2 text-white text-xs font-medium z-50 transition-all duration-300">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
       <div class="flex items-center space-x-2 min-w-0">
@@ -5333,37 +5374,147 @@
       }
     }
 
+    // --- Real-Time Broadcast Delivery & Dual-Stage Presentation Engine ---
+    window.lastBroadcastId = null;
+
+    function playNotificationChime() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        // Crisp two-tone chime (587.33Hz D5 -> 880Hz A5)
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch (e) {
+        console.warn("Audio notification blocked by browser autoplay policy until user interaction", e);
+      }
+    }
+
     function initBroadcastBanner() {
       const banner = document.getElementById('admin-broadcast-banner');
-      const textEl = document.getElementById('broadcast-message-text');
-      const dismissBtn = document.getElementById('btn-dismiss-broadcast');
+      const bannerTextEl = document.getElementById('broadcast-message-text');
+      const btnDismissBanner = document.getElementById('btn-dismiss-broadcast');
 
-      if (dismissBtn && banner) {
-        dismissBtn.addEventListener('click', () => {
-          banner.classList.add('hidden');
-          const lastMsg = banner.getAttribute('data-broadcast-msg') || '';
-          if (lastMsg) {
-            sessionStorage.setItem('axiom_dismissed_broadcast', lastMsg);
+      const modalBackdrop = document.getElementById('broadcast-modal-backdrop');
+      const modalTextEl = document.getElementById('broadcast-modal-text');
+      const modalTimeEl = document.getElementById('broadcast-modal-time');
+      const btnCloseModal = document.getElementById('btn-close-broadcast-modal');
+      const btnMinimize = document.getElementById('btn-minimize-broadcast');
+
+      let currentBcId = null;
+
+      // Helper: Minimize modal into top announcement banner
+      function minimizeModalToBanner() {
+        if (modalBackdrop) modalBackdrop.classList.add('hidden');
+        if (banner) banner.classList.remove('hidden');
+        if (currentBcId) {
+          sessionStorage.setItem('minimized_broadcast_' + currentBcId, 'true');
+        }
+      }
+
+      // Event handlers for Modal Stage 1
+      if (btnCloseModal) {
+        btnCloseModal.addEventListener('click', minimizeModalToBanner);
+      }
+      if (btnMinimize) {
+        btnMinimize.addEventListener('click', minimizeModalToBanner);
+      }
+
+      // Event handler for Banner Stage 2 permanent dismissal
+      if (btnDismissBanner) {
+        btnDismissBanner.addEventListener('click', () => {
+          if (banner) banner.classList.add('hidden');
+          if (modalBackdrop) modalBackdrop.classList.add('hidden');
+          if (currentBcId) {
+            localStorage.setItem('dismissed_broadcast_' + currentBcId, 'true');
           }
         });
       }
 
-      fetch('/api/broadcast')
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (!data || !data.active || !data.message) return;
-          const dismissed = sessionStorage.getItem('axiom_dismissed_broadcast');
-          if (dismissed === data.message) return;
+      async function checkBroadcast() {
+        try {
+          const res = await fetch('/api/broadcast');
+          if (!res.ok) return;
+          const data = await res.json();
 
-          if (textEl && banner) {
-            textEl.textContent = data.message;
-            banner.setAttribute('data-broadcast-msg', data.message);
-            banner.classList.remove('hidden');
+          // If inactive or empty message, hide both modal and banner
+          if (!data || !data.active || !data.message) {
+            if (modalBackdrop) modalBackdrop.classList.add('hidden');
+            if (banner) banner.classList.add('hidden');
+            window.lastBroadcastId = null;
+            return;
           }
-        })
-        .catch(err => {
-          console.debug('Broadcast check notice:', err);
-        });
+
+          const bcId = data.id || ('bc_' + encodeURIComponent(data.message.slice(0, 30)));
+          currentBcId = bcId;
+
+          // Check if user has permanently dismissed this broadcast ID
+          if (localStorage.getItem('dismissed_broadcast_' + bcId) === 'true') {
+            if (modalBackdrop) modalBackdrop.classList.add('hidden');
+            if (banner) banner.classList.add('hidden');
+            window.lastBroadcastId = bcId;
+            return;
+          }
+
+          // Populate broadcast text
+          if (bannerTextEl) bannerTextEl.textContent = data.message;
+          if (modalTextEl) modalTextEl.textContent = data.message;
+          if (modalTimeEl && data.updated_at) {
+            try {
+              const dt = new Date(data.updated_at);
+              modalTimeEl.textContent = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' UTC';
+            } catch (e) {
+              modalTimeEl.textContent = '';
+            }
+          }
+
+          const isNewlyArrived = (window.lastBroadcastId !== null && window.lastBroadcastId !== bcId);
+          const isFirstTimeSeen = (window.lastBroadcastId === null);
+          const isMinimized = sessionStorage.getItem('minimized_broadcast_' + bcId) === 'true';
+
+          if (isNewlyArrived) {
+            // A brand new broadcast was published live while session is active!
+            playNotificationChime();
+            sessionStorage.removeItem('minimized_broadcast_' + bcId);
+            if (banner) banner.classList.add('hidden');
+            if (modalBackdrop) modalBackdrop.classList.remove('hidden');
+          } else if (isFirstTimeSeen) {
+            // First check on page load
+            if (isMinimized) {
+              if (modalBackdrop) modalBackdrop.classList.add('hidden');
+              if (banner) banner.classList.remove('hidden');
+            } else {
+              playNotificationChime();
+              if (modalBackdrop) modalBackdrop.classList.remove('hidden');
+              if (banner) banner.classList.add('hidden');
+            }
+          } else {
+            // Ongoing poll for current active broadcast
+            if (!isMinimized && modalBackdrop && !modalBackdrop.classList.contains('hidden')) {
+              // Modal stays in focus
+            } else {
+              if (banner) banner.classList.remove('hidden');
+            }
+          }
+
+          window.lastBroadcastId = bcId;
+        } catch (err) {
+          console.debug('Broadcast poll exception:', err);
+        }
+      }
+
+      // Initial check immediately, then live poll every 5 seconds
+      checkBroadcast();
+      setInterval(checkBroadcast, 5000);
     }
 
     // Run Cohort Gate verification, Server Health check, Onboarding Tour, and Broadcast listener on startup

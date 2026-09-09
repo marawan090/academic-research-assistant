@@ -356,7 +356,10 @@ def extract_request_access_key(request: Request) -> Optional[str]:
             or request.query_params.get("admin_key")
         )
     if not key:
-        key = request.cookies.get("axiom_admin_session")
+        key = (
+            request.cookies.get("axiom_access_token")
+            or request.cookies.get("axiom_admin_session")
+        )
     return key.strip() if key else None
 
 
@@ -397,15 +400,16 @@ async def telemetry_and_moderation_middleware(request: Request, call_next):
         return await call_next(request)
 
     client_ip = get_client_ip(request)
-    access_key = extract_request_access_key(request)
+    raw_key = extract_request_access_key(request)
+    access_key = raw_key if raw_key else "UNAUTHENTICATED / VISITOR"
 
-    # 1. Moderation Blacklist Check
-    is_blocked, reason = telemetry_manager.is_blocked(client_ip, access_key)
+    # 1. Moderation Blacklist Check (check IP and raw_key if present)
+    is_blocked, reason = telemetry_manager.is_blocked(client_ip, raw_key)
     if is_blocked:
         # Allow Master Admin override for admin routes
         is_admin_override = False
         if path.startswith("/admin") or path.startswith("/api/admin"):
-            clean_k = (access_key or "").strip().upper()
+            clean_k = (raw_key or "").strip().upper()
             if clean_k in MASTER_ADMIN_KEYS:
                 is_admin_override = True
 

@@ -2,13 +2,14 @@
   "banned_ips": [],
   "banned_keys": [],
   "broadcast": {
+    "id": "",
     "message": "",
     "active": false,
-    "updated_at": "2026-09-09T14:21:54.580303+00:00"
+    "updated_at": "2026-09-09T14:36:16.118958+00:00"
   },
   "limits": {
     "global_hourly_limit": 0,
     "key_hourly_limit": 0
   },
-  "saved_at": "2026-09-09T14:21:54.580559+00:00"
+  "saved_at": "2026-09-09T14:36:16.119186+00:00"
 }
