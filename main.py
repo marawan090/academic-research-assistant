@@ -48,6 +48,7 @@ from services.llm import (
     ComparePapersRequest,
     generate_compare_matrix,
 )
+from services.telemetry import telemetry_manager
 
 # Configure logging
 logging.basicConfig(
@@ -126,6 +127,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 class AccessRegistryManager:
     MASTER_CODE = "AXIOM-ROOT-V4HEWT"
+    MASTER_ADMIN_KEYS: List[str] = ["AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"]
     RESEARCHER_CODES = [
         "AXIOM-ENKT-HRGL",
         "AXIOM-KN76-4YLC",
@@ -161,14 +163,15 @@ class AccessRegistryManager:
                 except Exception as e:
                     logger.error("Failed to load access registry from %s: %s", self.storage_path, str(e))
 
-            # Master code: unrestricted access, no expiration, multi-IP
-            if self.MASTER_CODE not in loaded:
-                loaded[self.MASTER_CODE] = {
-                    "type": "master",
-                    "bound_ip": None,
-                    "expires_at": None,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
+            # Master codes: unrestricted access, no expiration, multi-IP
+            for m_code in self.MASTER_ADMIN_KEYS:
+                if m_code not in loaded:
+                    loaded[m_code] = {
+                        "type": "master",
+                        "bound_ip": None,
+                        "expires_at": None,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }
 
             # 15 Researcher codes: valid for 30 days until 2026-10-07, bound to single IP on first use
             for code in self.RESEARCHER_CODES:
@@ -327,8 +330,138 @@ async def verify_axiom_access(
         raise HTTPException(status_code=status_code, detail=msg)
 
     return key
+ 
+ 
+MASTER_ADMIN_KEYS: Set[str] = {"AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"}
 
-# In-memory dynamic config state (allows live UI configuration)
+
+def extract_request_access_key(request: Request) -> Optional[str]:
+    """
+    Extracts client access key or passkey from headers, query params, cookies, or Bearer auth.
+    Used by telemetry interceptor and admin verification.
+    """
+    key = (
+        request.headers.get("x-admin-key")
+        or request.headers.get("x-axiom-key")
+    )
+    if not key:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            key = auth_header[7:].strip()
+    if not key:
+        key = (
+            request.query_params.get("access_code")
+            or request.query_params.get("token")
+            or request.query_params.get("key")
+            or request.query_params.get("admin_key")
+        )
+    if not key:
+        key = request.cookies.get("axiom_admin_session")
+    return key.strip() if key else None
+
+
+def verify_master_admin(request: Request) -> str:
+    """
+    Validates that the incoming request has Master Admin privileges.
+    Accepts X-Admin-Key / X-Axiom-Key headers, ?key= query parameter, or axiom_admin_session cookie.
+    Returns HTTP 404 Not Found on failure (instead of 401/403) to ensure security through obscurity
+    against scanners and scrapers.
+    """
+    raw_key = extract_request_access_key(request)
+    if not raw_key:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    clean_key = raw_key.strip().upper()
+    if clean_key in MASTER_ADMIN_KEYS or clean_key == access_registry.MASTER_CODE:
+        return clean_key
+
+    # Check registered tokens for master role
+    with access_registry._lock:
+        token_info = access_registry.tokens.get(clean_key)
+        if token_info and token_info.get("type") == "master":
+            return clean_key
+
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.middleware("http")
+async def telemetry_and_moderation_middleware(request: Request, call_next):
+    """
+    Asynchronous telemetry interceptor and moderation security middleware.
+    1. Moderation: Evaluates client IP and Access Key against the blacklist, returning 403 if revoked.
+    2. Telemetry: Records timestamp, client IP, key, latency, status code, and preview in in-memory ring buffer.
+    Never consumes streaming request bodies to preserve SSE and file transfers.
+    """
+    path = request.url.path
+    if path.startswith("/static/"):
+        return await call_next(request)
+
+    client_ip = get_client_ip(request)
+    access_key = extract_request_access_key(request)
+
+    # 1. Moderation Blacklist Check
+    is_blocked, reason = telemetry_manager.is_blocked(client_ip, access_key)
+    if is_blocked:
+        # Allow Master Admin override for admin routes
+        is_admin_override = False
+        if path.startswith("/admin") or path.startswith("/api/admin"):
+            clean_k = (access_key or "").strip().upper()
+            if clean_k in MASTER_ADMIN_KEYS:
+                is_admin_override = True
+
+        if not is_admin_override:
+            action_type = telemetry_manager.classify_action_type(path, request.method)
+            telemetry_manager.record_event(
+                client_ip=client_ip,
+                access_key=access_key,
+                action_type="BLOCKED_" + action_type,
+                query_preview="Access revoked: " + str(reason),
+                path=path,
+                method=request.method,
+                status_code=403,
+                latency_ms=0.0,
+                user_agent=request.headers.get("user-agent", "")
+            )
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Access revoked by administrator", "detail": reason}
+            )
+
+    # 2. Request execution with telemetry timing
+    start_time = time.time()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        latency_ms = (time.time() - start_time) * 1000.0
+        action_type = telemetry_manager.classify_action_type(path, request.method)
+        query_preview = (
+            request.query_params.get("query")
+            or request.query_params.get("inquiry")
+            or request.query_params.get("name")
+            or request.query_params.get("author")
+            or request.query_params.get("target_professor")
+            or request.query_params.get("q")
+            or ""
+        )
+        telemetry_manager.record_event(
+            client_ip=client_ip,
+            access_key=access_key,
+            action_type=action_type,
+            query_preview=query_preview,
+            path=path,
+            method=request.method,
+            status_code=status_code,
+            latency_ms=latency_ms,
+            user_agent=request.headers.get("user-agent", "")
+        )
+
+
 runtime_config: Dict[str, str] = {
     "orcarouter_api_key": ORCAROUTER_API_KEY,
     "orcarouter_base_url": ORCAROUTER_BASE_URL,
@@ -422,6 +555,23 @@ class ConfigUpdateRequest(BaseModel):
     orcarouter_base_url: Optional[str] = None
     model_name: Optional[str] = None
     semantic_scholar_api_key: Optional[str] = None
+
+
+class ModerationBlockRequest(BaseModel):
+    target_type: str = Field(..., description="'ip' or 'key'")
+    target_value: str = Field(..., description="IP address or Access Key to block/unblock")
+    action: str = Field(default="block", description="'block' or 'unblock'")
+
+
+class BroadcastRequest(BaseModel):
+    message: str = Field(default="", description="Alert announcement text")
+    active: bool = Field(default=True, description="Whether alert banner is active")
+
+
+class AdminLimitsRequest(BaseModel):
+    global_hourly_limit: Optional[int] = Field(default=None)
+    key_hourly_limit: Optional[int] = Field(default=None)
+
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -1297,6 +1447,100 @@ async def export_literature_review_endpoint(payload: LiteratureReviewExportReque
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="Literature_Review.md"'}
     )
+
+
+# ============================================================================
+# Admin Observability Dashboard & Telemetry API
+# ============================================================================
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard_page(request: Request):
+    """
+    Renders the protected Admin Observability Dashboard.
+    Enforces Master Admin Key verification (via header, query param, or cookie).
+    Returns 404 Not Found on unauthorized access for security obscurity against scrapers.
+    """
+    try:
+        admin_key = verify_master_admin(request)
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    response = templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={"admin_key": admin_key}
+    )
+    response.set_cookie(
+        key="axiom_admin_session",
+        value=admin_key,
+        max_age=86400 * 30,
+        httponly=False,
+        samesite="lax",
+    )
+    return response
+
+
+@app.get("/api/admin/metrics")
+async def get_admin_metrics_endpoint(request: Request):
+    """
+    Returns live presence, recent telemetry events, ring buffer usage, and moderation status.
+    Protected by verify_master_admin (returns 404 Not Found if unauthorized).
+    """
+    verify_master_admin(request)
+    return telemetry_manager.get_metrics_summary()
+
+
+
+@app.post("/api/admin/block")
+async def admin_block_endpoint(payload: ModerationBlockRequest, request: Request):
+    """
+    Ban or unban an IP address or Access Key.
+    Protected by verify_master_admin (returns 404 Not Found if unauthorized).
+    """
+    verify_master_admin(request)
+    ban = payload.action.lower() == "block"
+    result = telemetry_manager.toggle_block(
+        target_type=payload.target_type,
+        target_value=payload.target_value,
+        block=ban
+    )
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
+
+@app.post("/api/admin/broadcast")
+async def admin_broadcast_endpoint(payload: BroadcastRequest, request: Request):
+    """
+    Publish or clear the global system broadcast banner.
+    Protected by verify_master_admin (returns 404 Not Found if unauthorized).
+    """
+    verify_master_admin(request)
+    result = telemetry_manager.set_broadcast(message=payload.message, active=payload.active)
+    return {"status": "ok", "broadcast": result}
+
+
+@app.post("/api/admin/limits")
+async def admin_limits_endpoint(payload: AdminLimitsRequest, request: Request):
+    """
+    Configure global or per-key hourly rate limits.
+    Protected by verify_master_admin (returns 404 Not Found if unauthorized).
+    """
+    verify_master_admin(request)
+    result = telemetry_manager.set_limits(
+        global_hourly_limit=payload.global_hourly_limit,
+        key_hourly_limit=payload.key_hourly_limit
+    )
+    return {"status": "ok", "limits": result}
+
+
+@app.get("/api/broadcast")
+async def get_public_broadcast_endpoint():
+    """
+    Public unauthenticated endpoint returning current system broadcast banner.
+    Polled or fetched on load by client frontend (index.html).
+    """
+    return telemetry_manager.get_broadcast()
 
 
 if __name__ == "__main__":

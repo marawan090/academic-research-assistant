@@ -479,6 +479,19 @@
 
 <body class="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-150">
 
+  <!-- Global System Broadcast Alert Banner -->
+  <div id="admin-broadcast-banner" class="hidden bg-indigo-600 dark:bg-indigo-900 border-b border-indigo-400/30 px-4 py-2 text-white text-xs font-medium z-50 transition-all duration-300">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center space-x-2 min-w-0">
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/20 text-white tracking-wider shrink-0 uppercase">ANNOUNCEMENT</span>
+        <span id="broadcast-message-text" class="truncate font-sans font-medium"></span>
+      </div>
+      <button id="btn-dismiss-broadcast" class="text-white/80 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer shrink-0" title="Dismiss Announcement">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+  </div>
+
   <!-- Cold-Start Wakeup Banner (Render Free Tier spin-up notice) -->
   <div id="cold-start-banner" class="hidden bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-center text-xs font-medium text-amber-800 dark:text-amber-300 flex items-center justify-center space-x-2 transition-all duration-300 z-50">
     <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block"></span>
@@ -5320,10 +5333,44 @@
       }
     }
 
-    // Run Cohort Gate verification, Server Health check, and Onboarding Tour on startup
+    function initBroadcastBanner() {
+      const banner = document.getElementById('admin-broadcast-banner');
+      const textEl = document.getElementById('broadcast-message-text');
+      const dismissBtn = document.getElementById('btn-dismiss-broadcast');
+
+      if (dismissBtn && banner) {
+        dismissBtn.addEventListener('click', () => {
+          banner.classList.add('hidden');
+          const lastMsg = banner.getAttribute('data-broadcast-msg') || '';
+          if (lastMsg) {
+            sessionStorage.setItem('axiom_dismissed_broadcast', lastMsg);
+          }
+        });
+      }
+
+      fetch('/api/broadcast')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (!data || !data.active || !data.message) return;
+          const dismissed = sessionStorage.getItem('axiom_dismissed_broadcast');
+          if (dismissed === data.message) return;
+
+          if (textEl && banner) {
+            textEl.textContent = data.message;
+            banner.setAttribute('data-broadcast-msg', data.message);
+            banner.classList.remove('hidden');
+          }
+        })
+        .catch(err => {
+          console.debug('Broadcast check notice:', err);
+        });
+    }
+
+    // Run Cohort Gate verification, Server Health check, Onboarding Tour, and Broadcast listener on startup
     initCohortGate();
     initServerHealthCheck();
     initOnboardingTour();
+    initBroadcastBanner();
   </script>
 </body>
 </html>

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axiom Admin · Observability & Live Control Center</title>
+  <link rel="icon" type="image/jpeg" href="/static/axiom_logo.jpg">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            accent: {
+              400: '#38bdf8',
+              500: '#0ea5e9',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Menlo', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 flex flex-col min-h-screen">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs ring-1 ring-brand-500/40 bg-black shrink-0">
+          <img src="/static/axiom_logo.jpg" alt="Axiom Logo" class="w-full h-full object-cover" />
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="font-bold text-sm sm:text-base tracking-tight text-white">
+              Axiom <span class="text-brand-400">Admin Observability</span>
+            </h1>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              RESTRICTED
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">Live Presence, Telemetry Ring Buffer & Moderation Gateway</p>
+        </div>
+      </div>
+
+      <!-- Controls & Session Info -->
+      <div class="flex items-center space-x-2.5 sm:space-x-3 text-xs">
+        <!-- Live Clock -->
+        <div class="hidden md:flex items-center space-x-1.5 font-mono text-slate-400 text-[11px] px-2.5 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span id="live-clock">--:--:-- UTC</span>
+        </div>
+
+        <!-- Auto-Refresh Toggle -->
+        <button id="btn-toggle-autorefresh" class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer text-xs font-medium">
+          <span id="autorefresh-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="autorefresh-label">Auto (4s)</span>
+        </button>
+
+        <!-- Manual Refresh Button -->
+        <button id="btn-manual-refresh" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Refresh Metrics Now">
+          <i data-lucide="refresh-cw" id="refresh-icon" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Back to App Link -->
+        <a href="/" target="_blank" class="hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition text-xs font-medium">
+          <i data-lucide="external-link" class="w-3.5 h-3.5 text-brand-400"></i>
+          <span>Public App</span>
+        </a>
+
+        <!-- Logout Button -->
+        <button id="btn-admin-logout" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 transition cursor-pointer text-xs font-semibold">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- OVERVIEW STATS CARDS -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      
+      <!-- Card 1: Online Users -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">Active Now (5m)</span>
+          <span class="flex h-2 w-2 relative">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="stat-online-users" class="text-2xl sm:text-3xl font-bold font-mono text-white">0</span>
+          <span class="text-xs text-slate-500 font-mono">sessions</span>
+        </div>
+        <div class="mt-1 text-[11px] text-slate-500 flex items-center space-x-1">
+          <span>Idle (30m):</span>
+          <span id="stat-idle-users" class="font-mono text-slate-400 font-semibold">0</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Recent Events Buffer -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">Ring Buffer Events</span>
+          <i data-lucide="activity" class="w-4 h-4 text-brand-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="stat-buffer-events" class="text-2xl sm:text-3xl font-bold font-mono text-white">0</span>
+          <span class="text-xs text-slate-500 font-mono">/ 500 max</span>
+        </div>
+        <div class="mt-1 text-[11px] text-slate-500">Zero disk bloat · In-Memory FIFO</div>
+      </div>
+
+      <!-- Card 3: Blacklisted Entities -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">Blacklisted Entities</span>
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="stat-banned-count" class="text-2xl sm:text-3xl font-bold font-mono text-rose-400">0</span>
+          <span class="text-xs text-slate-500 font-mono">entities</span>
+        </div>
+        <div class="mt-1 text-[11px] text-slate-500">
+          <span id="stat-banned-ips">0</span> IPs · <span id="stat-banned-keys">0</span> Keys
+        </div>
+      </div>
+
+      <!-- Card 4: Uptime -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">Engine Uptime</span>
+          <i data-lucide="server" class="w-4 h-4 text-emerald-400"></i>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span id="stat-uptime" class="text-xl sm:text-2xl font-bold font-mono text-white">--</span>
+        </div>
+        <div class="mt-1 text-[11px] text-slate-500">Cloud Engine Active</div>
+      </div>
+
+    </div>
+
+    <!-- SYSTEM BROADCAST CONTROL BANNER -->
+    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+      <div class="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="megaphone" class="w-4 h-4 text-amber-400"></i>
+          <h3 class="font-bold text-sm text-white">Global System Broadcast Banner</h3>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span id="broadcast-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+            Inactive
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <div class="lg:col-span-2 space-y-3">
+          <label class="block text-xs font-medium text-slate-300">
+            Broadcast Announcement Message (Rendered on main client UI)
+          </label>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              id="broadcast-input"
+              placeholder="e.g., Scheduled maintenance at 10 PM UTC · High API capacity warning"
+              class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+            />
+            <div class="flex items-center space-x-2">
+              <button id="btn-save-broadcast" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-xs transition shadow-sm cursor-pointer whitespace-nowrap">
+                Publish Banner
+              </button>
+              <button id="btn-clear-broadcast" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer text-xs whitespace-nowrap">
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview Card -->
+        <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 space-y-1.5">
+          <span class="text-[10px] uppercase tracking-wider font-mono font-semibold text-slate-500">Live Client Preview:</span>
+          <div id="broadcast-preview-box" class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 text-amber-400"></i>
+            <span id="broadcast-preview-text" class="truncate font-medium">No active broadcast message</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE USER PRESENCE TABLE -->
+    <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="users" class="w-4 h-4 text-emerald-400"></i>
+          <h3 class="font-bold text-sm text-white">Live User Sessions (Online & Recent)</h3>
+          <span id="presence-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            0 Sessions
+          </span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <input
+            type="text"
+            id="search-presence-input"
+            placeholder="Filter by IP, key, or action..."
+            class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 w-48 sm:w-64"
+          />
+        </div>
+      </div>
+
+      <!-- Presence Table Container -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800/70">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950/80 text-slate-400 uppercase tracking-wider font-mono text-[10px] border-b border-slate-800">
+            <tr>
+              <th class="p-3">Status</th>
+              <th class="p-3">Client IP</th>
+              <th class="p-3">Cohort Access Key</th>
+              <th class="p-3">Last Action</th>
+              <th class="p-3">Recent Query / Topic</th>
+              <th class="p-3">Last Seen</th>
+              <th class="p-3 text-right">Moderation Actions</th>
+            </tr>
+          </thead>
+          <tbody id="presence-table-body" class="divide-y divide-slate-800/60 font-sans">
+            <tr>
+              <td colspan="7" class="p-6 text-center text-slate-500 font-mono text-xs">
+                Scanning for active connections...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2-COLUMN LAYOUT: MODERATION BLACKLIST & LIVE EVENT FEED -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- LEFT: Blacklist & Moderation Controls (1 col) -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="shield-x" class="w-4 h-4 text-rose-400"></i>
+            <h3 class="font-bold text-sm text-white">Blacklist & Moderation</h3>
+          </div>
+        </div>
+
+        <!-- Quick Add Ban Form -->
+        <div class="space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-xs">
+          <label class="font-semibold text-slate-300">Quick Ban IP or Revoke Key:</label>
+          <div class="flex gap-2">
+            <select id="ban-target-type" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none">
+              <option value="ip">IP Address</option>
+              <option value="key">Access Key</option>
+            </select>
+            <input
+              type="text"
+              id="ban-target-val"
+              placeholder="e.g. 192.168.1.5 or AXIOM-..."
+              class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+            <button id="btn-submit-ban" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition cursor-pointer">
+              Block
+            </button>
+          </div>
+        </div>
+
+        <!-- Banned IPs List -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+            <span>Banned IP Addresses</span>
+            <span id="badge-banned-ips-count" class="font-mono text-slate-500">0</span>
+          </div>
+          <div id="banned-ips-container" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            <div class="text-[11px] text-slate-500 font-mono p-2 text-center bg-slate-950/60 rounded-lg border border-slate-800/40">
+              No blacklisted IPs
+            </div>
+          </div>
+        </div>
+
+        <!-- Banned Keys List -->
+        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+            <span>Revoked Cohort Keys</span>
+            <span id="badge-banned-keys-count" class="font-mono text-slate-500">0</span>
+          </div>
+          <div id="banned-keys-container" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            <div class="text-[11px] text-slate-500 font-mono p-2 text-center bg-slate-950/60 rounded-lg border border-slate-800/40">
+              No revoked keys
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: Recent Activity Event Logs Stream (2 cols) -->
+      <div class="lg:col-span-2 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 shrink-0">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="list-filter" class="w-4 h-4 text-accent-400"></i>
+            <h3 class="font-bold text-sm text-white">Live Event Stream (Ring Buffer)</h3>
+          </div>
+          <span class="text-[11px] font-mono text-slate-500">Latest 100 API Invocations</span>
+        </div>
+
+        <!-- Scrollable Log Table -->
+        <div class="flex-1 overflow-x-auto overflow-y-auto max-h-[380px] rounded-xl border border-slate-800/70 min-h-[220px]">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950/80 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800 sticky top-0">
+              <tr>
+                <th class="p-2.5">Time (UTC)</th>
+                <th class="p-2.5">Action</th>
+                <th class="p-2.5">Client IP</th>
+                <th class="p-2.5">Access Key</th>
+                <th class="p-2.5">Query Snippet</th>
+                <th class="p-2.5">Code</th>
+                <th class="p-2.5">Latency</th>
+              </tr>
+            </thead>
+            <tbody id="events-table-body" class="divide-y divide-slate-800/60 text-[11px]">
+              <tr>
+                <td colspan="7" class="p-6 text-center text-slate-500">
+                  No events captured in ring buffer yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MASTER PASSKEY MODAL (Appears if session is not yet authenticated) -->
+  <div id="passkey-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center mx-auto text-brand-400">
+        <i data-lucide="lock" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-white">Admin Master Key Required</h3>
+        <p class="text-xs text-slate-400 mt-1">Please provide the Master Admin Key to access the live observability control center.</p>
+      </div>
+      <form id="passkey-form" class="space-y-3 pt-2">
+        <input
+          type="password"
+          id="passkey-input"
+          placeholder="AXIOM-MASTER-RESEARCH-2026"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 text-center tracking-widest"
+          required
+        />
+        <div id="passkey-error" class="text-rose-400 text-xs font-mono hidden">Invalid Master Key. Access denied.</div>
+        <button
+          type="submit"
+          class="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
+        >
+          Authenticate Control Center
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- JAVASCRIPT DASHBOARD LOGIC -->
+  <script>
+    let activeKey = null;
+    let autoRefreshEnabled = true;
+    let refreshIntervalTimer = null;
+
+    // Toast helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const bg = type === 'error' ? 'bg-rose-900/90 border-rose-700 text-rose-100' :
+                 type === 'success' ? 'bg-emerald-900/90 border-emerald-700 text-emerald-100' :
+                 'bg-slate-800/95 border-slate-700 text-slate-100';
+      toast.className = `${bg} border rounded-xl px-3.5 py-2 text-xs font-medium shadow-lg backdrop-blur-sm pointer-events-auto transition-all transform duration-200 flex items-center space-x-2`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 250);
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      })[m]);
+    }
+
+    // Cookie helper
+    function getCookie(name) {
+      const matches = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+      return matches ? decodeURIComponent(matches[1]) : undefined;
+    }
+
+    function setCookie(name, value, days = 30) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${d.toUTCString()}; path=/; SameSite=Strict`;
+    }
+
+    function deleteCookie(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }
+
+    // Determine current key from URL query or cookie
+    function resolveAdminKey() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlKey = urlParams.get('key') || urlParams.get('admin_key');
+      if (urlKey) {
+        activeKey = urlKey.trim();
+        setCookie('axiom_admin_session', activeKey);
+        // Clean URL to avoid leaking key in browser address bar history
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        return activeKey;
+      }
+      const cookieKey = getCookie('axiom_admin_session');
+      if (cookieKey) {
+        activeKey = cookieKey.trim();
+        return activeKey;
+      }
+      return null;
+    }
+
+    // Update Live UTC Clock
+    function updateLiveClock() {
+      const clockEl = document.getElementById('live-clock');
+      if (clockEl) {
+        const now = new Date();
+        clockEl.textContent = now.toTimeString().split(' ')[0] + ' UTC';
+      }
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Authenticated Admin Fetch helper
+    async function adminFetch(endpoint, options = {}) {
+      const headers = Object.assign({}, options.headers || {});
+      if (activeKey) {
+        headers['X-Admin-Key'] = activeKey;
+      }
+      options.headers = headers;
+      options.credentials = 'same-origin';
+      const res = await fetch(endpoint, options);
+      if (res.status === 404 || res.status === 401) {
+        showPasskeyModal();
+        throw new Error('Authentication required');
+      }
+      return res;
+    }
+
+    // Fetch and render dashboard metrics
+    async function fetchDashboardMetrics() {
+      const refreshIcon = document.getElementById('refresh-icon');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+      try {
+        const res = await adminFetch('/api/admin/metrics');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderDashboard(data);
+      } catch (err) {
+        console.warn('Metrics fetch error:', err.message);
+      } finally {
+        if (refreshIcon) {
+          setTimeout(() => refreshIcon.classList.remove('animate-spin'), 400);
+        }
+      }
+    }
+
+    // Render dashboard UI
+    function renderDashboard(data) {
+      // Top stats
+      document.getElementById('stat-online-users').textContent = data.online_users_count || 0;
+      document.getElementById('stat-idle-users').textContent = data.idle_users_count || 0;
+      document.getElementById('stat-buffer-events').textContent = data.total_events_in_buffer || 0;
+      
+      const totalBanned = (data.banned_ips_count || 0) + (data.banned_keys_count || 0);
+      document.getElementById('stat-banned-count').textContent = totalBanned;
+      document.getElementById('stat-banned-ips').textContent = data.banned_ips_count || 0;
+      document.getElementById('stat-banned-keys').textContent = data.banned_keys_count || 0;
+      document.getElementById('stat-uptime').textContent = data.server_uptime || '--';
+
+      // Broadcast state
+      const bc = data.broadcast || {};
+      const bcBadge = document.getElementById('broadcast-status-badge');
+      const bcPreviewText = document.getElementById('broadcast-preview-text');
+      const bcInput = document.getElementById('broadcast-input');
+      
+      if (bc.active && bc.message) {
+        bcBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        bcBadge.textContent = 'Active Banner';
+        bcPreviewText.textContent = bc.message;
+        if (!bcInput.value) bcInput.value = bc.message;
+      } else {
+        bcBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-400 border border-slate-700';
+        bcBadge.textContent = 'Inactive';
+        bcPreviewText.textContent = 'No active broadcast message';
+      }
+
+      // Render Presence Table
+      renderPresenceTable(data.online_users || []);
+
+      // Render Blacklist
+      renderBlacklist(data.banned_ips || [], data.banned_keys || []);
+
+      // Render Event Stream
+      renderEventStream(data.recent_events || []);
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Render Presence Table
+    function renderPresenceTable(users) {
+      const tbody = document.getElementById('presence-table-body');
+      const badge = document.getElementById('presence-count-badge');
+      badge.textContent = `${users.length} Session${users.length === 1 ? '' : 's'}`;
+
+      if (!users.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="p-6 text-center text-slate-500 font-mono text-xs">
+              No active or idle sessions detected in the past 30 minutes.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => {
+        const isOnline = u.status === 'online';
+        const statusBadge = isOnline
+          ? '<span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>Online</span>'
+          : '<span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">Idle</span>';
+
+        const ipBanBtn = u.is_ip_banned
+          ? `<button onclick="toggleBlock('ip', '${escapeHtml(u.client_ip)}', false)" class="px-2 py-1 rounded bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] font-semibold transition cursor-pointer">Unban IP</button>`
+          : `<button onclick="toggleBlock('ip', '${escapeHtml(u.client_ip)}', true)" class="px-2 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-[10px] font-semibold transition cursor-pointer">Ban IP</button>`;
+
+        const keyBanBtn = (u.access_key && u.access_key !== 'ANONYMOUS')
+          ? (u.is_key_banned
+              ? `<button onclick="toggleBlock('key', '${escapeHtml(u.access_key)}', false)" class="px-2 py-1 rounded bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] font-semibold transition cursor-pointer">Restore Key</button>`
+              : `<button onclick="toggleBlock('key', '${escapeHtml(u.access_key)}', true)" class="px-2 py-1 rounded bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50 text-[10px] font-semibold transition cursor-pointer">Revoke Key</button>`)
+          : '';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition">
+            <td class="p-3 whitespace-nowrap">${statusBadge}</td>
+            <td class="p-3 font-mono font-medium text-slate-200">${escapeHtml(u.client_ip)}</td>
+            <td class="p-3 font-mono text-slate-300">${escapeHtml(u.access_key)}</td>
+            <td class="p-3 font-mono text-[11px] text-brand-400 font-semibold">${escapeHtml(u.last_action)}</td>
+            <td class="p-3 text-slate-400 max-w-xs truncate" title="${escapeHtml(u.last_query)}">${escapeHtml(u.last_query || '—')}</td>
+            <td class="p-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">${u.seconds_ago}s ago</td>
+            <td class="p-3 text-right whitespace-nowrap space-x-1.5">
+              ${ipBanBtn}
+              ${keyBanBtn}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Render Blacklist
+    function renderBlacklist(ips, keys) {
+      document.getElementById('badge-banned-ips-count').textContent = ips.length;
+      document.getElementById('badge-banned-keys-count').textContent = keys.length;
+
+      const ipsBox = document.getElementById('banned-ips-container');
+      if (!ips.length) {
+        ipsBox.innerHTML = '<div class="text-[11px] text-slate-500 font-mono p-2 text-center bg-slate-950/60 rounded-lg border border-slate-800/40">No blacklisted IPs</div>';
+      } else {
+        ipsBox.innerHTML = ips.map(ip => `
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono">
+            <span class="text-rose-400 font-medium">${escapeHtml(ip)}</span>
+            <button onclick="toggleBlock('ip', '${escapeHtml(ip)}', false)" class="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded hover:bg-slate-800 transition cursor-pointer">Unban</button>
+          </div>
+        `).join('');
+      }
+
+      const keysBox = document.getElementById('banned-keys-container');
+      if (!keys.length) {
+        keysBox.innerHTML = '<div class="text-[11px] text-slate-500 font-mono p-2 text-center bg-slate-950/60 rounded-lg border border-slate-800/40">No revoked keys</div>';
+      } else {
+        keysBox.innerHTML = keys.map(k => `
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono">
+            <span class="text-amber-400 font-medium">${escapeHtml(k)}</span>
+            <button onclick="toggleBlock('key', '${escapeHtml(k)}', false)" class="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded hover:bg-slate-800 transition cursor-pointer">Restore</button>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Render Event Stream
+    function renderEventStream(events) {
+      const tbody = document.getElementById('events-table-body');
+      if (!events.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-500">No events in ring buffer yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = events.slice(0, 75).map(ev => {
+        const timePart = ev.timestamp ? ev.timestamp.split('T')[1].slice(0, 8) : '--';
+        const isErr = ev.status_code >= 400;
+        const statusClass = isErr ? 'text-rose-400 font-bold' : 'text-emerald-400';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition">
+            <td class="p-2.5 text-slate-500 whitespace-nowrap">${timePart}</td>
+            <td class="p-2.5 text-brand-400 font-semibold whitespace-nowrap">${escapeHtml(ev.action_type)}</td>
+            <td class="p-2.5 text-slate-300 whitespace-nowrap">${escapeHtml(ev.client_ip)}</td>
+            <td class="p-2.5 text-slate-400 whitespace-nowrap">${escapeHtml(ev.access_key)}</td>
+            <td class="p-2.5 text-slate-400 max-w-[180px] truncate" title="${escapeHtml(ev.query_preview)}">${escapeHtml(ev.query_preview || '—')}</td>
+            <td class="p-2.5 ${statusClass}">${ev.status_code}</td>
+            <td class="p-2.5 text-slate-500">${ev.latency_ms}ms</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Block / Unblock action
+    async function toggleBlock(type, value, block) {
+      try {
+        const res = await adminFetch('/api/admin/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_type: type,
+            target_value: value,
+            action: block ? 'block' : 'unblock'
+          })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        showToast(data.message || 'Moderation status updated', 'success');
+        fetchDashboardMetrics();
+      } catch (err) {
+        showToast(`Failed: ${err.message}`, 'error');
+      }
+    }
+
+    // Quick Ban from form
+    document.getElementById('btn-submit-ban')?.addEventListener('click', () => {
+      const type = document.getElementById('ban-target-type').value;
+      const val = document.getElementById('ban-target-val').value.trim();
+      if (!val) {
+        showToast('Please enter an IP address or Access Key', 'error');
+        return;
+      }
+      toggleBlock(type, val, true);
+      document.getElementById('ban-target-val').value = '';
+    });
+
+    // Save Broadcast
+    document.getElementById('btn-save-broadcast')?.addEventListener('click', async () => {
+      const msg = document.getElementById('broadcast-input').value.trim();
+      if (!msg) {
+        showToast('Please enter a broadcast announcement message', 'error');
+        return;
+      }
+      try {
+        const res = await adminFetch('/api/admin/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, active: true })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast('Global broadcast banner published!', 'success');
+        fetchDashboardMetrics();
+      } catch (err) {
+        showToast(`Broadcast update failed: ${err.message}`, 'error');
+      }
+    });
+
+    // Clear Broadcast
+    document.getElementById('btn-clear-broadcast')?.addEventListener('click', async () => {
+      try {
+        const res = await adminFetch('/api/admin/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: '', active: false })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        document.getElementById('broadcast-input').value = '';
+        showToast('Global broadcast banner cleared', 'info');
+        fetchDashboardMetrics();
+      } catch (err) {
+        showToast(`Clear failed: ${err.message}`, 'error');
+      }
+    });
+
+    // Toggle Auto Refresh
+    document.getElementById('btn-toggle-autorefresh')?.addEventListener('click', () => {
+      autoRefreshEnabled = !autoRefreshEnabled;
+      const dot = document.getElementById('autorefresh-dot');
+      const label = document.getElementById('autorefresh-label');
+      if (autoRefreshEnabled) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        label.textContent = 'Auto (4s)';
+        startAutoRefresh();
+        showToast('Auto-refresh resumed (4s)', 'info');
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-600';
+        label.textContent = 'Paused';
+        stopAutoRefresh();
+        showToast('Auto-refresh paused', 'info');
+      }
+    });
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      refreshIntervalTimer = setInterval(() => {
+        if (autoRefreshEnabled) fetchDashboardMetrics();
+      }, 4000);
+    }
+
+    function stopAutoRefresh() {
+      if (refreshIntervalTimer) clearInterval(refreshIntervalTimer);
+      refreshIntervalTimer = null;
+    }
+
+    document.getElementById('btn-manual-refresh')?.addEventListener('click', () => {
+      fetchDashboardMetrics();
+    });
+
+    // Logout
+    document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
+      deleteCookie('axiom_admin_session');
+      activeKey = null;
+      window.location.href = '/';
+    });
+
+    // Passkey Modal Handling
+    function showPasskeyModal() {
+      stopAutoRefresh();
+      const modal = document.getElementById('passkey-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        const input = document.getElementById('passkey-input');
+        if (input) input.focus();
+      }
+    }
+
+    document.getElementById('passkey-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const keyVal = document.getElementById('passkey-input').value.trim();
+      if (!keyVal) return;
+
+      activeKey = keyVal;
+      try {
+        const res = await fetch('/api/admin/metrics', {
+          headers: { 'X-Admin-Key': activeKey }
+        });
+        if (res.status === 404 || res.status === 401) {
+          document.getElementById('passkey-error').classList.remove('hidden');
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        setCookie('axiom_admin_session', activeKey);
+        document.getElementById('passkey-modal').classList.add('hidden');
+        document.getElementById('passkey-error').classList.add('hidden');
+        showToast('Admin session authenticated!', 'success');
+        const data = await res.json();
+        renderDashboard(data);
+        if (autoRefreshEnabled) startAutoRefresh();
+      } catch (err) {
+        document.getElementById('passkey-error').classList.remove('hidden');
+      }
+    });
+
+    // Client-side search in presence table
+    document.getElementById('search-presence-input')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      document.querySelectorAll('#presence-table-body tr').forEach(row => {
+        if (!q) {
+          row.style.display = '';
+          return;
+        }
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      const key = resolveAdminKey();
+      if (!key) {
+        showPasskeyModal();
+      } else {
+        fetchDashboardMetrics();
+        startAutoRefresh();
+      }
+    });
+  </script>
+</body>
+</html>
+
