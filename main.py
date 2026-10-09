@@ -1332,7 +1332,7 @@ async def export_notebooklm_endpoint(payload: NotebookLMExportRequest):
     clean_title = payload.inquiry.strip() or "Academic Systems Research"
     lines = [
         f"# NotebookLM Source Pack: {clean_title}",
-        f"**Curated By**: Axiom Research AI (Engineered by SWMP Labs)",
+        f"**Curated By**: SWMP Labs",
         f"**Date**: {time.strftime('%Y-%m-%d')}",
         f"**Total Indexed Literature Sources**: {len(payload.papers)}",
         f"",
@@ -1390,7 +1390,7 @@ async def export_literature_review_endpoint(payload: LiteratureReviewExportReque
     clean_title = payload.inquiry.strip().title() if payload.inquiry else "Distributed Systems Computing"
     lines = [
         f"# Systematic Literature Review: {clean_title}",
-        f"**Author / Literature Engine**: Axiom Research AI (SWMP Labs Open-Source Initiative)",
+        f"**Author / Literature Engine**: SWMP Labs (Open-Source Initiative)",
         f"**Date**: {time.strftime('%B %Y')}",
         f"",
         f"## Abstract",

@@ -2,7 +2,7 @@
   <img src="static/axiom_logo.jpg" alt="Axiom Research" width="100" style="border-radius: 18px; margin: 8px;" />
   <img src="static/swmp_logo.jpg" alt="SWMP Labs" width="100" style="border-radius: 18px; margin: 8px;" />
 
-  # Axiom Research AI: Next-Gen Academic Systems Literature Engine
+  # SWMP Labs: Next-Gen Academic Systems Literature Engine
   *An open-source initiative by **SWMP Labs** — Technology for a Smarter Tomorrow*
 </div>
 
