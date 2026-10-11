@@ -641,46 +641,31 @@ def _access_denied(status_code: int, machine_code: str, message: str) -> HTTPExc
 
 async def resolve_access(
     request: Request,
-    x_axiom_key: Optional[str] = Header(None, alias="X-Axiom-Key"),
-    access_code: Optional[str] = Query(None),
-    token: Optional[str] = Query(None),
     sb_token: Optional[str] = Query(None),
 ) -> str:
     """
-    Unified gate for metered endpoints (search + AI generation, 1 credit each).
-    1. Supabase invite path: valid Bearer/sb_token + completed profile + active
-       code + credits>0 -> deduct 1 credit, allow (no cohort code needed).
-    2. Legacy path: existing Axiom cohort gate, unchanged, no credit burn.
+    Strict dual-gate for all 12 metered endpoints (search + AI generation).
+    Requires BOTH a validated invite code AND an active Supabase session with
+    a completed profile. Each allowed call deducts 1 credit. Cohort-only keys
+    are NOT sufficient here (401 AUTH_REQUIRED). Guests get 401, incomplete
+    profiles 403 ONBOARDING_REQUIRED, revoked codes 403 CODE_REVOKED, empty
+    balances 402 CREDITS_EXHAUSTED — machine codes in X-Access-Code.
     """
     sb_user = await get_current_user(request.headers.get("authorization"), sb_token)
-    if sb_user is not None:
-        profile = access_store.get_user(sb_user["id"])
-        if not profile or not profile.get("code"):
-            raise _access_denied(403, "ONBOARDING_REQUIRED", "Profile setup required. Complete onboarding to unlock.")
-        access_store.touch_user(sb_user["id"], get_client_ip(request))
-        ok, msg, status = access_store.deduct_credit(sb_user["id"])
-        if not ok:
-            machine = "CODE_REVOKED" if status == 403 else "CREDITS_EXHAUSTED"
-            raise _access_denied(status, machine, msg)
-        return f"sb:{sb_user['id']}"
-
-    # Legacy cohort path (unchanged behavior).
-    key = x_axiom_key or access_code or token
-    if not key:
-        auth_header = request.headers.get("authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
-            key = auth_header[7:].strip()
-    if not key and os.getenv("AXIOM_TEST_KEY"):
-        key = os.getenv("AXIOM_TEST_KEY")
-    if not key:
-        raise HTTPException(status_code=401, detail="Access token required. Please authenticate via the Cohort Gate.")
-    client_ip = get_client_ip(request)
-    is_valid, msg, status_code, _ = access_registry.validate_code(
-        code=key, client_ip=client_ip, bind_if_unbound=True
-    )
-    if not is_valid:
-        raise HTTPException(status_code=status_code, detail=msg)
-    return key
+    if sb_user is None:
+        raise _access_denied(
+            401, "AUTH_REQUIRED",
+            "Authentication required. Sign in and complete onboarding to use search.",
+        )
+    profile = access_store.get_user(sb_user["id"])
+    if not profile or not profile.get("code"):
+        raise _access_denied(403, "ONBOARDING_REQUIRED", "Profile setup required. Complete onboarding to unlock.")
+    access_store.touch_user(sb_user["id"], get_client_ip(request))
+    ok, msg, status = access_store.deduct_credit(sb_user["id"])
+    if not ok:
+        machine = "CODE_REVOKED" if status == 403 else "CREDITS_EXHAUSTED"
+        raise _access_denied(status, machine, msg)
+    return f"sb:{sb_user['id']}"
 
 
 @app.get("/api/onboarding/status")
@@ -1172,6 +1157,62 @@ async def serve_ui(request: Request):
             "has_ss_key": bool(runtime_config["semantic_scholar_api_key"]),
             "base_url": runtime_config["orcarouter_base_url"],
         }
+    )
+
+
+@app.get("/confirmed", response_class=HTMLResponse)
+async def email_confirmed_page():
+    """
+    Standalone email-verification landing page. Static confirmation only —
+    deliberately no redirect, reload, or navigation back to /.
+    """
+    return HTMLResponse(
+        content="""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Confirmed · SWMP Labs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: #09090b;
+      color: #e4e4e7;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .card { text-align: center; max-width: 22rem; }
+    .icon {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 0.9rem;
+      background: rgba(39, 39, 42, 0.8);
+      border: 1px solid #3f3f46;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      color: #4ade80;
+    }
+    .icon svg { width: 1.75rem; height: 1.75rem; }
+    h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; color: #f4f4f5; }
+    p { font-size: 0.8rem; line-height: 1.6; color: #a1a1aa; margin-top: 0.6rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    </div>
+    <h1>Email Confirmed</h1>
+    <p>Your email has been verified. You can now close this tab and return to the website to sign in.</p>
+  </div>
+</body>
+</html>"""
     )
 
 

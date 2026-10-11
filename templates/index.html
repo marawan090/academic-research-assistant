@@ -1502,6 +1502,33 @@
     </div>
   </div>
 
+  <!-- Email Confirmation Status Card (replaces the easy-to-miss toast) -->
+  <div id="sb-confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-8 shadow-2xl space-y-4 text-center text-slate-800 dark:text-slate-100 relative">
+      <div class="w-14 h-14 rounded-2xl bg-brand-600/15 border border-brand-500/30 flex items-center justify-center mx-auto text-brand-400">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold">Check your inbox</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+          We've sent a verification link to <strong id="sb-confirm-email" class="text-slate-700 dark:text-slate-200 break-all"></strong>.
+          Please click the link to confirm your account and start researching.
+        </p>
+      </div>
+      <div class="space-y-2 pt-1">
+        <button id="sb-confirm-resend" class="w-full flex items-center justify-center px-4 py-2 rounded-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-semibold text-xs transition cursor-pointer disabled:opacity-50">
+          <span>Resend Email</span>
+        </button>
+        <button id="sb-confirm-back" class="w-full text-center text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer">
+          Back to Sign In
+        </button>
+      </div>
+      <button id="sb-confirm-close" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Close">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
   <!-- Mandatory Onboarding Modal (profile + invite code; blocks tools until complete) -->
   <div id="onboarding-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/85 backdrop-blur-md p-4">
     <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-800 dark:text-slate-100">
@@ -1689,8 +1716,18 @@
 
         if (res.ok && data.valid) {
           localStorage.setItem('axiom_access_token', code);
+          try { sessionStorage.setItem('pending_access_code', code); } catch (_) {}
           hideAuthGate();
-          showToast(`Access granted (${data.type || 'researcher'}). Cohort active.`, 'success');
+          if (!sbUser) {
+            // Code-first funnel: code accepted once here — never ask again.
+            // Route to sign-in; onboarding auto-fills the stashed code.
+            showToast('Code accepted — sign in to finish unlocking.', 'success');
+            openSbAuthModal();
+          } else if (!sbOnboarded) {
+            openOnboardingModal();
+          } else {
+            showToast(`Access granted (${data.type || 'researcher'}). Cohort active.`, 'success');
+          }
         } else {
           const errMsg = data.error || (data.detail ? data.detail : 'Authentication failed. Please verify code.');
           showAuthGate(errMsg);
@@ -1750,6 +1787,11 @@
       } catch (_) {}
       const response = await fetch(url, { ...options, headers });
       const machine = response.headers ? response.headers.get('X-Access-Code') : null;
+      if (machine === 'AUTH_REQUIRED') {
+        if (sbUser) openOnboardingModal();
+        else showAuthGate('Enter your invite code to unlock research tools.');
+        return response;
+      }
       if (response.status === 402 || machine === 'CREDITS_EXHAUSTED') {
         showToast('Out of credits — contact the administrator for a top-up.', 'error');
         return response;
@@ -5198,13 +5240,27 @@
       if (!email || !password || password.length < 6) { showErr('Enter a valid email and a 6+ character password.'); return; }
       if (submitBtn) submitBtn.disabled = true;
       try {
+        // Signup carries a dynamic redirect (never localhost) plus early metadata:
+        // full name if already typed, and any code stashed by the code-first gate.
+        function buildSignupOptions() {
+          const meta = {};
+          try {
+            const earlyName = (document.getElementById('onboarding-name')?.value || '').trim();
+            if (earlyName) meta.full_name = earlyName;
+            const pending = (sessionStorage.getItem('pending_access_code') || '').trim().toUpperCase();
+            if (pending) meta.access_code = pending;
+          } catch (_) {}
+          return { emailRedirectTo: window.location.origin, data: meta };
+        }
         const fn = sbAuthMode === 'signup'
-          ? sbClient.auth.signUp({ email, password })
+          ? sbClient.auth.signUp({ email, password, options: buildSignupOptions() })
           : sbClient.auth.signInWithPassword({ email, password });
         const { data, error } = await fn;
         if (error) throw error;
         if (sbAuthMode === 'signup' && data && !data.session) {
-          showToast('Account created! Check your email to confirm, then sign in.', 'success');
+          sbPendingEmail = email;
+          closeSbAuthModal();
+          openSbConfirmModal(email);
           setSbAuthMode('signin');
           return;
         }
@@ -5214,6 +5270,46 @@
         showErr(e.message || 'Authentication failed.');
       } finally {
         if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    let sbPendingEmail = '';
+
+    function openSbConfirmModal(email) {
+      const modal = document.getElementById('sb-confirm-modal');
+      if (!modal) return;
+      const addr = document.getElementById('sb-confirm-email');
+      if (addr) addr.textContent = email || sbPendingEmail || 'your email';
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    }
+
+    function closeSbConfirmModal() {
+      const modal = document.getElementById('sb-confirm-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    async function resendSbConfirmEmail() {
+      const btn = document.getElementById('sb-confirm-resend');
+      const target = (sbPendingEmail || '').trim();
+      if (!target) { showToast('No pending email to resend to.', 'warning'); return; }
+      if (!sbClient) { showToast('Auth service unavailable (offline).', 'error'); return; }
+      if (btn) btn.disabled = true;
+      try {
+        const { error } = await sbClient.auth.resend({
+          type: 'signup',
+          email: target,
+          options: { emailRedirectTo: window.location.origin }
+        });
+        if (error) throw error;
+        showToast('Verification email resent.', 'success');
+      } catch (e) {
+        showToast(e.message || 'Resend failed.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -5473,13 +5569,19 @@
         sbClient = window.supabase.createClient(SB_URL, SB_ANON_KEY);
         sbClient.auth.onAuthStateChange(async (event, session) => {
           if (session && session.user) {
-            sbUser = { id: session.user.id, email: session.user.email };
+            sbUser = { id: session.user.id, email: session.user.email, meta: (session.user.user_metadata || {}) };
             sbSessionId = null;
             try {
               const tok = session.access_token || '';
               if (tok) sbAccessTokenCache = tok;
             } catch (_) {}
             updateSbAuthUI();
+            // Hash-token exchange (email confirmation link) lands here with
+            // SIGNED_IN: dismiss the confirmation card and glide into onboarding.
+            if (event === 'SIGNED_IN') {
+              closeSbConfirmModal();
+              showToast('Email confirmed — welcome!', 'success');
+            }
             mergeServerBookmarks();
             checkOnboardingStatus();
           } else {
@@ -5526,6 +5628,14 @@
       if (histToggle) histToggle.addEventListener('click', openHistoryDrawer);
       const histClose = document.getElementById('btn-close-history');
       if (histClose) histClose.addEventListener('click', closeHistoryDrawer);
+      const confirmResend = document.getElementById('sb-confirm-resend');
+      if (confirmResend) confirmResend.addEventListener('click', resendSbConfirmEmail);
+      const confirmBack = document.getElementById('sb-confirm-back');
+      if (confirmBack) confirmBack.addEventListener('click', () => { closeSbConfirmModal(); openSbAuthModal(); });
+      const confirmClose = document.getElementById('sb-confirm-close');
+      if (confirmClose) confirmClose.addEventListener('click', closeSbConfirmModal);
+      const confirmModal = document.getElementById('sb-confirm-modal');
+      if (confirmModal) confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) closeSbConfirmModal(); });
     }
 
     // --- Invite-Only Onboarding Gate (profile + code + credits) ---
@@ -5553,6 +5663,16 @@
       const err = document.getElementById('onboarding-error');
       if (err) err.classList.add('hidden');
       if (hint) hint.classList.toggle('hidden', !!sbUser);
+      // Single-prompt guarantee: pre-fill the code stashed by the code-first
+      // gate (or signup metadata) so it is never requested twice.
+      try {
+        const codeEl = document.getElementById('onboarding-code');
+        const nameEl = document.getElementById('onboarding-name');
+        const pending = (sessionStorage.getItem('pending_access_code') || '').trim().toUpperCase();
+        if (codeEl && pending && !codeEl.value.trim()) codeEl.value = pending;
+        const metaName = (sbUser && sbUser.meta && sbUser.meta.full_name) || '';
+        if (nameEl && metaName && !nameEl.value.trim()) nameEl.value = metaName;
+      } catch (_) {}
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       try { if (window.lucide) lucide.createIcons(); } catch (_) {}
@@ -5632,6 +5752,7 @@
         sbOnboarded = true;
         sbCredits = (data && data.credits) || 0;
         updateSbCreditsUI();
+        try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
         closeOnboardingModal();
         showToast(`Welcome, ${data.full_name || fullName}! ${sbCredits} credits granted.`, 'success');
       } catch (e) {
@@ -5834,12 +5955,15 @@
         return;
       }
 
-      if (!localStorage.getItem('axiom_access_token') && !(sbUser && sbOnboarded)) {
+      // Strict dual-gate: metered search needs BOTH an onboarded Supabase
+      // session and a validated code. Guests are fully blocked from running
+      // searches — the gate opens instead.
+      if (!(sbUser && sbOnboarded)) {
         if (sbUser && !sbOnboarded) {
           openOnboardingModal();
           return;
         }
-        showAuthGate('Please authenticate with your cohort access code to execute research.');
+        showAuthGate('Enter your invite code to unlock research tools.');
         return;
       }
 
