@@ -659,6 +659,10 @@
               <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
               <span>University / Lab</span>
             </button>
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="custom">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+              <span>Custom Search</span>
+            </button>
           </div>
           <span id="search-mode-label" class="hidden sm:inline-block text-[11px] font-mono text-slate-400 dark:text-slate-500">Multi-source CS index</span>
         </div>
@@ -682,6 +686,30 @@
                 <i data-lucide="send" class="w-3.5 h-3.5 transition group-hover:translate-x-0.5"></i>
                 <span id="btn-text">Research</span>
               </button>
+            </div>
+          </div>
+
+          <!-- Custom / Advanced Search: combined multi-field filters (visible only in Custom mode) -->
+          <div id="custom-search-panel" class="hidden mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+              <input
+                type="text"
+                id="custom-author-input"
+                placeholder="Author (e.g., Tri Dao) — optional"
+                autocomplete="off"
+                class="w-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 py-2.5 focus:outline-none"
+              />
+            </div>
+            <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
+              <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+              <input
+                type="text"
+                id="custom-institution-input"
+                placeholder="University / Lab (e.g., Stanford) — optional"
+                autocomplete="off"
+                class="w-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 py-2.5 focus:outline-none"
+              />
             </div>
           </div>
 
@@ -1319,8 +1347,14 @@
 
   <!-- Client-side Logic -->
   <script>
-    // Initialize Lucide icons
-    lucide.createIcons();
+    // Initialize Lucide icons (guarded: CDN may load after this script).
+    function refreshLucideIcons() {
+      try { if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons(); } catch (_) {}
+    }
+    refreshLucideIcons();
+    // Re-run on DOM ready so dynamically added Custom Search buttons/inputs
+    // (sliders-horizontal, user, building-2) render even if lucide loaded late.
+    document.addEventListener('DOMContentLoaded', refreshLucideIcons);
 
     // ============================================================================
     // Theme Manager: Dark / Light Mode
@@ -2267,7 +2301,7 @@
       entityQuery: ''
     };
 
-    // Dynamic Search Mode State ('topic' | 'author' | 'institution')
+    // Dynamic Search Mode State ('topic' | 'author' | 'institution' | 'custom')
     let currentSearchMode = 'topic';
     const searchModeBtns = document.querySelectorAll('.search-mode-btn');
     const searchModeLabel = document.getElementById('search-mode-label');
@@ -2276,19 +2310,22 @@
     const searchModePlaceholders = {
       topic: "e.g., FlashAttention-3 GPU kernel optimizations, diffusion state-space models...",
       author: "e.g., Tri Dao, Ilya Sutskever, Kaiming He, Yann LeCun...",
-      institution: "e.g., Stanford University, MIT, DeepMind, OpenAI..."
+      institution: "e.g., Stanford University, MIT, DeepMind, OpenAI...",
+      custom: "e.g., diffusion models — optionally combine with author + university below..."
     };
 
     const searchModeButtonTexts = {
       topic: "Research",
       author: "Find Works",
-      institution: "Find Works"
+      institution: "Find Works",
+      custom: "Custom Search"
     };
 
     const searchModeLabels = {
       topic: "Multi-source CS index (ArXiv, Scholar, OpenAlex)",
       author: "OpenAlex Researcher Works Index",
-      institution: "OpenAlex Institution / Lab Works Index"
+      institution: "OpenAlex Institution / Lab Works Index",
+      custom: "Combined Topic + Author + Institution (AND)"
     };
 
     function setMode(mode) {
@@ -2315,8 +2352,38 @@
           categoryScopeText.textContent = 'Global Author Publications';
         } else if (mode === 'institution') {
           categoryScopeText.textContent = 'Global Lab / University Works';
+        } else if (mode === 'custom') {
+          categoryScopeText.textContent = 'Combined multi-field query';
         } else {
           categoryScopeText.textContent = 'cs.DC, cs.SE, cs.AI, cs.AR';
+        }
+      }
+      // Toggle Custom / Advanced multi-field panel; standalone modes keep single-input flow unchanged.
+      const customPanel = document.getElementById('custom-search-panel');
+      if (customPanel) {
+        if (mode === 'custom') {
+          customPanel.classList.remove('hidden');
+        } else {
+          customPanel.classList.add('hidden');
+        }
+      }
+      // State cleanup: leaving custom mode clears hidden filter values so they
+      // cannot leak into subsequent standalone (topic/author/institution) requests.
+      if (mode !== 'custom') {
+        const customAuthorEl = document.getElementById('custom-author-input');
+        const customInstEl = document.getElementById('custom-institution-input');
+        if (customAuthorEl) customAuthorEl.value = '';
+        if (customInstEl) customInstEl.value = '';
+      }
+      // Re-render icons after mode switch so the Custom Search toggle state
+      // (active/inactive button + panel inputs) always shows fresh Lucide SVGs.
+      try { if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons(); } catch (_) {}
+      // Topic textarea is required for standalone modes; custom allows author/institution-only queries.
+      if (queryInput) {
+        if (mode === 'custom') {
+          queryInput.removeAttribute('required');
+        } else {
+          queryInput.setAttribute('required', '');
         }
       }
     }
@@ -4676,7 +4743,19 @@
       researchForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const inquiry = queryInput.value.trim();
-      if (!inquiry) return;
+      // Custom / Advanced Search: combine topic + author + institution (any single field suffices).
+      const customAuthorEl = document.getElementById('custom-author-input');
+      const customInstEl = document.getElementById('custom-institution-input');
+      const customAuthor = currentSearchMode === 'custom' && customAuthorEl ? customAuthorEl.value.trim() : '';
+      const customInstitution = currentSearchMode === 'custom' && customInstEl ? customInstEl.value.trim() : '';
+      if (currentSearchMode === 'custom') {
+        if (!inquiry && !customAuthor && !customInstitution) {
+          showToast('Custom Search needs at least one field: topic, author, or university/lab.', 'error');
+          return;
+        }
+      } else if (!inquiry) {
+        return;
+      }
 
       if (!localStorage.getItem('axiom_access_token')) {
         showAuthGate('Please authenticate with your cohort access code to execute research.');
@@ -4701,13 +4780,19 @@
         modeBadge = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white mr-1.5 uppercase tracking-wider">Author Profile</span>';
       } else if (currentSearchMode === 'institution') {
         modeBadge = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white mr-1.5 uppercase tracking-wider">University / Lab</span>';
+      } else if (currentSearchMode === 'custom') {
+        modeBadge = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 text-white mr-1.5 uppercase tracking-wider">Custom Search</span>';
       }
 
       const userBubble = document.createElement('div');
       userBubble.className = 'flex items-start space-x-3 justify-end';
+      const customSuffix = currentSearchMode === 'custom'
+        ? [customAuthor ? `author: ${customAuthor}` : '', customInstitution ? `lab: ${customInstitution}` : ''].filter(Boolean).join(' · ')
+        : '';
+      const bubbleLabel = customSuffix ? `${inquiry || '(no topic)'} (${customSuffix})` : inquiry;
       userBubble.innerHTML = `
         <div class="max-w-2xl bg-brand-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm shadow-md text-sm leading-relaxed">
-          <p class="font-medium">${modeBadge}${escapeHtml(inquiry)}</p>
+          <p class="font-medium">${modeBadge}${escapeHtml(bubbleLabel)}</p>
         </div>
         <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
           <i data-lucide="user" class="w-4 h-4"></i>
@@ -4812,18 +4897,27 @@
 
       let accumulatedMarkdown = '';
 
+      // Multi-field query builder: standalone modes send only query; custom appends author/institution.
       const params = new URLSearchParams({
         query: inquiry,
         limit: currentPaperLimit,
         search_mode: currentSearchMode
       });
+      if (currentSearchMode === 'custom') {
+        if (customAuthor) params.set('author', customAuthor);
+        if (customInstitution) params.set('institution', customInstitution);
+      }
       const axiomToken = localStorage.getItem('axiom_access_token') || '';
       if (axiomToken) {
         params.set('access_code', axiomToken);
       }
 
-      const eventSource = new EventSource(`/api/research/stream?${params.toString()}`);
+      const streamUrl = `/api/research/stream?${params.toString()}`;
+      const eventSource = new EventSource(streamUrl);
       activeEventSource = eventSource;
+      // Tracks clean terminal states so onerror can distinguish an expected
+      // close (after done/error event) from a transport/HTTP failure.
+      let streamDone = false;
 
       eventSource.onmessage = async (e) => {
         if (!e.data) return;
@@ -4913,6 +5007,7 @@
             renderMathInContainer(markdownBody);
             feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
           } else if (type === 'done') {
+            streamDone = true;
             clearInterval(timerInterval);
             stepDiscovery.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
             stageHeading.textContent = 'Literature Discovery Complete';
@@ -4924,6 +5019,7 @@
             renderMathInContainer(markdownBody);
             showToast('Literature discovery complete!', 'success');
           } else if (type === 'error') {
+            streamDone = true;
             clearInterval(timerInterval);
             stageHeading.textContent = 'Pipeline Notice';
             stageDetail.textContent = data.message;
@@ -4941,10 +5037,47 @@
         console.error('SSE Error:', err);
         clearInterval(timerInterval);
         setFormLoading(false);
-        eventSource.close();
+        // Abort immediately: EventSource auto-reconnects by default, so close
+        // first to prevent reconnection loops on HTTP 4xx/5xx validation failures.
+        try { eventSource.close(); } catch (_) {}
         activeEventSource = null;
+        if (streamDone) {
+          stageHeading.textContent = 'Stream Terminated';
+          stageDetail.textContent = 'Connection closed or completed.';
+          return;
+        }
         stageHeading.textContent = 'Stream Terminated';
         stageDetail.textContent = 'Connection closed or completed.';
+        // Surface server-side validation detail (e.g., HTTP 400 for empty custom
+        // search, 401 auth) via a single non-streaming probe. The probe body is
+        // cancelled immediately on HTTP 200 so a healthy stream is never
+        // re-downloaded; HTTP 4xx/5xx bodies are tiny JSON error payloads.
+        fetch(streamUrl, { method: 'GET', headers: { 'Accept': 'text/event-stream' } }).then(async (res) => {
+          try {
+            if (res.ok) {
+              try { if (res.body && res.body.cancel) await res.body.cancel(); } catch (_) {}
+              showToast('Search stream interrupted. Please retry.', 'error');
+              return;
+            }
+            let detail = `Search request failed (HTTP ${res.status})`;
+            try {
+              const data = await res.clone().json();
+              detail = data.detail || data.error || data.message || detail;
+            } catch (_) {
+              try {
+                const text = await res.text();
+                if (text && text.length < 500) detail = text;
+              } catch (_) {}
+            }
+            try { if (res.body && res.body.cancel) await res.body.cancel(); } catch (_) {}
+            stageDetail.textContent = detail;
+            showToast(detail, 'error');
+          } catch (_) {
+            showToast('Search stream interrupted. Please retry.', 'error');
+          }
+        }).catch(() => {
+          showToast('Search stream interrupted. Please check connection and retry.', 'error');
+        });
       };
 
       if (btnPrintReport) {

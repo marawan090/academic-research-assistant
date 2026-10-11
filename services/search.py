@@ -229,9 +229,11 @@ def clean_academic_query(raw_query: str) -> str:
       "Recent advances and research gaps in distributed checkpointing and fault tolerance
        for cloud-based HPC scientific simulations (such as reactor or thermal digital twins)"
       -> "distributed checkpointing fault tolerance cloud HPC simulations"
+    Custom-search hardening: empty/whitespace-only input returns "" (no phantom
+    fallback keywords) so author/institution-only queries are filter-only.
     """
-    if not raw_query:
-        return "distributed systems"
+    if not raw_query or not raw_query.strip():
+        return ""
 
     # 1. Strip content inside parentheses and brackets (e.g. "(such as reactor or thermal digital twins)")
     cleaned = re.sub(r"\([^)]*\)", " ", raw_query)
@@ -353,12 +355,14 @@ async def fetch_arxiv_papers(
     else:
         term_clause = ""
 
-    # Integrate author filter
+    # Integrate author filter (sanitized: strip embedded quotes to keep au:"..." valid;
+    # empty keywords + author => filter-only query, no empty all:(...) clause prepended)
+    safe_author = (author or "").strip().replace('"', '').strip()
     query_parts = []
     if term_clause:
         query_parts.append(term_clause)
-    if author and author.strip():
-        query_parts.append(f'au:"{author.strip()}"')
+    if safe_author:
+        query_parts.append(f'au:"{safe_author}"')
     if cat_clause:
         query_parts.append(cat_clause)
 
@@ -401,8 +405,8 @@ async def fetch_arxiv_papers(
             relaxed_terms = tokens[:2]
             relaxed_term_clause = f"all:({' AND '.join(relaxed_terms)})"
             relaxed_parts = [relaxed_term_clause]
-            if author and author.strip():
-                relaxed_parts.append(f'au:"{author.strip()}"')
+            if safe_author:
+                relaxed_parts.append(f'au:"{safe_author}"')
             if cat_clause:
                 relaxed_parts.append(cat_clause)
             relaxed_query = " AND ".join(relaxed_parts)
@@ -522,6 +526,11 @@ async def fetch_semantic_scholar_papers(
     """
     papers: List[Paper] = []
     effective_key = (api_key or os.getenv("SEMANTIC_SCHOLAR_API_KEY", "") or kwargs.get("key") or "").strip()
+
+    # Custom-search hardening: empty topic => skip API call (avoids ?query= 400s).
+    # Standalone flows always pass non-empty keywords, so this is a no-op for them.
+    if not (keywords or "").strip():
+        return papers
 
     headers = {
         "User-Agent": "AxiomResearchAI/1.0 (academic-assistant@gemini.ai)"
