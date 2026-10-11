@@ -52,6 +52,7 @@ from services.llm import (
 from services.telemetry import telemetry_manager
 from services.access import (
     access_store,
+    code_for_bearer,
     verify_admin_password,
 )
 from services.db import (
@@ -427,8 +428,16 @@ async def telemetry_and_moderation_middleware(request: Request, call_next):
 
     client_ip = get_client_ip(request)
     raw_key = extract_request_access_key(request)
+    # Attribute Supabase-authed traffic to the redeemed access code: decode the
+    # JWT locally (display only, no network) and swap the key BEFORE moderation
+    # and recording, so code bans apply and telemetry shows real codes.
+    resolved_code = code_for_bearer(request.headers.get("authorization")) or code_for_bearer(
+        request.query_params.get("sb_token")
+    )
+    if resolved_code:
+        raw_key = resolved_code
     # Never log raw Supabase JWTs in the ring buffer (length + eyJ prefix heuristic).
-    if raw_key and len(raw_key) > 64 and raw_key.startswith("eyJ"):
+    elif raw_key and len(raw_key) > 64 and raw_key.startswith("eyJ"):
         raw_key = "SUPABASE_USER"
     access_key = raw_key if raw_key else "UNAUTHENTICATED / VISITOR"
 
@@ -680,13 +689,14 @@ async def onboarding_status(request: Request):
     if not profile or not profile.get("code"):
         return {"completed": False, "guest": False, "credits": 0, "email": sb_user.get("email")}
     code_active = access_store.is_code_active(profile.get("code", ""))
+    code_credits = access_store.user_credits(sb_user["id"])
     return {
         "completed": code_active,
         "guest": False,
         "email": sb_user.get("email"),
         "full_name": profile.get("full_name", ""),
         "code": profile.get("code", ""),
-        "credits": int(profile.get("credits", 0) or 0),
+        "credits": code_credits if code_credits is not None else 0,
         "code_active": code_active,
     }
 
