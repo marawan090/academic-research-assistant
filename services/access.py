@@ -282,6 +282,24 @@ class AccessStore:
             logger.warning("Admin adjusted credits for %s by %+d -> %d", target_id, int(delta), new_balance)
             return True, "Credits updated.", 200, dict(user)
 
+    def set_credits(
+        self, user_id: str, amount: int
+    ) -> Tuple[bool, str, int, Optional[Dict[str, Any]]]:
+        """Admin absolute balance set (floor 0). Lookup strictly by user_id."""
+        with self._lock:
+            user = self.users.get(user_id)
+            if user is None:
+                return False, "No onboarded user found for identifier.", 404, None
+            try:
+                new_balance = max(0, int(amount))
+            except (TypeError, ValueError):
+                return False, "Amount must be an integer.", 400, None
+            user["credits"] = new_balance
+            user["updated_at"] = _utcnow_iso()
+            self._save_unlocked()
+            logger.warning("Admin set credits for %s -> %d", user_id, new_balance)
+            return True, "Credits updated.", 200, dict(user)
+
     # -- admin activity -------------------------------------------------------
     def build_activity_rows(
         self,

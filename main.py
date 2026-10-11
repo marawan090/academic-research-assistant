@@ -754,6 +754,40 @@ async def admin_adjust_credits(payload: CreditAdjustRequest, request: Request):
     return {"status": "ok", "message": msg, "credits": int(user.get("credits", 0) or 0), "user": user}
 
 
+class UserCreditsRequest(BaseModel):
+    user_id: str
+    action: str = Field(default="adjust", description="'adjust' (+/- delta) or 'set' (absolute)")
+    amount: int = 0
+
+
+@app.post("/api/admin/users/credits")
+async def admin_users_credits(payload: UserCreditsRequest, request: Request):
+    """
+    Direct per-user credit control for the admin users table.
+    action="adjust": amount added (negative allowed, floor 0).
+    action="set": balance set to amount (floor 0).
+    """
+    verify_master_admin(request)
+    action = (payload.action or "adjust").strip().lower()
+    if action not in ("adjust", "set"):
+        raise HTTPException(status_code=400, detail="action must be 'adjust' or 'set'.")
+    if action == "set":
+        ok, msg, status, user = access_store.set_credits(payload.user_id, payload.amount)
+    else:
+        ok, msg, status, user = access_store.adjust_credits(
+            user_id=payload.user_id, delta=payload.amount
+        )
+    if not ok:
+        raise HTTPException(status_code=status, detail=msg)
+    assert user is not None
+    return {
+        "status": "ok",
+        "message": msg,
+        "credits": int(user.get("credits", 0) or 0),
+        "user_id": payload.user_id,
+    }
+
+
 @app.get("/api/admin/telemetry")
 async def admin_telemetry_24h(request: Request):
     """

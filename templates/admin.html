@@ -287,9 +287,9 @@
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-zinc-900/60 transition';
         tr.dataset.search = `${r.user_email || ''} ${r.user_name || ''} ${r.client_ip || ''} ${r.access_code || ''}`.toLowerCase();
-        const creditCell = (r.credits === -1 || r.credits === undefined)
+        const creditCell = (r.credits === -1 || r.credits === undefined || !r.user_id)
           ? '<span class="font-mono text-zinc-600">—</span>'
-          : `<span class="font-mono text-zinc-200">${escapeHtml(String(r.credits))}</span>`;
+          : `<button data-act="custom" data-uid="${escapeHtml(r.user_id)}" data-balance="${escapeHtml(String(r.credits))}" title="Click to set exact balance" class="font-mono text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-1.5 py-0.5 transition cursor-pointer">${escapeHtml(String(r.credits))}</button>`;
         const idRef = r.user_id || r.user_email || r.access_code || '';
         tr.innerHTML = `
           <td class="p-2.5"><span class="block text-zinc-200">${escapeHtml(r.user_email || '—')}</span><span class="block text-[11px] text-zinc-500">${escapeHtml(r.user_name || '')}</span></td>
@@ -300,8 +300,8 @@
           <td class="p-2.5">${statusPill(r.status)}</td>
           <td class="p-2.5 text-right whitespace-nowrap">
             <span class="inline-flex items-center gap-1">
-              <button data-act="dec" data-ref="${escapeHtml(idRef)}" title="−5 credits" class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[11px] font-mono transition cursor-pointer">−</button>
-              <button data-act="inc" data-ref="${escapeHtml(idRef)}" title="+5 credits" class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[11px] font-mono transition cursor-pointer">+</button>
+              <button data-act="dec5" data-uid="${escapeHtml(r.user_id || '')}" title="−5 credits" class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[11px] font-mono transition cursor-pointer">−5</button>
+              <button data-act="inc10" data-uid="${escapeHtml(r.user_id || '')}" title="+10 credits" class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[11px] font-mono transition cursor-pointer">+10</button>
               <button data-act="revoke" data-code="${escapeHtml(r.access_code || '')}" title="Deactivate code" class="px-1.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-[11px] transition cursor-pointer">Revoke</button>
             </span>
           </td>
@@ -327,6 +327,53 @@
       } catch (err) {
         showToast(`Deactivate failed: ${err.message}`, 'error');
       }
+    }
+
+    // Direct per-user credit control: POST /api/admin/users/credits
+    // {user_id, action: "adjust"|"set", amount}. Optimistic UI + toast.
+    async function usersCredits(userId, action, amount, btn) {
+      if (!userId) { showToast('No onboarded user on this row.', 'error'); return; }
+      if (btn) btn.disabled = true;
+      try {
+        const res = await adminFetch('/api/admin/users/credits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, action, amount })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
+        // Optimistic inline balance update (full refresh follows).
+        const row = btn ? btn.closest('tr') : null;
+        const badge = row ? row.querySelector('[data-act="custom"]') : null;
+        if (badge) {
+          badge.textContent = data.credits;
+          badge.setAttribute('data-balance', data.credits);
+        }
+        showToast(
+          action === 'set' ? `Balance set → ${data.credits}` : `Credits ${amount > 0 ? '+' : ''}${amount} → ${data.credits}`,
+          'success'
+        );
+        fetchTelemetry();
+      } catch (err) {
+        showToast(`Credit update failed: ${err.message}`, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function customCreditsPrompt(uid, current) {
+      if (!uid) { showToast('No onboarded user on this row.', 'error'); return; }
+      const raw = prompt(`Set or adjust credits (current: ${current}).\nEnter a number to adjust (+/- allowed), or =N to set exact:`, '+10');
+      if (raw === null) return;
+      const text = raw.trim();
+      if (!text) return;
+      const setMatch = text.match(/^=\s*(-?\d+)$/);
+      if (setMatch) {
+        usersCredits(uid, 'set', parseInt(setMatch[1], 10), null);
+        return;
+      }
+      if (!/^[-+]?\d+$/.test(text)) { showToast('Enter an integer like +10, -5, or =25.', 'error'); return; }
+      usersCredits(uid, 'adjust', parseInt(text, 10), null);
     }
 
     async function adjustCredits(ref, delta) {
@@ -355,6 +402,9 @@
       if (!btn) return;
       const act = btn.getAttribute('data-act');
       if (act === 'revoke') deactivateCode(btn.getAttribute('data-code'));
+      else if (act === 'inc10') usersCredits(btn.getAttribute('data-uid'), 'adjust', 10, btn);
+      else if (act === 'dec5') usersCredits(btn.getAttribute('data-uid'), 'adjust', -5, btn);
+      else if (act === 'custom') customCreditsPrompt(btn.getAttribute('data-uid'), btn.getAttribute('data-balance'));
       else if (act === 'inc') adjustCredits(btn.getAttribute('data-ref'), creditStep);
       else if (act === 'dec') adjustCredits(btn.getAttribute('data-ref'), -creditStep);
     });

@@ -5825,6 +5825,7 @@
           if (session && session.user) {
             sbUser = { id: session.user.id, email: session.user.email, meta: (session.user.user_metadata || {}) };
             sbSessionId = null;
+            sbProvisionAttempted = false;
             try {
               const tok = session.access_token || '';
               if (tok) sbAccessTokenCache = tok;
@@ -5844,6 +5845,7 @@
             sbOnboarded = false;
             sbCredits = 0;
             sbAccessTokenCache = '';
+            sbProvisionAttempted = false;
             updateSbAuthUI();
             updateSbCreditsUI();
             closeOnboardingModal();
@@ -5962,14 +5964,81 @@
         if (data && data.completed) {
           sbOnboarded = true;
           sbCredits = data.credits || 0;
+          try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
           closeOnboardingModal();
           updateSbCreditsUI();
         } else if (data && !data.guest) {
           updateSbCreditsUI();
-          openOnboardingModal();
+          tryAutoProvision();
         }
       } catch (e) {
         console.warn('Onboarding status check failed:', e);
+      }
+    }
+
+    // Single-gate auto-provisioning: derive the display name silently
+    // (metadata -> email local-part) and bind the stashed access code in the
+    // background. The profile modal only appears as a one-time fallback when
+    // no code is available anywhere — never twice.
+    let sbProvisionAttempted = false;
+
+    function deriveDisplayName() {
+      try {
+        const metaName = (sbUser && sbUser.meta && sbUser.meta.full_name) || '';
+        if (metaName.trim()) return metaName.trim().slice(0, 120);
+        const email = (sbUser && sbUser.email) || '';
+        const local = email.split('@')[0] || '';
+        const parts = local.split(/[._-]+/).filter(Boolean).map(p => p.replace(/\d+$/, ''));
+        const titled = parts.filter(Boolean).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+        return (titled || local || 'Researcher').slice(0, 120);
+      } catch (_) {
+        return 'Researcher';
+      }
+    }
+
+    function resolveStashedCode() {
+      try {
+        const pending = (sessionStorage.getItem('pending_access_code') || '').trim().toUpperCase();
+        if (pending) return pending;
+        const metaCode = (sbUser && sbUser.meta && sbUser.meta.access_code) || '';
+        if (metaCode.trim()) return metaCode.trim().toUpperCase();
+      } catch (_) {}
+      return '';
+    }
+
+    async function tryAutoProvision() {
+      if (sbProvisionAttempted || sbOnboarded || !sbUser) return;
+      sbProvisionAttempted = true;
+      const code = resolveStashedCode();
+      const nameEl = document.getElementById('onboarding-name');
+      const codeEl = document.getElementById('onboarding-code');
+      if (nameEl && !nameEl.value.trim()) nameEl.value = deriveDisplayName();
+      if (!code) {
+        // No code anywhere: single one-time fallback prompt (name prefilled).
+        openOnboardingModal();
+        return;
+      }
+      if (codeEl && !codeEl.value.trim()) codeEl.value = code;
+      try {
+        const headers = await sbAuthHeaders();
+        const res = await fetch('/api/onboarding/complete', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ full_name: deriveDisplayName(), access_code: code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data && (data.detail || data.error)) || `HTTP ${res.status}`);
+        sbOnboarded = true;
+        sbCredits = (data && data.credits) || 0;
+        updateSbCreditsUI();
+        try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
+        closeOnboardingModal();
+        showToast(`Welcome, ${data.full_name || deriveDisplayName()}! ${sbCredits} credits granted.`, 'success');
+      } catch (e) {
+        // Stashed code invalid/deactivated: fall back to one manual attempt.
+        const errEl = document.getElementById('onboarding-error');
+        openOnboardingModal();
+        if (errEl) { errEl.textContent = e.message || 'Invalid or deactivated access code.'; errEl.classList.remove('hidden'); }
       }
     }
 
