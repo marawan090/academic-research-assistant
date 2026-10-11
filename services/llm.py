@@ -31,6 +31,9 @@ class OutreachEmailRequest(BaseModel):
     target_professor: str
     scope_type: str = "single_paper"  # Options: "single_paper" | "holistic_lab"
     orcarouter_key: Optional[str] = None
+    # Structured outreach metadata (all optional; safe fallbacks applied when absent)
+    core_method_or_contribution: str = ""
+    institution_name: str = ""
 
 
 class ComparePapersRequest(BaseModel):
@@ -165,83 +168,274 @@ def generate_fallback_compare_matrix(papers: List[Dict[str, Any]]) -> str:
     return "\n".join(table_lines) + summary
 
 
-OUTREACH_SYSTEM_PROMPT = """You are an elite academic advisor and researcher specializing in computer systems and AI.
-You compose high-impact, intellectually rigorous academic cold outreach emails from prospective graduate/doctoral researchers or visiting scholars to principal investigators (professors).
+OUTREACH_SYSTEM_PROMPT = """You write faculty cold-outreach emails that get replies. PIs triage inbox on mobile between lectures: extreme brevity, intellectual substance, zero marketing fluff. You write as a prospective graduate researcher (peer-to-peer inquiry tone: professional, direct, humble, technically competent).
 
-Adhere strictly to these core rules:
-1. Tone & Standards: Formal, intellectually rigorous, respectful, and direct.
-2. Length: Concise, strictly under 250 words for the body text.
-3. Content: Avoid superficial compliments (never say "I loved your paper", "I was fascinated by your work", or "I am a big fan of your research"). Directly connect the technical mechanics, concrete architectural bottlenecks, mathematical formulations, or unresolved trade-offs in the paper to prospective research collaboration.
-4. Scope Modes:
-   - "single_paper": Focus specifically on the core problem statement, architectural bottleneck, and unresolved trade-offs identified in the target paper.
-   - "holistic_lab": Frame the email around the professor's overarching research trajectory and lab vision in this domain, using the paper as the primary springboard.
-5. Placeholders: Include standardized bracketed placeholders for the applicant to customize (e.g., [My Current University/Degree], [Specific Technical Skill/Tooling], [Proposed Research Extension], [Link to CV/Portfolio]).
-6. Format: Output strictly valid JSON with no markdown fences, backticks, reasoning preamble, or extraneous conversational text. Start immediately with '{' and end with '}':
+HARD CONSTRAINTS (violating any of these fails the task):
+1. TOTAL BODY LENGTH: strictly under 120 words. Count before responding. If over, cut ruthlessly.
+2. SUBJECT LINE: concise, technical, contextual. Allowed patterns ONLY:
+   - "Question on [Paper Method / Concept]"
+   - "[Research Topic] inquiry — prospective student"
+   - "Quick thought regarding [Specific Paper Title]"
+   BANNED subject content: "Exciting opportunity", "In awe of your work", "Hoping to connect", "Prospective PhD candidate seeking collaboration", excessive capitalization, exclamation marks.
+3. OPENING (hook): NO generic flattery. Never write "I hope this email finds you well", "I recently stumbled across", "groundbreaking research", "big fan", or any praise without a concrete technical reference. Open by naming a specific contribution, method, mechanism, or insight from the target paper.
+4. BRIDGE (substance): state what the student built/reproduced OR ask one crisp technical question about the paper's open problems, limitations, or edge cases.
+5. PROOF: exactly one compact line with concrete artifacts — reproduction repo, demo link, or precise technical skill relevant to the lab. Use bracketed placeholders the student will fill (e.g., [link to reproduction repo], [relevant skill]).
+6. CALL TO ACTION (low friction ONLY): "Would you have 5 minutes for a quick feedback exchange?" and/or "Are you accepting students for [Term/Year]?" NEVER request a 30-minute call, Zoom meeting, or admission in the first email.
+7. BANNED VOCABULARY (never emit these tokens/phrases): delve, fascinating, tapestry, plethora, groundbreaking, testament, pivotal, "in today's rapidly evolving landscape", "beacon of knowledge", "in awe", "thrilled", "revolutionary", "game-changer".
+8. PLACEHOLDERS: applicant-specific facts MUST be bracketed ([Degree/Program], [University], [Term/Year], [Your Full Name], [Contact / GitHub]). NEVER invent the student's credentials, and NEVER leave an empty or dangling placeholder. If institution metadata is "N/A", simply omit any institution reference.
+9. SCOPE MODES:
+   - "single_paper": hook on the paper's core method, bottleneck, and one open question.
+   - "holistic_lab": hook on the lab's trajectory using the paper as springboard; still name the paper once.
+10. FORMAT: output strictly valid JSON with no markdown fences, backticks, or preamble. Start with '{' and end with '}'. Compute word_count as whitespace-separated tokens of the body:
 {
-  "subject": "Inquiring on [Specific Topic] — Prospective Graduate Researcher",
-  "body": "Dear Professor [Last Name],\\n\\n..."
+  "subject": "Question on [Method] — prospective student",
+  "body": "Dear Professor [Last Name],\\n\\n...",
+  "word_count": 0
 }
 """
+
+
+# ============================================================================
+# Academic cold-outreach framework (brevity-first, deliverability-optimized).
+# All helpers are pure/local: no network calls, bounded latency.
+# ============================================================================
+
+OUTREACH_MAX_WORDS = 120
+
+# Banned AI/spam vocabulary -> neutral replacement ("" drops the phrase).
+OUTREACH_BANNED_TERMS = {
+    "delve": "examine",
+    "fascinating": "notable",
+    "tapestry": "set",
+    "plethora": "range",
+    "groundbreaking": "notable",
+    "testament": "result",
+    "pivotal": "central",
+    "in today's rapidly evolving landscape": "",
+    "beacon of knowledge": "",
+    "in awe": "",
+    "thrilled": "",
+    "revolutionary": "notable",
+    "game-changer": "advance",
+    "game changer": "advance",
+}
+
+# Sentences containing these (case-insensitive) are generic flattery/openers
+# with no technical substance and are removed wholesale by the sanitizer.
+OUTREACH_FLATTERY_PATTERNS = [
+    "i hope this email finds you well",
+    "i recently stumbled across",
+    "i am a big fan",
+    "i was fascinated by",
+    "it would be an honor",
+    "hoping to connect",
+    "exciting opportunity",
+    "in awe of your work",
+    "i loved your paper",
+]
+
+# Banned subject-line content (case-insensitive substring match).
+OUTREACH_BANNED_SUBJECT_PHRASES = [
+    "exciting opportunity",
+    "in awe",
+    "hoping to connect",
+    "prospective phd candidate seeking collaboration",
+    "groundbreaking",
+    "revolutionary",
+]
+
+
+def _outreach_word_count(text: str) -> int:
+    """Whitespace-token word count used for the 120-word faculty-inbox budget."""
+    if not text:
+        return 0
+    return len(text.split())
+
+
+def _extract_professor_last_name(target_professor: str) -> str:
+    """Return a safe salutation surname, tolerating titles and empty input."""
+    name_parts = (target_professor or "").strip().split()
+    if not name_parts:
+        return "Professor"
+    last_name = name_parts[-1]
+    if last_name.lower().rstrip(".") in ("dr", "prof", "professor"):
+        last_name = name_parts[0] if len(name_parts) > 1 else "Professor"
+    return last_name.strip() or "Professor"
+
+
+def _truncate_words(text: str, max_chars: int) -> str:
+    """Truncate to max_chars at a word boundary (no mid-word cuts in subjects)."""
+    clean = re.sub(r"\s+", " ", (text or "").strip())
+    if len(clean) <= max_chars:
+        return clean
+    cut = clean[:max_chars].rsplit(" ", 1)[0].strip()
+    return cut or clean[:max_chars].strip()
+
+
+def _extract_core_method(
+    paper_title: str,
+    abstract: str = "",
+    explicit: str = "",
+) -> Tuple[str, str, str]:
+    """
+    Derive (method_phrase, hook_fragment, open_question) for the email hook.
+    Prefers the caller-supplied `explicit` contribution; otherwise mines the
+    title/abstract for domain cues. Never returns empty strings — falls back to
+    neutral technical phrasing so no broken placeholders reach the output.
+    """
+    title = (paper_title or "").strip().rstrip(".")
+    title_short = _truncate_words(title, 60) if title else "your recent paper"
+
+    if explicit and explicit.strip():
+        method = _truncate_words(explicit, 120)
+    else:
+        # Method phrase: title clause before a colon, else first ~8 words.
+        candidate = title.split(":")[0].strip() if ":" in title else title
+        words = candidate.split()
+        method = _truncate_words(" ".join(words[:8]), 120) if words else "your recent work"
+        method = method or "your recent work"
+
+    text = f"{title} {abstract or ''}".lower()
+    if any(k in text for k in ("gpu", "kernel", "attention", "cuda", "sram")):
+        hook = "the IO-aware staging that sidesteps memory-bandwidth limits"
+        open_q = "the staging bounds hold at longer contexts"
+    elif any(k in text for k in ("consensus", "raft", "paxos", "bft", "byzantine", "quorum")):
+        hook = "the coordination-avoiding commit path under asynchronous faults"
+        open_q = "liveness holds without the leader fast-path"
+    elif any(k in text for k in ("checkpoint", "snapshot", "fault toler")):
+        hook = "the non-blocking snapshot staging under high-frequency state capture"
+        open_q = "recovery cost stays flat as snapshot frequency grows"
+    elif any(k in text for k in ("cxl", "rdma", "cache", "memory", "disaggregat")):
+        hook = "the kernel-bypass remote-access path across heterogeneous nodes"
+        open_q = "access overhead stays bounded as nodes scale"
+    elif any(k in text for k in ("serverless", "cold start", "microvm", "faas")):
+        hook = "the snapshot-restore path for cold-start latency"
+        open_q = "restore latency holds under bursty arrivals"
+    elif any(k in text for k in ("diffusion", "transformer", "llm", "language model", "quantiz", "prun")):
+        hook = "the efficiency mechanism and its scaling limits"
+        open_q = "the reported bounds hold outside the evaluated regime"
+    else:
+        hook = "the core mechanism and its scaling limits"
+        open_q = "the reported bounds hold outside the evaluated regime"
+
+    return method, hook, open_q
+
+
+def _sanitize_outreach_output(
+    subject: str,
+    body: str,
+    fallback_subject: str = "",
+) -> Tuple[str, str, int]:
+    """
+    Enforce anti-AI/anti-spam constraints on LLM or fallback output:
+    drop flattery sentences, swap banned vocabulary, rebuild spammy subjects,
+    and hard-truncate to OUTREACH_MAX_WORDS at a sentence boundary.
+    Returns (subject, body, word_count).
+    """
+    clean_subject = (subject or "").strip()
+    clean_body = (body or "").strip()
+
+    # 1. Banned vocabulary swap (case-insensitive, longest phrases first).
+    for banned in sorted(OUTREACH_BANNED_TERMS, key=len, reverse=True):
+        replacement = OUTREACH_BANNED_TERMS[banned]
+        clean_subject = re.sub(re.escape(banned), replacement, clean_subject, flags=re.IGNORECASE)
+        clean_body = re.sub(re.escape(banned), replacement, clean_body, flags=re.IGNORECASE)
+    clean_subject = re.sub(r"\s+", " ", clean_subject).strip()
+    clean_body = re.sub(r"[ \t]+", " ", clean_body).strip()
+
+    # 2. Drop flattery/openers lacking technical substance (keep sentences with
+    #    paper-specific anchors: quotes, method terms, or placeholders).
+    kept: List[str] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", clean_body):
+        low = sentence.lower()
+        if any(pat in low for pat in OUTREACH_FLATTERY_PATTERNS):
+            if ('"' not in sentence and "[" not in sentence
+                    and not any(k in low for k in ("figure", "section", "table", "theorem", "algorithm"))):
+                continue
+        kept.append(sentence)
+    clean_body = " ".join(kept).strip() or clean_body
+
+    # 3. Subject guard: banned content, excessive length, or SHOUTING rebuild.
+    sub_low = clean_subject.lower()
+    letters = [c for c in clean_subject if c.isalpha()]
+    caps_ratio = (sum(1 for c in letters if c.isupper()) / len(letters)) if letters else 0
+    if (not clean_subject
+            or any(p in sub_low for p in OUTREACH_BANNED_SUBJECT_PHRASES)
+            or len(clean_subject.split()) > 12
+            or caps_ratio > 0.5
+            or "!" in clean_subject):
+        clean_subject = fallback_subject or "Question on recent work — prospective student"
+
+    # 4. Hard 120-word cap at a sentence boundary (body already drafted short;
+    #    this only fires on non-compliant LLM output).
+    words = clean_body.split()
+    if len(words) > OUTREACH_MAX_WORDS:
+        sentences = re.split(r"(?<=[.!?])\s+", clean_body)
+        acc: List[str] = []
+        count = 0
+        for s in sentences:
+            w = len(s.split())
+            if acc and count + w > OUTREACH_MAX_WORDS:
+                break
+            acc.append(s)
+            count += w
+        clean_body = " ".join(acc).strip() or " ".join(words[:OUTREACH_MAX_WORDS]).strip()
+
+    return clean_subject, clean_body, _outreach_word_count(clean_body)
 
 
 def generate_fallback_outreach_email(
     paper_title: str,
     target_professor: str,
     abstract: str = "",
-    scope_type: str = "single_paper"
-) -> Dict[str, str]:
+    scope_type: str = "single_paper",
+    authors: Optional[List[str]] = None,
+    core_method_or_contribution: str = "",
+    institution_name: str = "",
+) -> Dict[str, Any]:
     """
-    Generate an intellectually rigorous, publication-grade academic outreach email fallback
-    strictly under 250 words adhering to the specified scope.
+    Deterministic sub-120-word academic outreach draft (offline fallback).
+    Framework: technical hook -> bridge (built artifact or crisp question) ->
+    one-line proof -> frictionless low ask. All caller facts are optional;
+    safe neutral fallbacks guarantee no empty or dangling placeholders.
     """
-    name_parts = target_professor.strip().split()
-    last_name = name_parts[-1] if name_parts else "Professor"
-    if last_name.lower() in ("dr.", "dr", "prof.", "prof", "professor"):
-        last_name = name_parts[0] if len(name_parts) > 1 else "Professor"
+    last_name = _extract_professor_last_name(target_professor)
+    clean_title = (paper_title or "").strip().rstrip(".") or "your recent paper"
+    short_title = _truncate_words(clean_title, 60)
+    method, hook, open_q = _extract_core_method(clean_title, abstract, core_method_or_contribution)
+    method_short = _truncate_words(method, 45)
+    scope = "holistic_lab" if scope_type == "holistic_lab" else "single_paper"
 
-    clean_title = paper_title.strip().rstrip(".")
-
-    if scope_type == "holistic_lab":
-        subject = f"Inquiring on Scalable Systems & Lab Trajectory — Prospective Graduate Researcher"
-        body = (
-            f"Dear Professor {last_name},\n\n"
-            f"I have been following your laboratory's overarching research trajectory in scalable computing, "
-            f"and was particularly compelled by your recent paper, \"{clean_title}\". Your work provides an incisive "
-            f"formulation of core throughput-latency trade-offs in this domain.\n\n"
-            f"I am completing my [My Current Degree/Program] at [My Current University], focusing on [Specific Technical Skill/Tooling, e.g., distributed consensus / kernel concurrency]. "
-            f"Examining your group's methodology, I am particularly interested in extending these principles toward [Proposed Research Extension, e.g., lock-free execution pipelining under asymmetric latency]. "
-            f"Your lab's broader agenda aligns closely with my aspiration to pursue doctoral research on resilient systems.\n\n"
-            f"Are you considering prospective graduate researchers or research fellows for your group for upcoming cycles? "
-            f"I would welcome 15 minutes to discuss potential alignment with your lab's active projects.\n\n"
-            f"My curriculum vitae and recent implementations are linked at [Link to CV/Portfolio].\n\n"
-            f"Thank you for your time and guidance.\n\n"
-            f"Sincerely,\n\n"
-            f"[Your Full Name]\n"
-            f"[Your Contact Information / GitHub]"
+    if scope == "holistic_lab":
+        subject = f"{method_short} inquiry — prospective student"
+        hook_para = (
+            f"Your lab's work on {method}, especially \"{short_title}\", stood out — "
+            f"particularly {hook}. I am checking whether {open_q}."
         )
     else:
-        subject_title = clean_title[:45]
-        subject = f"Inquiring on \"{subject_title}\" — Prospective Graduate Researcher"
-        body = (
-            f"Dear Professor {last_name},\n\n"
-            f"I have been closely analyzing your paper, \"{clean_title}\", particularly regarding its approach to addressing the "
-            f"underlying bottleneck in [Core Architectural Bottleneck from Paper]. Your formulation provides a compelling mechanism "
-            f"for navigating the trade-off between [Technical Property A] and [Technical Property B].\n\n"
-            f"Currently pursuing my [My Current Degree/Program] at [My Current University], my background centers on [Specific Technical Skill/Tooling]. "
-            f"In evaluating your benchmark conclusions, I observed a potential open question regarding [Specific Limitation / Unresolved Edge Case]. "
-            f"I would be eager to investigate extending your architecture through [Proposed Research Extension, e.g., adaptive partition pruning or asynchronous state verification].\n\n"
-            f"Are you currently open to prospective graduate researchers or research assistants joining your group? "
-            f"I would appreciate the opportunity for a brief conversation to explore potential alignment.\n\n"
-            f"My CV and representative code repositories are available at [Link to CV/Portfolio].\n\n"
-            f"Thank you for your consideration.\n\n"
-            f"Sincerely,\n\n"
-            f"[Your Full Name]\n"
-            f"[Your Contact Information / GitHub]"
+        subject = f"Question on {method_short} — prospective student"
+        hook_para = (
+            f"Your work on {method} in \"{short_title}\" stood out — "
+            f"particularly {hook}. I am checking whether {open_q}."
         )
 
+    body = (
+        f"Dear Professor {last_name},\n\n"
+        f"{hook_para}\n\n"
+        f"I am completing my [Degree/Program] at [University], working on [relevant skill].\n"
+        f"- Proof: [link to reproduction repo/demo]\n\n"
+        f"Would you have 5 minutes for a quick feedback exchange? "
+        f"Are you accepting students for [Term/Year]?\n\n"
+        f"Sincerely,\n"
+        f"[Your Full Name]\n"
+        f"[Contact / GitHub]"
+    )
+
+    clean_subject, clean_body, word_count = _sanitize_outreach_output(subject, body, subject)
     return {
-        "subject": subject,
-        "body": body
+        "subject": clean_subject,
+        "body": clean_body,
+        "word_count": word_count,
     }
 
 
@@ -1717,23 +1911,36 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
     async def generate_outreach_email(
         self,
         payload: OutreachEmailRequest
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
-        Generate an intellectually rigorous, publication-grade academic outreach email
-        strictly under 250 words using DeepSeek or graceful fallback.
+        Generate a sub-120-word faculty cold-outreach email draft via DeepSeek
+        or deterministic fallback. Returns {"subject", "body", "word_count"}.
+        The prompt consumes structured metadata (title, authors, derived or
+        explicit core method, institution) with safe fallbacks; output passes
+        through the anti-AI/anti-spam sanitizer before caching.
         """
         target_prof = payload.target_professor.strip() or "Professor"
         scope = "holistic_lab" if payload.scope_type == "holistic_lab" else "single_paper"
         title = payload.paper_title.strip()
         abstract = payload.abstract.strip()
 
-        cache_key = f"outreach:{scope}:{target_prof.lower()}:{title.lower()}"
+        # Structured metadata with safe fallbacks (never emit empties downstream).
+        authors_list = [a.strip() for a in (payload.authors or []) if a and a.strip()]
+        authors_str = ", ".join(authors_list) if authors_list else "Not listed"
+        method, hook, open_q = _extract_core_method(
+            title, abstract, payload.core_method_or_contribution or ""
+        )
+        institution = (payload.institution_name or "").strip() or "N/A"
+
+        cache_key = f"outreach:v2:{scope}:{target_prof.lower()}:{title.lower()}"
         cached_json = synthesis_cache.get(cache_key)
         if cached_json is not None:
             try:
                 data = json.loads(cached_json)
                 if isinstance(data, dict) and "subject" in data and "body" in data:
                     logger.info("Synthesis cache HIT for outreach email to %r (0ms latency)", target_prof)
+                    if "word_count" not in data:
+                        data["word_count"] = _outreach_word_count(str(data.get("body", "")))
                     return data
             except Exception:
                 pass
@@ -1745,21 +1952,29 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 paper_title=title,
                 target_professor=target_prof,
                 abstract=abstract,
-                scope_type=scope
+                scope_type=scope,
+                authors=authors_list,
+                core_method_or_contribution=payload.core_method_or_contribution or "",
+                institution_name=payload.institution_name or "",
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
 
-        authors_str = ", ".join(payload.authors) if payload.authors else target_prof
         abstract_str = abstract if abstract else "N/A"
         user_prompt = (
-            f"Generate a cold outreach email from a prospective graduate researcher to Professor {target_prof}.\n\n"
-            f"Paper Title: {title}\n"
-            f"Authors: {authors_str}\n"
-            f"Abstract:\n{abstract_str}\n\n"
-            f"Scope Mode: {scope}\n"
-            f"Target Professor: {target_prof}\n\n"
-            f"Remember: Output strictly JSON with keys 'subject' and 'body'. Keep the body under 250 words, intellectually rigorous, and include standardized bracketed placeholders."
+            f"Draft a faculty cold-outreach email from a prospective graduate researcher.\n\n"
+            f"STRUCTURED METADATA (use exactly; if a field is N/A, omit that reference — never invent):\n"
+            f"- Paper Title: {title}\n"
+            f"- Authors: {authors_str}\n"
+            f"- Core Method / Contribution: {method}\n"
+            f"- Technical Hook: {hook}\n"
+            f"- Suggested Open Question: {open_q}\n"
+            f"- Lead Author Institution: {institution}\n"
+            f"- Target Professor: {target_prof}\n"
+            f"- Scope Mode: {scope}\n\n"
+            f"Remember: body strictly under 120 words, low-friction ask only, bracketed "
+            f"placeholders for applicant facts, and output strictly JSON with keys "
+            f"'subject', 'body', and 'word_count'."
         )
 
         messages = [
@@ -1774,7 +1989,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                     primary_model=self.model_name,
                     messages=messages,
                     temperature=0.3,
-                    max_tokens=1500,
+                    max_tokens=700,
                     secondary_model=SECONDARY_MODEL,
                 )
             content = (response.choices[0].message.content or "").strip()
@@ -1794,9 +2009,16 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                         pass
 
             if isinstance(parsed, dict) and "subject" in parsed and "body" in parsed:
-                result = {
-                    "subject": str(parsed["subject"]).strip(),
-                    "body": str(parsed["body"]).strip()
+                raw_subject = str(parsed["subject"]).strip()
+                raw_body = str(parsed["body"]).strip()
+                fb_subject = f"Question on {_truncate_words(method, 45)} — prospective student"
+                clean_subject, clean_body, word_count = _sanitize_outreach_output(
+                    raw_subject, raw_body, fb_subject
+                )
+                result: Dict[str, Any] = {
+                    "subject": clean_subject,
+                    "body": clean_body,
+                    "word_count": word_count,
                 }
                 synthesis_cache.set(cache_key, json.dumps(result))
                 return result
@@ -1806,7 +2028,10 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 paper_title=title,
                 target_professor=target_prof,
                 abstract=abstract,
-                scope_type=scope
+                scope_type=scope,
+                authors=authors_list,
+                core_method_or_contribution=payload.core_method_or_contribution or "",
+                institution_name=payload.institution_name or "",
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -1817,7 +2042,10 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 paper_title=title,
                 target_professor=target_prof,
                 abstract=abstract,
-                scope_type=scope
+                scope_type=scope,
+                authors=authors_list,
+                core_method_or_contribution=payload.core_method_or_contribution or "",
+                institution_name=payload.institution_name or "",
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -1920,7 +2148,7 @@ def get_default_llm_service() -> ResearchLLMService:
     return _default_llm_service
 
 
-async def generate_outreach_email(payload: OutreachEmailRequest, service: Optional[ResearchLLMService] = None) -> Dict[str, str]:
+async def generate_outreach_email(payload: OutreachEmailRequest, service: Optional[ResearchLLMService] = None) -> Dict[str, Any]:
     """Module-level helper to generate academic cold outreach email."""
     svc = service or get_default_llm_service()
     return await svc.generate_outreach_email(payload)

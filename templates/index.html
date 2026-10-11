@@ -15,23 +15,23 @@
         extend: {
           colors: {
             brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              400: '#818cf8',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
+              50: '#f1f2f4',
+              100: '#e2e4e9',
+              400: '#9aa1b2',
+              500: '#6b7280',
+              600: '#3f4756',
+              700: '#2e3440',
             },
             accent: {
-              300: '#7dd3fc',
-              400: '#38bdf8',
-              500: '#0ea5e9',
-              600: '#0284c7',
+              300: '#a8b3c2',
+              400: '#7d8ca3',
+              500: '#5b6b82',
+              600: '#475569',
             },
             lab: {
-              400: '#2dd4bf',
-              500: '#14b8a6',
-              600: '#0d9488',
+              400: '#8a94a6',
+              500: '#64748b',
+              600: '#475569',
             }
           },
           fontFamily: {
@@ -76,18 +76,18 @@
   </script>
 
   <style>
-    /* Custom Theme Colors & Variables */
+    /* Custom Theme Colors & Variables (matte zinc academic system) */
     :root {
-      --bg-body: #F8FAFC;
-      --border-color: #E2E8F0;
-      --text-main: #0F172A;
-      --text-muted: #64748B;
+      --bg-body: #FAFAFA;
+      --border-color: #E4E4E7;
+      --text-main: #09090B;
+      --text-muted: #71717A;
     }
     html.dark {
-      --bg-body: #0B0F19;
-      --border-color: #1E293B;
-      --text-main: #F8FAFC;
-      --text-muted: #94A3B8;
+      --bg-body: #090A0F;
+      --border-color: #27272A;
+      --text-main: #F4F4F5;
+      --text-muted: #A1A1AA;
     }
 
     /* Custom Scrollbar */
@@ -475,9 +475,83 @@
       }
     }
   </style>
+
+  <!-- Academic Reskin Layer: muted zinc system, inverted tabs, tactile actions.
+       Overrides only (IDs and JS hooks untouched; JS-driven active states are
+       restyled here via attribute selectors so no script changes are needed). -->
+  <style id="academic-reskin">
+    /* Matte page + shell surfaces */
+    html.dark body { background-color: #090A0F !important; }
+    html.dark header { background-color: rgba(9, 10, 15, 0.92) !important; border-color: #27272A !important; }
+    html.dark footer { background-color: rgba(9, 10, 15, 0.85) !important; border-color: #27272A !important; }
+    html.dark #analysis-pane, html.dark #papers-drawer { background-color: rgba(18, 21, 29, 0.72) !important; border-color: #27272A !important; box-shadow: none !important; }
+
+    /* Neutralize vivid gradient stops left in marketing-era buttons/headers */
+    html .to-indigo-600 { --tw-gradient-to: #3f4756 !important; }
+    html .to-indigo-500 { --tw-gradient-to: #525b6e !important; }
+    html .to-brand-400 { --tw-gradient-to: #9aa1b2 !important; }
+    html .to-brand-500 { --tw-gradient-to: #6b7280 !important; }
+    html .to-accent-500 { --tw-gradient-to: #5b6b82 !important; }
+    html .to-accent-400 { --tw-gradient-to: #7d8ca3 !important; }
+    html .via-indigo-300 { --tw-gradient-stops: var(--tw-gradient-from), #a8b3c2, var(--tw-gradient-to) !important; }
+
+    /* Kill glow shadows */
+    html .shadow-brand-500\/20, html .shadow-brand-500\/25, html .shadow-indigo-600\/30 { --tw-shadow: 0 1px 2px rgba(0,0,0,0.35) !important; box-shadow: 0 1px 2px rgba(0,0,0,0.35) !important; }
+
+    /* Logo wordmark: solid zinc, no neon gradient text */
+    html header h1 .text-transparent, html #welcome-card h2 .text-transparent { background-image: none !important; -webkit-background-clip: initial !important; background-clip: initial !important; }
+    html.dark header h1 .text-transparent, html.dark #welcome-card h2 .text-transparent { color: #e4e4e7 !important; }
+    html:not(.dark) header h1 .text-transparent, html:not(.dark) #welcome-card h2 .text-transparent { color: #18181b !important; }
+
+    /* Segmented search-mode control: quiet track, inverted active pill (JS sets .bg-brand-600 on active) */
+    html #search-mode-group { background-color: #f4f4f5 !important; border-color: #e4e4e7 !important; }
+    html.dark #search-mode-group { background-color: #12151d !important; border-color: #27272a !important; }
+    html #search-mode-group .search-mode-btn { box-shadow: none !important; }
+    html #search-mode-group .search-mode-btn:not(.bg-brand-600) { color: #71717a !important; }
+    html #search-mode-group .search-mode-btn:not(.bg-brand-600):hover { color: #e4e4e7 !important; }
+    html:not(.dark) #search-mode-group .search-mode-btn:not(.bg-brand-600):hover { color: #18181b !important; }
+    html #search-mode-label { color: #71717a !important; }
+    html #search-mode-group .search-mode-btn.bg-brand-600 { background-color: #18181b !important; color: #fafafa !important; box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important; }
+    html.dark #search-mode-group .search-mode-btn.bg-brand-600 { background-color: #f4f4f5 !important; color: #09090b !important; }
+
+    /* Paper-limit segmented: same inverted treatment (JS sets .bg-brand-600) */
+    html #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: #3f3f46 !important; color: #fafafa !important; box-shadow: none !important; }
+    html.dark #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; }
+
+    /* Depth segmented on cards (JS sets .bg-brand-600 on the active depth) */
+    html .depth-segmented-control .depth-btn.bg-brand-600 { background-color: #3f3f46 !important; color: #fafafa !important; box-shadow: none !important; }
+    html.dark .depth-segmented-control .depth-btn.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; }
+
+    /* Workspace + discovery tabs (JS toggles .bg-brand-600 on the active tab) */
+    html #tab-discovered.bg-brand-600, html #tab-saved.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
+    html:not(.dark) #tab-discovered.bg-brand-600, html:not(.dark) #tab-saved.bg-brand-600 { background-color: #18181b !important; color: #fafafa !important; }
+    html #tab-discovered, html #tab-saved { font-family: 'JetBrains Mono', ui-monospace, monospace !important; font-size: 11px !important; border-radius: 6px !important; box-shadow: none !important; }
+    html #tab-discovered:not(.bg-brand-600), html #tab-saved:not(.bg-brand-600) { color: #71717a !important; }
+
+    /* Primary gradient buttons rendered calm: outreach generate, mailto, compare, broadcast */
+    html #btn-run-outreach, html #btn-mailto-outreach { background-image: none !important; background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
+    html:not(.dark) #btn-run-outreach, html:not(.dark) #btn-mailto-outreach { background-color: #18181b !important; color: #fafafa !important; }
+    html #btn-run-compare { background-image: none !important; background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
+    html #compare-bar { background: #12151d !important; border-color: #3f3f46 !important; box-shadow: none !important; }
+    html #compare-bar #compare-count-text { color: #d4d4d8 !important; }
+    html #btn-minimize-broadcast { background-image: none !important; background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
+
+    /* Monospace metadata: badges, counters, timers read as instrument readouts */
+    html #papers-drawer .uppercase.tracking-wider, html #papers-drawer .tabular-nums { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
+    html .stage-timer, html .paper-timer { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
+
+    /* Slim status dot: no ping halo (JS rewrites badge classes at runtime; neutralize here) */
+    html #server-status-dot.animate-pulse { animation: none !important; }
+    /* PDF-only toggle (JS rewrites classes on toggle; data-active stays truthful) */
+    html #filter-pdf-toggle { border-radius: 6px !important; font-family: 'JetBrains Mono', ui-monospace, monospace !important; font-size: 11px !important; box-shadow: none !important; }
+    html #filter-pdf-toggle[data-active="true"] { background-color: #e4e4e7 !important; color: #09090b !important; border-color: transparent !important; }
+    html:not(.dark) #filter-pdf-toggle[data-active="true"] { background-color: #18181b !important; color: #fafafa !important; }
+    html #server-status-badge { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    html #server-status-badge #server-status-text { color: #a1a1aa !important; font-weight: 400 !important; }
+  </style>
 </head>
 
-<body class="h-full flex flex-col overflow-hidden bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-150">
+<body class="h-full flex flex-col overflow-hidden bg-[#FAFAFA] dark:bg-[#090A0F] text-zinc-900 dark:text-zinc-100 font-sans antialiased transition-colors duration-150">
 
   <!-- Broadcast Alert Modal (Stage 1: Centered Screen Focus) -->
   <div id="broadcast-modal-backdrop" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300">
@@ -539,48 +613,47 @@
     <span id="cold-start-banner-text">Waking up compute engine on Render Free Tier... Requests may take up to 45s initially.</span>
   </div>
 
-  <!-- Top Navigation Header (Minimalist & Clutter-Free) -->
-  <header class="flex-none border-b border-slate-200 dark:border-[#1E293B] bg-white/90 dark:bg-[#0B0F19]/90 backdrop-blur-md z-30 px-4 lg:px-6 py-3">
-    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
-      
-      <!-- Axiom Brand & Logo (Zero subtitle pills or engine clutter) -->
-      <div class="flex items-center space-x-3 min-w-0">
-        <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-sm ring-1 ring-brand-500/40 shrink-0 bg-black flex items-center justify-center">
+  <!-- Top Navigation Header: slim instrument bar -->
+  <header class="flex-none h-12 border-b border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-[#090A0F]/90 backdrop-blur-md z-30 px-4 lg:px-6 transition-colors">
+    <div class="max-w-7xl mx-auto h-full flex items-center justify-between gap-3">
+
+      <!-- Brand mark + wordmark -->
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <div class="relative w-7 h-7 rounded-md overflow-hidden ring-1 ring-zinc-300 dark:ring-zinc-700 shrink-0 bg-black flex items-center justify-center">
           <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
         </div>
-        <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
-          SWMP <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:via-indigo-300 dark:to-accent-400">Labs</span>
+        <h1 class="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
+          SWMP <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-accent-400">Labs</span>
         </h1>
       </div>
 
-      <!-- Right Header Actions (Status Pill, Theme Toggle, Support Button ONLY) -->
-      <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
-        
-        <!-- Status Badge: Server Health & Cold Start Indicator -->
-        <div id="server-status-badge" class="cohort-status-pill system-health-indicator flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors" title="Axiom Engine Health Status">
-          <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="server-status-text" class="font-semibold tracking-wide">Engine: Active</span>
+      <!-- Right header actions -->
+      <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+
+        <!-- Status: plain dot + muted text (no glow pill) -->
+        <div id="server-status-badge" class="cohort-status-pill system-health-indicator flex items-center space-x-1.5 px-2 py-1 text-xs text-zinc-500 dark:text-zinc-400" title="Axiom Engine Health Status">
+          <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="server-status-text" class="font-mono text-[11px]">Engine: Active</span>
         </div>
 
         <!-- Interactive Product Tour Trigger Button -->
-        <button id="btn-start-tour" class="flex items-center space-x-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition shadow-xs cursor-pointer text-xs font-medium" title="Quick Product Tour / Guided Walkthrough">
-          <i data-lucide="compass" class="w-4 h-4 text-brand-500 dark:text-brand-400"></i>
-          <span class="hidden md:inline">Tour</span>
+        <button id="btn-start-tour" class="flex items-center space-x-1 p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Quick Product Tour / Guided Walkthrough">
+          <i data-lucide="compass" class="w-4 h-4"></i>
         </button>
 
         <!-- Dark / Light Mode Switcher Toggle -->
-        <button id="btn-theme-toggle" class="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition cursor-pointer" title="Toggle Dark / Light Mode">
-          <i data-lucide="sun" id="theme-icon" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i>
+        <button id="btn-theme-toggle" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Toggle Dark / Light Mode">
+          <i data-lucide="sun" id="theme-icon" class="w-4 h-4"></i>
         </button>
 
-        <!-- Support Project Button -->
-        <button id="btn-support-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300/80 dark:text-amber-300 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:border-amber-500/40 transition shadow-xs cursor-pointer" title="Support Axiom Research Project">
-          <i data-lucide="coffee" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"></i>
-          <span>☕ Support Project</span>
+        <!-- Support Project Button (ghost) -->
+        <button id="btn-support-modal" class="flex items-center space-x-1.5 px-2 py-1.5 rounded-md text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Support Axiom Research Project">
+          <i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Support</span>
         </button>
 
         <!-- Discreet Session Reset Button -->
-        <button id="btn-clear-session" title="Start New Session" class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-[#1E293B] transition cursor-pointer">
+        <button id="btn-clear-session" title="Start New Session" class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-600 dark:hover:text-zinc-300 dark:hover:bg-zinc-800/80 transition cursor-pointer">
           <i data-lucide="refresh-cw" class="w-4 h-4"></i>
         </button>
       </div>
@@ -592,44 +665,40 @@
   <main class="flex-1 flex overflow-hidden max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 gap-4 lg:gap-6 min-h-0">
 
     <!-- LEFT COLUMN: Chat Feed & Synthesis Display -->
-    <section id="analysis-pane" class="flex-1 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl relative min-w-0 transition-colors">
+    <section id="analysis-pane" class="flex-1 flex flex-col bg-white dark:bg-[#12151D]/70 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden backdrop-blur-sm transition-colors min-w-0 relative">
       
       <!-- Feed Scrollable Area -->
       <div id="feed-container" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         
-        <!-- Minimalist Hero State (shown when feed is empty) -->
-        <div id="welcome-card" class="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-[#1E293B] rounded-2xl p-6 sm:p-10 shadow-sm dark:shadow-xl relative overflow-hidden text-center space-y-6 max-w-2xl mx-auto my-auto transition-colors">
-          
-          <div class="space-y-3">
-            <div class="inline-flex relative w-12 h-12 rounded-2xl overflow-hidden shadow-sm ring-1 ring-brand-500/40 bg-black items-center justify-center mx-auto">
+        <!-- Compact workbench header (shown when feed is empty) -->
+        <div id="welcome-card" class="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg px-5 py-6 relative overflow-hidden text-center space-y-4 max-w-xl mx-auto my-auto transition-colors">
+
+          <div class="space-y-2">
+            <div class="inline-flex relative w-9 h-9 rounded-md overflow-hidden ring-1 ring-zinc-300 dark:ring-zinc-700 bg-black items-center justify-center mx-auto">
               <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
             </div>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <h2 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
               SWMP <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-accent-400">Labs</span>
             </h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-              Accelerating academic systems literature discovery, multi-source synthesis, and thesis ideation.
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed font-mono">
+              systems literature discovery · multi-source synthesis
             </p>
           </div>
 
-          <!-- Suggested Starter Chips (Clean 3-chip sample queries) -->
-          <div class="pt-2">
-            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">Sample Inquiries:</p>
-            <div class="flex flex-wrap items-center justify-center gap-2" id="starter-chips">
-              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+          <!-- Sample inquiries: plain-text chips -->
+          <div>
+            <div class="flex flex-wrap items-center justify-center gap-1.5" id="starter-chips">
+              <button type="button" class="starter-chip text-[11px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:border-zinc-700 px-2.5 py-1 rounded-md transition cursor-pointer"
                 data-query="Distributed checkpointing techniques for large language model training">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
-                <span>Distributed Checkpointing</span>
+                <span>distributed-checkpointing</span>
               </button>
-              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+              <button type="button" class="starter-chip text-[11px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:border-zinc-700 px-2.5 py-1 rounded-md transition cursor-pointer"
                 data-query="Mitigating serverless cold starts with microVM snapshots and CXL">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
-                <span>Serverless Cold Starts</span>
+                <span>serverless-cold-starts</span>
               </button>
-              <button type="button" class="starter-chip text-xs bg-slate-50 dark:bg-slate-800/80 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-300 border border-slate-200 dark:border-[#1E293B] hover:border-brand-400/50 px-3.5 py-1.5 rounded-full transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+              <button type="button" class="starter-chip text-[11px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:border-zinc-700 px-2.5 py-1 rounded-md transition cursor-pointer"
                 data-query="Byzantine fault-tolerant consensus for geo-distributed datastores">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
-                <span>Byzantine Consensus</span>
+                <span>byzantine-consensus</span>
               </button>
             </div>
           </div>
@@ -641,12 +710,12 @@
 
       </div>
 
-      <!-- Bottom Query Input Dock (Refined spacing & clean border) -->
-      <div class="flex-none p-4 bg-white/95 dark:bg-[#111827]/90 border-t border-slate-200 dark:border-[#1E293B] backdrop-blur-md transition-colors">
-        
-        <!-- Search Mode Switcher -->
-        <div class="flex items-center justify-between gap-2 mb-2.5 px-1">
-          <div id="search-mode-group" class="inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B] text-xs" role="tablist" aria-label="Search mode">
+      <!-- Bottom Query Input Dock -->
+      <div class="flex-none p-3 bg-white dark:bg-[#12151D]/90 border-t border-zinc-200 dark:border-zinc-800 backdrop-blur-md transition-colors">
+
+        <!-- Search Mode Switcher: segmented control -->
+        <div class="flex items-center justify-between gap-2 mb-2 px-0.5">
+          <div id="search-mode-group" class="inline-flex max-w-full overflow-x-auto rounded-md bg-zinc-100 dark:bg-[#090A0F] p-0.5 gap-0.5 border border-zinc-200 dark:border-zinc-800 text-xs" role="tablist" aria-label="Search mode">
             <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0" data-mode="topic">
               <i data-lucide="compass" class="w-3.5 h-3.5"></i>
               <span>Topic Exploration</span>
@@ -668,21 +737,21 @@
         </div>
 
         <form id="research-form" class="relative">
-          <div id="search-input" class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 rounded-xl transition shadow-xs">
+          <div id="search-input" class="relative flex items-center bg-zinc-50 dark:bg-[#090A0F] border border-zinc-200 dark:border-zinc-800 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/20 dark:focus-within:ring-zinc-600/20 rounded-md transition">
             <textarea
               id="query-input"
               rows="2"
               placeholder="e.g., FlashAttention-3 GPU kernel optimizations, diffusion state-space models..."
-              class="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 px-4 py-3 focus:outline-none resize-none leading-relaxed"
+              class="w-full bg-transparent text-[13px] text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 px-3.5 py-2.5 focus:outline-none resize-none leading-relaxed"
               required
             ></textarea>
-            
-            <div class="pr-3 flex items-center space-x-2 shrink-0">
+
+            <div class="pr-2.5 flex items-center space-x-2 shrink-0">
               <button
                 type="submit"
                 id="submit-btn"
                 aria-label="Run academic search"
-                class="flex items-center justify-center space-x-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0B0F19] text-white font-semibold tracking-wide text-xs shadow-md shadow-brand-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
+                class="flex items-center justify-center space-x-1.5 px-4 py-2 rounded-md bg-zinc-900 text-zinc-50 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-semibold tracking-wide transition disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
               >
                 <i data-lucide="send" class="w-3.5 h-3.5 transition group-hover:translate-x-0.5"></i>
                 <span id="btn-text">Research</span>
@@ -691,52 +760,51 @@
           </div>
 
           <!-- Custom / Advanced Search: combined multi-field filters (visible only in Custom mode) -->
-          <div id="custom-search-panel" class="hidden mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-stretch">
-            <div class="relative flex items-center h-10 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
-              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
+          <div id="custom-search-panel" class="hidden mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 items-stretch">
+            <div class="relative flex items-center h-10 bg-zinc-50 dark:bg-[#090A0F] border border-zinc-200 dark:border-zinc-800 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 rounded-md transition">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-600 absolute left-3 pointer-events-none shrink-0"></i>
               <input
                 type="text"
                 id="custom-author-input"
                 placeholder="Author (e.g., Tri Dao) — optional"
                 autocomplete="off"
                 aria-label="Custom search author filter"
-                class="w-full h-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 focus:outline-none"
+                class="w-full h-full bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 pl-9 pr-3 focus:outline-none"
               />
             </div>
-            <div class="relative flex items-center h-10 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
-              <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
+            <div class="relative flex items-center h-10 bg-zinc-50 dark:bg-[#090A0F] border border-zinc-200 dark:border-zinc-800 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 rounded-md transition">
+              <i data-lucide="building-2" class="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-600 absolute left-3 pointer-events-none shrink-0"></i>
               <input
                 type="text"
                 id="custom-institution-input"
                 placeholder="University / Lab (e.g., Stanford) — optional"
                 autocomplete="off"
                 aria-label="Custom search institution filter"
-                class="w-full h-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 focus:outline-none"
+                class="w-full h-full bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 pl-9 pr-3 focus:outline-none"
               />
             </div>
           </div>
 
-          <div class="mt-2.5 flex flex-wrap items-center justify-between gap-y-2 text-xs text-slate-500 dark:text-slate-400 px-1">
+          <div class="mt-2 flex flex-wrap items-center justify-between gap-y-1.5 text-[11px] text-zinc-500 dark:text-zinc-500 px-0.5">
             <div class="flex items-center space-x-3">
               <!-- Secondary control: paper count (deliberately understated next to the primary action) -->
               <div class="flex items-center space-x-1.5">
-                <span class="font-normal text-slate-400 dark:text-slate-500">Papers:</span>
-                <div id="paper-limit-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B]" role="group" aria-label="Target paper count">
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer" data-limit="10">10</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="25">25</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="50">50</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="100">100</button>
+                <span class="font-normal font-mono">limit:</span>
+                <div id="paper-limit-group" class="inline-flex rounded-md bg-zinc-100 dark:bg-[#090A0F] p-0.5 gap-0.5 border border-zinc-200 dark:border-zinc-800" role="group" aria-label="Target paper count">
+                  <button type="button" class="paper-limit-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 transition cursor-pointer" data-limit="10">10</button>
+                  <button type="button" class="paper-limit-btn px-2 py-0.5 rounded text-[11px] font-mono text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition cursor-pointer" data-limit="25">25</button>
+                  <button type="button" class="paper-limit-btn px-2 py-0.5 rounded text-[11px] font-mono text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition cursor-pointer" data-limit="50">50</button>
+                  <button type="button" class="paper-limit-btn px-2 py-0.5 rounded text-[11px] font-mono text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition cursor-pointer" data-limit="100">100</button>
                 </div>
               </div>
 
-              <div class="hidden sm:flex items-center space-x-1.5 text-[11px] pl-3 border-l border-slate-200 dark:border-[#1E293B]">
-                <span>Index Scope:</span>
-                <span id="category-scope-text" class="font-mono text-slate-600 dark:text-slate-300">cs.DC, cs.SE, cs.AI, cs.AR</span>
+              <div class="hidden sm:flex items-center space-x-1.5 text-[11px] pl-3 border-l border-zinc-200 dark:border-zinc-800">
+                <span id="category-scope-text" class="font-mono text-zinc-400 dark:text-zinc-500">cs.DC, cs.SE, cs.AI, cs.AR</span>
               </div>
             </div>
 
-            <div class="hidden md:flex items-center text-[11px] text-slate-400 dark:text-slate-500">
-              <span>Press <kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 font-mono text-[10px]">Enter</kbd> to search</span>
+            <div class="hidden md:flex items-center text-[11px] text-zinc-400 dark:text-zinc-600">
+              <span class="font-mono">⏎ search</span>
             </div>
           </div>
         </form>
@@ -745,37 +813,36 @@
     </section>
 
     <!-- RIGHT COLUMN: Discovered Papers Drawer -->
-    <aside id="papers-drawer" class="w-full lg:w-[420px] shrink-0 flex flex-col bg-white/70 dark:bg-[#111827]/60 border border-slate-200 dark:border-[#1E293B] rounded-2xl overflow-hidden backdrop-blur-sm shadow-xs dark:shadow-xl transition-colors">
-      
+    <aside id="papers-drawer" class="w-full lg:w-[420px] shrink-0 flex flex-col bg-white dark:bg-[#12151D]/70 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden backdrop-blur-sm transition-colors">
+
       <!-- Drawer Header & Workspace Tabs -->
-      <div class="flex-none px-4 py-3 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/80 dark:bg-[#111827]/90 flex items-center justify-between gap-2">
-        <!-- Dual Workspace Tabs -->
-        <div class="flex space-x-1 bg-slate-100 dark:bg-[#0B0F19] p-1 rounded-xl border border-slate-200 dark:border-[#1E293B] text-xs">
-          <button id="tab-discovered" class="px-2.5 py-1 rounded-lg font-semibold bg-brand-600 text-white transition flex items-center space-x-1.5 shadow-xs cursor-pointer">
-            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-            <span>Discovered</span>
-            <span id="tab-discovered-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-700 text-white ml-1"><span id="discovered-count">0</span></span>
+      <div class="flex-none px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#090A0F]/90 flex items-center justify-between gap-2">
+        <!-- Compact workspace counters -->
+        <div class="flex items-center space-x-1 text-xs" role="tablist" aria-label="Workspace">
+          <button id="tab-discovered" class="px-2 py-1 rounded-md font-mono text-[11px] bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 transition flex items-center space-x-1.5 cursor-pointer">
+            <span>discovered</span>
+            <span id="tab-discovered-badge" class="tabular-nums opacity-70"><span id="discovered-count">0</span></span>
             <span id="paper-count-badge" class="hidden">0 papers</span>
           </button>
-          <button id="tab-saved" class="px-2.5 py-1 rounded-lg font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400"></i>
-            <span>Saved</span>
-            <span id="tab-saved-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ml-1">0</span>
+          <button id="tab-saved" class="px-2 py-1 rounded-md font-mono text-[11px] text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition flex items-center space-x-1.5 cursor-pointer">
+            <span>saved</span>
+            <span id="tab-saved-badge" class="tabular-nums opacity-70">0</span>
           </button>
         </div>
 
         <!-- Export Actions Toolbar -->
-        <div class="flex items-center space-x-1">
-          <button id="btn-export-notebooklm" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer" title="Export to Google NotebookLM Pack">
-            <i data-lucide="file-box" class="w-4 h-4 text-accent-600 dark:text-accent-400"></i>
+        <!-- Export Actions Toolbar -->
+        <div class="flex items-center space-x-0.5">
+          <button id="btn-export-notebooklm" class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition cursor-pointer" title="Export to Google NotebookLM Pack">
+            <i data-lucide="file-box" class="w-4 h-4"></i>
           </button>
-          <button id="btn-export-litreview" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer" title="Export IEEE Literature Review">
-            <i data-lucide="download" class="w-4 h-4 text-emerald-600 dark:text-lab-400"></i>
+          <button id="btn-export-litreview" class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition cursor-pointer" title="Export IEEE Literature Review">
+            <i data-lucide="download" class="w-4 h-4"></i>
           </button>
 
           <!-- Saved Workspace Actions (visible when in Saved tab) -->
           <div id="saved-actions-toolbar" class="hidden items-center space-x-1 pl-1">
-            <button id="btn-clear-saved" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer" title="Clear All Saved Papers">
+            <button id="btn-clear-saved" class="p-1.5 rounded-md text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer" title="Clear All Saved Papers">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -783,62 +850,62 @@
       </div>
 
       <!-- Instant In-Results Client-Side Filter -->
-      <div class="flex-none px-4 py-2 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/70 dark:bg-[#0B0F19]/60">
+      <div class="flex-none px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#090A0F]/60">
         <div class="relative flex items-center">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
+          <i data-lucide="search" class="w-3 h-3 text-zinc-400 dark:text-zinc-600 absolute left-2.5 pointer-events-none shrink-0"></i>
           <input
             type="text"
             id="filter-entity-input"
             placeholder="Filter loaded papers..."
             aria-label="Filter loaded papers by author or institution"
             title="Filter loaded papers by author or institution"
-            class="w-full pl-9 pr-16 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-sans"
+            class="w-full pl-8 pr-16 py-1 text-[11px] font-mono bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition"
           />
-          <span id="filter-match-count" class="absolute right-1.5 top-1/2 -translate-y-1/2 max-w-[4.5rem] truncate text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-0.5 pointer-events-none empty:hidden"></span>
+          <span id="filter-match-count" class="absolute right-1.5 top-1/2 -translate-y-1/2 max-w-[4.5rem] truncate text-[10px] font-mono tabular-nums text-zinc-500 dark:text-zinc-500 pointer-events-none empty:hidden"></span>
         </div>
       </div>
 
       <!-- Faceted Filters & Comparative Matrix Action Strip -->
-      <div class="flex-none px-4 py-2 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/50 dark:bg-[#0B0F19]/40 space-y-2">
+      <div class="flex-none px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#090A0F]/40 space-y-1.5">
         <!-- Faceted Filter Chips -->
-        <div id="discovered-filters" class="flex items-center space-x-2 flex-wrap gap-y-1.5 text-[11px]">
+        <div id="discovered-filters" class="flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
           <!-- Year Filter -->
-          <div class="flex items-center space-x-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-            <span class="text-slate-400">Year:</span>
-            <select id="filter-year" class="bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer font-medium">
-              <option value="all" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">All Time</option>
-              <option value="recent" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">2024–2026</option>
+          <div class="flex items-center space-x-1 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-800">
+            <span class="text-zinc-400 dark:text-zinc-600">yr:</span>
+            <select id="filter-year" class="bg-transparent text-zinc-600 dark:text-zinc-400 focus:outline-none cursor-pointer">
+              <option value="all" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">all</option>
+              <option value="recent" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">2024–26</option>
             </select>
           </div>
 
           <!-- Source Filter -->
-          <div class="flex items-center space-x-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-            <span class="text-slate-400">Source:</span>
-            <select id="filter-source" class="bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer font-medium">
-              <option value="all" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">All Sources</option>
-              <option value="arxiv" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">ArXiv</option>
-              <option value="scholar" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">Semantic Scholar</option>
-              <option value="openalex" class="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">OpenAlex</option>
+          <div class="flex items-center space-x-1 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-800">
+            <span class="text-zinc-400 dark:text-zinc-600">src:</span>
+            <select id="filter-source" class="bg-transparent text-zinc-600 dark:text-zinc-400 focus:outline-none cursor-pointer">
+              <option value="all" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">all</option>
+              <option value="arxiv" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">arxiv</option>
+              <option value="scholar" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">scholar</option>
+              <option value="openalex" class="bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200">openalex</option>
             </select>
           </div>
 
           <!-- PDF Only Toggle -->
-          <button id="filter-pdf-toggle" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 transition cursor-pointer font-medium" data-active="false">
-            <i data-lucide="file-check" class="w-3 h-3 text-slate-400"></i>
-            <span>PDF Only</span>
+          <button id="filter-pdf-toggle" class="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 text-zinc-500 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-800 transition cursor-pointer" data-active="false">
+            <i data-lucide="file-check" class="w-3 h-3"></i>
+            <span>pdf</span>
           </button>
         </div>
 
         <!-- Comparative Matrix Action Bar (Appears when 2 or more papers checked) -->
-        <div id="compare-bar" class="hidden items-center justify-between bg-gradient-to-r from-brand-950/90 to-indigo-950/90 border border-brand-500/40 p-2 rounded-xl text-xs shadow-md">
+        <div id="compare-bar" class="hidden items-center justify-between bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 rounded-md text-xs">
           <div class="flex items-center space-x-2">
-            <span class="w-2 h-2 rounded-full bg-brand-400 animate-pulse"></span>
-            <span class="font-semibold text-brand-200" id="compare-count-text">2 Papers Selected</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+            <span class="font-mono text-[11px] text-zinc-600 dark:text-zinc-400" id="compare-count-text">2 selected</span>
           </div>
           <div class="flex items-center space-x-1.5">
-            <button id="btn-run-compare" class="px-3 py-1 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold shadow transition flex items-center space-x-1.5 cursor-pointer" disabled>
+            <button id="btn-run-compare" class="px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white disabled:opacity-50 text-[11px] font-mono transition flex items-center space-x-1.5 cursor-pointer" disabled>
               <i data-lucide="columns-2" class="w-3.5 h-3.5"></i>
-              <span>Compare Trade-off Matrix 📊</span>
+              <span>compare</span>
             </button>
             <button id="btn-clear-selection" class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer" title="Clear selection">
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
@@ -848,19 +915,16 @@
       </div>
 
       <!-- Drawer Content: Paper Cards List -->
-      <div id="papers-list" class="flex-1 overflow-y-auto p-4 space-y-3.5">
-        
+      <div id="papers-list" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+
         <!-- Empty Placeholder Container -->
-        <div id="no-papers-placeholder" data-legacy-id="papers-empty-placeholder" class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
-          <div class="w-14 h-14 rounded-2xl overflow-hidden bg-black ring-1 ring-slate-800 flex items-center justify-center mb-3 shadow-md">
-            <img src="/static/axiom_logo.jpg" alt="Axiom Research" class="w-full h-full object-cover opacity-85" />
-          </div>
-          <p id="empty-placeholder-title" class="text-sm font-medium text-slate-300">No Papers Retrieved Yet</p>
-          <p id="empty-placeholder-desc" class="text-xs text-slate-500 max-w-xs mt-1">Submit an academic inquiry to concurrently fetch relevant literature from ArXiv, Semantic Scholar, and OpenAlex.</p>
+        <div id="no-papers-placeholder" data-legacy-id="papers-empty-placeholder" class="h-full flex flex-col items-center justify-center text-center p-6">
+          <p id="empty-placeholder-title" class="text-xs font-mono text-zinc-500 dark:text-zinc-500">no papers retrieved</p>
+          <p id="empty-placeholder-desc" class="text-[11px] text-zinc-400 dark:text-zinc-600 max-w-[220px] mt-1.5 leading-relaxed">Run a search to populate this panel.</p>
         </div>
 
         <!-- Target Container for Paper Cards -->
-        <div id="discovered-papers-list" class="space-y-3.5 hidden"></div>
+        <div id="discovered-papers-list" class="space-y-2.5 hidden"></div>
 
         <!-- DOM Pagination Controls Bar -->
         <div id="papers-pagination" class="hidden items-center justify-between pt-3 pb-1 text-xs border-t border-slate-200 dark:border-slate-800">
@@ -878,9 +942,9 @@
       </div>
 
       <!-- Drawer Footer (Subtle minimal metrics) -->
-      <div class="flex-none px-4 py-2.5 border-t border-slate-200 dark:border-[#1E293B] bg-slate-50/50 dark:bg-[#0B0F19]/40 text-[11px] text-slate-400 flex items-center justify-between">
-        <span>Multi-Source Academic Pipeline</span>
-        <span class="font-mono text-[10px] text-slate-400 dark:text-slate-500">Ranked by Signal</span>
+      <div class="flex-none px-3 py-1.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#090A0F]/40 text-[10px] font-mono text-zinc-400 dark:text-zinc-600 flex items-center justify-between">
+        <span>multi-source pipeline</span>
+        <span>ranked by signal</span>
       </div>
 
     </aside>
@@ -888,16 +952,10 @@
   </main>
 
   <!-- Minimalist Clean Footer -->
-  <footer class="flex-none border-t border-slate-200 dark:border-[#1E293B] bg-white/70 dark:bg-[#0B0F19]/80 backdrop-blur-md px-4 lg:px-6 py-2.5 z-20 transition-colors">
-    <div class="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-      <div class="flex items-center space-x-2">
-        <span class="font-semibold text-slate-800 dark:text-slate-200">SWMP Labs</span>
-        <span>&mdash;</span>
-        <span class="text-[11px]">Academic Systems Literature Discovery</span>
-      </div>
-      <div class="text-[11px] text-slate-400 dark:text-slate-500">
-        <span>© 2026</span>
-      </div>
+  <footer class="flex-none border-t border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-[#090A0F]/80 backdrop-blur-md px-4 lg:px-6 py-1.5 z-20 transition-colors">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-[11px] font-mono text-zinc-400 dark:text-zinc-600">
+      <span>swmp labs — systems literature discovery</span>
+      <span>© 2026</span>
     </div>
   </footer>
 
