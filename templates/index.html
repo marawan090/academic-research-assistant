@@ -60,6 +60,12 @@
   <!-- Mermaid.js for System Architecture & Dataflow Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 
+  <!-- Cytoscape.js + dagre: interactive architecture concept graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dagre@0.8/dist/dagre.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2/cytoscape-dagre.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-svg@0.4/cytoscape-svg.js"></script>
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -1085,13 +1091,21 @@
           </div>
           <div class="min-w-0">
             <h3 id="diagram-modal-title" class="text-sm font-bold text-white truncate max-w-xl">System Architecture Diagram</h3>
-            <span class="text-[10px] text-slate-400 font-mono">Rendered via Kroki Engine (PlantUML Component & Deployment)</span>
+            <span class="text-[10px] text-slate-400 font-mono">Interactive Graph · drag nodes · scroll to zoom</span>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <button id="btn-download-diagram-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="Download High-Res SVG">
+          <button id="btn-fit-diagram-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="Fit graph to view">
+            <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+            <span>Fit View</span>
+          </button>
+          <button id="btn-export-svg-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="Export vector SVG">
+            <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
+            <span>SVG</span>
+          </button>
+          <button id="btn-download-diagram-modal" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer" title="Export High-Res PNG">
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
-            <span>Download SVG</span>
+            <span>PNG</span>
           </button>
           <button id="btn-close-diagram-modal" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Close Modal">
             <i data-lucide="x" class="w-4 h-4"></i>
@@ -1099,9 +1113,8 @@
         </div>
       </div>
 
-      <!-- Modal Viewport -->
-      <div id="diagram-modal-viewport" class="flex-1 bg-slate-950/95 rounded-xl border border-slate-800/80 p-4 overflow-auto flex items-center justify-center relative select-none">
-        <!-- SVG injected dynamically -->
+      <!-- Modal Viewport: interactive Cytoscape canvas injected dynamically -->
+      <div id="diagram-modal-viewport" class="flex-1 bg-slate-950/95 rounded-xl border border-slate-800/80 p-4 overflow-hidden relative select-none" style="min-height: 420px;">
       </div>
     </div>
   </div>
@@ -2388,7 +2401,7 @@
     ${hasDiagram ? `
     <div class="diagram-report-section">
       <div class="diagram-report-title">
-        <span>📐 Verified System Architecture (Kroki / PlantUML Engine)</span>
+          <span>📐 Verified System Architecture (Interactive Graph)</span>
       </div>
       <div class="diagram-svg-wrapper">
         ${diagramSvg}
@@ -3634,14 +3647,206 @@
       });
     }
 
-    // --- Architecture Diagram Modal Management ---
+    // --- Interactive Architecture Graph (Cytoscape.js + dagre, zinc/paper-and-ink) ---
+    // Renders the typed backend IR ({nodes, edges}) as a pannable, zoomable,
+    // draggable concept graph. Dagre hierarchical layout; theme-aware styling.
+    function archGraphReady() {
+      try {
+        if (typeof cytoscape === 'undefined') return false;
+        if (typeof cytoscapeDagre !== 'undefined' && !cytoscape._archDagreRegistered) {
+          cytoscape.use(cytoscapeDagre);
+          cytoscape._archDagreRegistered = true;
+        }
+        return true;
+      } catch (_) {
+        return typeof cytoscape !== 'undefined';
+      }
+    }
+
+    function archGraphTheme() {
+      const dark = document.documentElement.classList.contains('dark');
+      return dark ? {
+        nodeBg: '#1b1d23', nodeBorder: '#3f3f46', nodeText: '#e4e4e7',
+        coreBg: '#27272a', coreBorder: '#a1a1aa',
+        edgeLine: '#52525b', edgeText: '#a1a1aa', arrow: '#71717a'
+      } : {
+        nodeBg: '#fafafa', nodeBorder: '#d4d4d8', nodeText: '#27272a',
+        coreBg: '#f4f4f5', coreBorder: '#71717a',
+        edgeLine: '#a1a1aa', edgeText: '#52525b', arrow: '#71717a'
+      };
+    }
+
+    function archGraphElements(ir) {
+      if (!ir || !Array.isArray(ir.nodes) || !Array.isArray(ir.edges)) return null;
+      const kinds = ['input', 'process', 'core', 'store', 'output'];
+      const ids = new Set();
+      const nodes = [];
+      ir.nodes.slice(0, 10).forEach((n, i) => {
+        if (!n) return;
+        let id = String(n.id || ('n' + (i + 1)));
+        if (ids.has(id)) return;
+        ids.add(id);
+        const kind = kinds.includes(String(n.kind || '').toLowerCase()) ? String(n.kind).toLowerCase() : 'process';
+        const label = String(n.label || 'Component').split(/\s+/).slice(0, 4).join(' ') || 'Component';
+        nodes.push({ data: { id, label, kind } });
+      });
+      const edges = [];
+      const seen = new Set();
+      ir.edges.slice(0, 12).forEach((e) => {
+        if (!e) return;
+        const a = String(e.from || '');
+        const b = String(e.to || '');
+        if (!a || !b || a === b || !ids.has(a) || !ids.has(b) || seen.has(a + '>' + b)) return;
+        seen.add(a + '>' + b);
+        edges.push({
+          data: {
+            id: a + '>' + b, source: a, target: b,
+            label: String(e.label || '').split(/\s+/).filter(Boolean).slice(0, 3).join(' ')
+          }
+        });
+      });
+      if (nodes.length < 2 || !edges.length) return null;
+      return nodes.concat(edges);
+    }
+
+    function renderArchitectureGraph(container, ir, opts = {}) {
+      if (!container) return null;
+      if (container._archCy) {
+        try { container._archCy.destroy(); } catch (_) {}
+        container._archCy = null;
+      }
+      container.innerHTML = '';
+      const els = archGraphElements(ir);
+      if (!els || !archGraphReady()) return null;
+      const t = archGraphTheme();
+      const canvas = document.createElement('div');
+      canvas.style.width = '100%';
+      canvas.style.height = (opts.height || 340) + 'px';
+      container.appendChild(canvas);
+      let cy = null;
+      try {
+        cy = cytoscape({
+          container: canvas,
+          elements: els,
+          layout: { name: 'dagre', rankDir: opts.direction || 'TB', nodeSep: 45, rankSep: 60, animate: false, fit: true, padding: 24 },
+          style: [
+            {
+              selector: 'node',
+              style: {
+                'label': 'data(label)',
+                'font-family': 'Inter, system-ui, sans-serif',
+                'font-size': 11,
+                'font-weight': 500,
+                'color': t.nodeText,
+                'text-wrap': 'wrap',
+                'text-max-width': 120,
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'background-color': t.nodeBg,
+                'border-width': 1,
+                'border-color': t.nodeBorder,
+                'shape': 'roundrectangle',
+                'padding': '10px',
+                'width': 'label',
+                'height': 'label'
+              }
+            },
+            { selector: 'node[kind = "core"]', style: { 'background-color': t.coreBg, 'border-color': t.coreBorder, 'border-width': 1.5 } },
+            { selector: 'node[kind = "input"], node[kind = "output"]', style: { 'shape': 'ellipse' } },
+            {
+              selector: 'edge',
+              style: {
+                'label': 'data(label)',
+                'font-size': 10,
+                'font-family': 'JetBrains Mono, ui-monospace, monospace',
+                'color': t.edgeText,
+                'line-color': t.edgeLine,
+                'width': 1.5,
+                'curve-style': 'bezier',
+                'target-arrow-shape': 'triangle',
+                'target-arrow-color': t.arrow,
+                'arrow-scale': 0.9,
+                'text-rotation': 'autorotate',
+                'text-margin-y': -8
+              }
+            }
+          ],
+          wheelSensitivity: 0.25,
+          minZoom: 0.3,
+          maxZoom: 2.5
+        });
+      } catch (err) {
+        console.warn('Cytoscape render failed:', err);
+        container.innerHTML = '';
+        return null;
+      }
+      try { cy.fit(null, 24); } catch (_) {}
+      container._archCy = cy;
+      return cy;
+    }
+
+    function fitArchitectureGraph(container) {
+      const cy = container && container._archCy;
+      if (cy) {
+        try { cy.fit(null, 24); } catch (_) {}
+        return true;
+      }
+      return false;
+    }
+
+    function downloadCyBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportArchitecturePNG(container, title) {
+      const cy = container && container._archCy;
+      if (!cy || typeof cy.png !== 'function') {
+        showToast('Graph export unavailable — render the graph first.', 'error');
+        return;
+      }
+      const cleanTitle = (title || 'paper').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+      Promise.resolve()
+        .then(() => cy.png({ output: 'blob', full: true, scale: 2, bg: 'transparent' }))
+        .then((blob) => {
+          if (!blob) throw new Error('PNG render failed.');
+          downloadCyBlob(blob, `${cleanTitle}-architecture.png`);
+          showToast('Architecture PNG exported successfully!', 'success');
+        })
+        .catch((err) => showToast(err.message || 'PNG export failed.', 'error'));
+    }
+
+    function exportArchitectureSVG(container, title) {
+      const cy = container && container._archCy;
+      if (cy && typeof cy.svg === 'function') {
+        try {
+          const svgText = cy.svg({ full: true, scale: 1 });
+          const cleanTitle = (title || 'paper').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+          downloadCyBlob(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }), `${cleanTitle}-architecture.svg`);
+          showToast('Architecture SVG exported successfully!', 'success');
+          return;
+        } catch (err) {
+          console.warn('SVG export failed, falling back to PNG:', err);
+        }
+      } else {
+        showToast('SVG plugin unavailable — exporting PNG instead.', 'info');
+      }
+      exportArchitecturePNG(container, title);
+    }
+
+    // --- Architecture Diagram Modal Management (interactive Cytoscape canvas) ---
     const diagramModal = document.getElementById('diagram-modal');
     const diagramModalTitle = document.getElementById('diagram-modal-title');
     const diagramModalViewport = document.getElementById('diagram-modal-viewport');
     const btnCloseDiagramModal = document.getElementById('btn-close-diagram-modal');
     const btnDownloadDiagramModal = document.getElementById('btn-download-diagram-modal');
 
-    let activeModalSvg = '';
     let activeModalTitle = '';
 
     if (btnCloseDiagramModal) {
@@ -3658,45 +3863,53 @@
       });
     }
 
-    if (btnDownloadDiagramModal) {
-      btnDownloadDiagramModal.addEventListener('click', () => {
-        if (!activeModalSvg) return;
-        downloadSvgFile(activeModalSvg, activeModalTitle);
+    const btnFitDiagramModal = document.getElementById('btn-fit-diagram-modal');
+    if (btnFitDiagramModal) {
+      btnFitDiagramModal.addEventListener('click', () => {
+        if (!fitArchitectureGraph(diagramModalViewport)) {
+          showToast('No graph to fit yet.', 'warning');
+        }
       });
     }
 
-    function openDiagramModal(title, svgMarkup) {
-      activeModalSvg = svgMarkup;
+    const btnExportSvgModal = document.getElementById('btn-export-svg-modal');
+    if (btnExportSvgModal) {
+      btnExportSvgModal.addEventListener('click', () => {
+        exportArchitectureSVG(diagramModalViewport, activeModalTitle);
+      });
+    }
+
+    if (btnDownloadDiagramModal) {
+      btnDownloadDiagramModal.addEventListener('click', () => {
+        exportArchitecturePNG(diagramModalViewport, activeModalTitle);
+      });
+    }
+
+    function openDiagramModal(title, ir) {
       activeModalTitle = title || 'architecture';
       if (diagramModalTitle) {
-        diagramModalTitle.textContent = `${title} - Architecture`;
-      }
-      if (diagramModalViewport) {
-        diagramModalViewport.innerHTML = svgMarkup;
-        const svgEl = diagramModalViewport.querySelector('svg');
-        if (svgEl) {
-          svgEl.style.maxWidth = '100%';
-          svgEl.style.height = 'auto';
-        }
+        diagramModalTitle.textContent = `${activeModalTitle} - Architecture`;
       }
       if (diagramModal) {
         diagramModal.classList.remove('hidden');
         lucide.createIcons();
       }
-    }
-
-    function downloadSvgFile(svgContent, paperTitle) {
-      const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const cleanTitle = (paperTitle || 'paper').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
-      a.download = `${cleanTitle}-architecture.svg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Architecture SVG downloaded successfully!', 'success');
+      if (diagramModalViewport) {
+        diagramModalViewport.innerHTML = '';
+        requestAnimationFrame(() => {
+          const height = Math.max(420, (diagramModalViewport.clientHeight || 480) - 32);
+          const cy = renderArchitectureGraph(diagramModalViewport, ir, { direction: 'LR', height });
+          if (!cy) {
+            diagramModalViewport.innerHTML = `
+              <div class="text-xs text-rose-400 p-3 rounded-lg bg-rose-950/40 border border-rose-800/40 flex items-center space-x-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                <span>Architecture graph unavailable for this paper.</span>
+              </div>
+            `;
+            lucide.createIcons();
+          }
+        });
+      }
     }
 
     // --- Academic Cold Outreach Email Modal Management ---
@@ -4775,7 +4988,7 @@
                 </p>
               </div>
               <div class="flex items-center space-x-1.5 shrink-0 flex-wrap gap-y-1">
-                <button class="btn-generate-diagram flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30 transition cursor-pointer" title="Generate Professional Architecture Diagram via Kroki">
+                <button class="btn-generate-diagram flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30 transition cursor-pointer" title="Generate Interactive Architecture Graph">
                   <i data-lucide="network" class="w-3.5 h-3.5 text-emerald-400"></i>
                   <span>📐 Architecture Diagram</span>
                 </button>
@@ -4816,7 +5029,7 @@
             <!-- Action Bar with Generate Architecture Diagram Button -->
             <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center space-x-2 flex-wrap gap-2">
-                <button class="btn-generate-diagram-footer flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600/30 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shadow-sm" title="Generate Professional Architecture Diagram via Kroki">
+                <button class="btn-generate-diagram-footer flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600/30 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/30 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shadow-sm" title="Generate Interactive Architecture Graph">
                   <i data-lucide="network" class="w-4 h-4 text-emerald-400"></i>
                   <span class="btn-diagram-text">📐 Generate Architecture Diagram</span>
                 </button>
@@ -4834,18 +5047,22 @@
                 <div class="flex items-center space-x-2">
                   <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center space-x-1">
                     <i data-lucide="cpu" class="w-3 h-3 mr-1"></i>
-                    <span>System Architecture (Kroki SVG)</span>
+                    <span>System Architecture</span>
                   </span>
-                  <span class="text-[10px] text-slate-500 font-mono">PlantUML Engine</span>
+                  <span class="text-[10px] text-slate-500 font-mono">Interactive Graph · drag · scroll to zoom</span>
                 </div>
                 <div class="flex items-center space-x-2">
                   <button class="btn-diagram-fullscreen opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Open High-Resolution Modal" disabled>
                     <i data-lucide="maximize-2" class="w-3 h-3"></i>
                     <span>Full View / Modal</span>
                   </button>
-                  <button class="btn-diagram-download opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Download SVG" disabled>
+                  <button class="btn-diagram-fit opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Fit graph to view" disabled>
+                    <i data-lucide="scan" class="w-3 h-3"></i>
+                    <span>Fit View</span>
+                  </button>
+                  <button class="btn-diagram-download opacity-50 cursor-not-allowed flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Export PNG" disabled>
                     <i data-lucide="download" class="w-3 h-3"></i>
-                    <span>Download SVG</span>
+                    <span>Export PNG</span>
                   </button>
                 </div>
               </div>
@@ -4856,7 +5073,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Generating system architecture via Kroki...</span>
+                <span>Extracting architecture concept graph...</span>
               </div>
 
               <!-- Diagram SVG Viewer -->
@@ -4885,9 +5102,19 @@
       const diagramSvgContainer = assistantContainer.querySelector('#diagram-container') || assistantContainer.querySelector('.diagram-svg-container');
       const btnDiagramFullscreen = assistantContainer.querySelector('.btn-diagram-fullscreen');
       const btnDiagramDownload = assistantContainer.querySelector('.btn-diagram-download');
+      const btnDiagramFitCard = assistantContainer.querySelector('.btn-diagram-fit');
       const diagramActionBtns = assistantContainer.querySelectorAll('.btn-generate-diagram, .btn-generate-diagram-footer');
 
-      let renderedSvgMarkup = '';
+      function setDiagramToolsEnabled(enabled) {
+        [btnDiagramFullscreen, btnDiagramDownload, btnDiagramFitCard].forEach((b) => {
+          if (!b) return;
+          b.disabled = !enabled;
+          b.classList.toggle('opacity-50', !enabled);
+          b.classList.toggle('cursor-not-allowed', !enabled);
+        });
+      }
+
+      let renderedIR = null;
 
       async function requestArchitectureDiagram() {
         diagramActionBtns.forEach(btnEl => {
@@ -4897,7 +5124,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Generating system architecture via Kroki...</span>
+            <span>Extracting architecture graph...</span>
           `;
         });
 
@@ -4909,14 +5136,24 @@
           btnDiagramDownload.disabled = true;
           btnDiagramDownload.classList.add('opacity-50', 'cursor-not-allowed');
         }
+        if (btnDiagramFitCard) {
+          btnDiagramFitCard.disabled = true;
+          btnDiagramFitCard.classList.add('opacity-50', 'cursor-not-allowed');
+        }
 
         if (diagramSection) diagramSection.classList.remove('hidden');
         if (diagramLoadingBanner) diagramLoadingBanner.classList.remove('hidden');
-        if (diagramSvgContainer) diagramSvgContainer.innerHTML = '';
+        if (diagramSvgContainer) {
+          if (diagramSvgContainer._archCy) {
+            try { diagramSvgContainer._archCy.destroy(); } catch (_) {}
+            diagramSvgContainer._archCy = null;
+          }
+          diagramSvgContainer.innerHTML = '';
+        }
         if (diagramSection) diagramSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         try {
-          showToast('Requesting PlantUML architecture & Kroki SVG...', 'info');
+          showToast('Extracting architecture concept graph...', 'info');
           const res = await authenticatedFetch('/api/paper/diagram', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4933,18 +5170,14 @@
           }
 
           const data = await res.json();
-          if (!data.svg || !data.svg.includes('<svg')) {
-            throw new Error('Invalid SVG markup returned from diagram engine.');
+          if (!data.ir || !Array.isArray(data.ir.nodes) || !Array.isArray(data.ir.edges)) {
+            throw new Error('Invalid architecture graph returned from diagram engine.');
           }
 
-          renderedSvgMarkup = data.svg;
-          if (diagramSvgContainer) {
-            diagramSvgContainer.innerHTML = data.svg;
-            const svgEl = diagramSvgContainer.querySelector('svg');
-            if (svgEl) {
-              svgEl.style.maxWidth = '100%';
-              svgEl.style.height = 'auto';
-            }
+          renderedIR = data.ir;
+          const cy = renderArchitectureGraph(diagramSvgContainer, data.ir, { direction: 'TB', height: 340 });
+          if (!cy) {
+            throw new Error('Interactive graph engine unavailable (check network for CDN scripts).');
           }
 
           if (btnDiagramFullscreen) {
@@ -4954,6 +5187,10 @@
           if (btnDiagramDownload) {
             btnDiagramDownload.disabled = false;
             btnDiagramDownload.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          if (btnDiagramFitCard) {
+            btnDiagramFitCard.disabled = false;
+            btnDiagramFitCard.classList.remove('opacity-50', 'cursor-not-allowed');
           }
 
           if (diagramLoadingBanner) diagramLoadingBanner.classList.add('hidden');
@@ -4965,7 +5202,7 @@
             `;
           });
           lucide.createIcons();
-          showToast('Architecture diagram rendered successfully!', 'success');
+          showToast('Interactive architecture graph ready! Drag nodes · scroll to zoom.', 'success');
         } catch (err) {
           console.error('Architecture diagram error:', err);
           if (diagramLoadingBanner) diagramLoadingBanner.classList.add('hidden');
@@ -4985,6 +5222,10 @@
             btnDiagramDownload.disabled = true;
             btnDiagramDownload.classList.add('opacity-50', 'cursor-not-allowed');
           }
+          if (btnDiagramFitCard) {
+            btnDiagramFitCard.disabled = true;
+            btnDiagramFitCard.classList.add('opacity-50', 'cursor-not-allowed');
+          }
           diagramActionBtns.forEach(btnEl => {
             btnEl.disabled = false;
             btnEl.innerHTML = `
@@ -5003,15 +5244,24 @@
 
       if (btnDiagramFullscreen) {
         btnDiagramFullscreen.addEventListener('click', () => {
-          if (!renderedSvgMarkup || !renderedSvgMarkup.includes('<svg')) return;
-          openDiagramModal(paper.title, renderedSvgMarkup);
+          if (!renderedIR) return;
+          openDiagramModal(paper.title, renderedIR);
         });
       }
 
       if (btnDiagramDownload) {
         btnDiagramDownload.addEventListener('click', () => {
-          if (!renderedSvgMarkup || !renderedSvgMarkup.includes('<svg')) return;
-          downloadSvgFile(renderedSvgMarkup, paper.title);
+          if (!renderedIR || !diagramSvgContainer || !diagramSvgContainer._archCy) return;
+          exportArchitecturePNG(diagramSvgContainer, paper.title);
+        });
+      }
+
+      const btnDiagramFit = assistantContainer.querySelector('.btn-diagram-fit');
+      if (btnDiagramFit) {
+        btnDiagramFit.addEventListener('click', () => {
+          if (!fitArchitectureGraph(diagramSvgContainer)) {
+            showToast('No graph to fit yet.', 'warning');
+          }
         });
       }
 
@@ -5119,7 +5369,11 @@
 
         if (btnPrintPaper) {
           btnPrintPaper.addEventListener('click', () => {
-            const diagramSvg = renderedSvgMarkup || (diagramSvgContainer ? (diagramSvgContainer.querySelector('svg')?.outerHTML || '') : '');
+            let diagramSvg = '';
+            try {
+              const cy = diagramSvgContainer && diagramSvgContainer._archCy;
+              if (cy && typeof cy.svg === 'function') diagramSvg = cy.svg({ full: true, scale: 1 });
+            } catch (_) { diagramSvg = ''; }
             printTargetedPaperSynthesis({
               paper,
               depthFormatted,
@@ -6434,8 +6688,8 @@
       {
         selector: '#analysis-pane',
         altSelector: '#feed-container, #welcome-card',
-        title: 'Architectural Extraction & PlantUML',
-        content: 'Skip generic summaries. Axiom isolates concrete engineering bottlenecks, system assumptions, and automatically renders PlantUML topologies.',
+        title: 'Architectural Extraction & Concept Graphs',
+        content: 'Skip generic summaries. Axiom isolates concrete engineering bottlenecks, system assumptions, and renders interactive architecture graphs.',
         preferredPos: 'right'
       },
       {

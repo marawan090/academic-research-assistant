@@ -384,7 +384,7 @@ _shared_client_loop: Optional[asyncio.AbstractEventLoop] = None
 def get_shared_http_client() -> httpx.AsyncClient:
     """
     Retrieve or lazily initialize the shared HTTP client with keepalive connection pooling.
-    Guarantees reuse across all search providers, Kroki, and OpenAI-compatible SDKs.
+    Guarantees reuse across all search providers and OpenAI-compatible SDKs.
     Automatically detects if the client was bound to a previously closed event loop and refreshes it.
     """
     global _shared_http_client, _shared_client_loop

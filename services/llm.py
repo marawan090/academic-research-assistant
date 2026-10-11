@@ -463,8 +463,8 @@ def generate_fallback_outreach_email(
 
 class SynthesisCache:
     """
-    Thread-safe in-memory TTL cache for LLM syntheses, PlantUML architectures,
-    and rendered Kroki SVG diagrams.
+    Thread-safe in-memory TTL cache for LLM syntheses, architecture IR graphs,
+    and rendered diagrams.
     Default TTL is 3600.0 seconds (1 hour). Duplicate queries return instantly (0ms latency).
     """
     def __init__(self, ttl: float = 3600.0):
@@ -792,55 +792,18 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
 - Use standardized Unicode for simple units and metrics (e.g., 99.9%, 15 ms, 4.2 GB/s, ->).
 """
 
-PLANTUML_SYSTEM_PROMPT = """You are an elite Senior Distributed Systems and Software Architect.
-Your task is to extract and map the given academic research paper's distributed systems architecture into clean, professional PlantUML Component & Deployment syntax.
+ARCHITECTURE_IR_SYSTEM_PROMPT = """You are a systems architecture extractor. Given an academic paper's title and abstract, output ONLY a JSON object describing its system architecture as a small concept graph for a top-to-bottom dagre dataflow layout.
 
-System entities to visualize where relevant:
-1. Gateways, Client Workloads, or Ingestion Frontends
-2. Distributed Compute Workers, Accelerator Nodes (GPU/CPU/Host clusters)
-3. In-Memory Caches, Checkpoint Ring Buffers, Shared Memory pools (RDMA, CXL, NVLink)
-4. Async Message Queues, Consensus Coordinators, Event Streams (e.g. Raft, Paxos, Kafka)
-5. Persistent Storage Mesh or Distributed Filesystem (e.g. NVMe, SSDs, S3, Lustre)
+Schema:
+{"nodes": [{"id": "n1", "label": "...", "kind": "input|process|core|store|output"}], "edges": [{"from": "n1", "to": "n2", "label": "..."}]}
 
-Style configuration:
-Inject these exact modern skinparams immediately after @startuml:
-skinparam roundcorner 10
-skinparam shadowing false
-skinparam defaultFontName "Inter", "Helvetica", sans-serif
-skinparam defaultFontSize 12
-skinparam ArrowColor #6366f1
-skinparam ArrowThickness 1.5
-skinparam componentStyle uml2
-skinparam packageStyle rectangle
-skinparam rectangle {
-    BackgroundColor #0f172a
-    BorderColor #334155
-    FontColor #f8fafc
-}
-skinparam component {
-    BackgroundColor #1e293b
-    BorderColor #4f46e5
-    FontColor #f8fafc
-}
-skinparam database {
-    BackgroundColor #1e293b
-    BorderColor #06b6d4
-    FontColor #f8fafc
-}
-skinparam queue {
-    BackgroundColor #1e293b
-    BorderColor #a855f7
-    FontColor #f8fafc
-}
-skinparam node {
-    BackgroundColor #0b1120
-    BorderColor #475569
-    FontColor #e2e8f0
-}
-
-Output constraint:
-- Output ONLY valid PlantUML code wrapped between @startuml and @enduml.
-- Do NOT output any markdown backticks (no ```plantuml or ```), conversational preamble, or explanations.
+Rules:
+- 4 to 10 nodes, 3 to 12 edges forming a linear-ish pipeline: input(s) -> process -> core -> store/output.
+- Node label: 1 to 4 plain words naming the component (no sentences, no slash-stuffed lists).
+- kind: input (clients/workloads), process (compute/coordination), core (the paper's key mechanism), store (buffers/storage), output (results/serving).
+- Edge label: 0 to 3 words (verbs like "dispatches", "persists") or empty.
+- Node ids n1..nK in dataflow order. Every edge endpoint must reference a defined id.
+- Output ONLY the JSON object. No fences, no prose.
 """
 
 SINGLE_PAPER_SYSTEM_PROMPT = SINGLE_PAPER_DEEP_SYSTEM_PROMPT
@@ -933,88 +896,156 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
 """
 
 
-def sanitize_plantuml(raw: str, default_title: str = "System Architecture") -> str:
+ARCH_IR_KINDS = ("input", "process", "core", "store", "output")
+ARCH_IR_MAX_NODES = 10
+ARCH_IR_MAX_EDGES = 12
+
+
+class ArchitectureNode(BaseModel):
+    """Single concept-graph node: label capped at 4 words by the validator."""
+    id: str
+    label: str
+    kind: str = "process"
+
+
+class ArchitectureEdge(BaseModel):
+    """Directed concept-graph edge: label capped at 3 words by the validator."""
+    from_node: str = Field(alias="from")
+    to_node: str = Field(alias="to")
+    label: str = ""
+
+    model_config = {"populate_by_name": True}
+
+
+class ArchitectureIR(BaseModel):
+    """Typed intermediate representation rendered client-side with Cytoscape.js/dagre."""
+    nodes: List[ArchitectureNode]
+    edges: List[ArchitectureEdge]
+
+
+def _truncate_label_words(text: str, max_words: int, fallback: str) -> str:
+    """Collapse whitespace and hard-truncate to max_words (no mid-graph surprises)."""
+    cleaned = re.sub(r"\s+", " ", (text or "").strip().strip("\"'"))
+    words = cleaned.split()
+    if not words:
+        return fallback
+    return " ".join(words[:max_words])
+
+
+def validate_architecture_ir(data: Any) -> Optional[Dict[str, Any]]:
     """
-    Sanitize and validate PlantUML code extracted from LLM responses:
-    1. Removes any surrounding markdown code fences (```plantuml ... ```).
-    2. Strips out conversational preamble and postamble.
-    3. Extracts strictly the content between @startuml and @enduml.
-    4. Guarantees valid @startuml and @enduml boundaries.
-    5. Injects essential dark/modern skinparams if missing.
+    Strict validator for model-produced architecture graphs.
+    Enforces: 2-10 nodes, 1-12 edges, node labels <= 4 words, edge labels
+    <= 3 words, known kinds, resolvable ids, no self-loops, no duplicate ids.
+    Returns a clean plain-dict IR or None when unrecoverable.
     """
-    if not raw or not raw.strip():
-        return ""
+    if not isinstance(data, dict):
+        return None
+    raw_nodes = data.get("nodes")
+    raw_edges = data.get("edges")
+    if not isinstance(raw_nodes, list) or not isinstance(raw_edges, list):
+        return None
 
-    text = raw.strip()
+    nodes: List[Dict[str, str]] = []
+    seen_ids: set = set()
+    raw_to_final: Dict[str, str] = {}
+    for i, n in enumerate(raw_nodes[:ARCH_IR_MAX_NODES]):
+        if not isinstance(n, dict):
+            continue
+        raw_id = str(n.get("id") or f"n{i + 1}").strip()
+        nid = raw_id
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,16}", nid) or nid in seen_ids:
+            nid = f"n{i + 1}"
+            if nid in seen_ids:
+                continue
+        seen_ids.add(nid)
+        raw_to_final.setdefault(raw_id, nid)
+        kind = str(n.get("kind") or "process").strip().lower()
+        if kind not in ARCH_IR_KINDS:
+            kind = "process"
+        nodes.append({
+            "id": nid,
+            "label": _truncate_label_words(str(n.get("label") or ""), 4, "Component"),
+            "kind": kind,
+        })
 
-    # Step 1: Locate @startuml and @enduml case-insensitively
-    lower_text = text.lower()
-    start_idx = lower_text.find("@startuml")
-    end_idx = lower_text.rfind("@enduml")
+    edges: List[Dict[str, str]] = []
+    seen_pairs: set = set()
+    for e in raw_edges[:ARCH_IR_MAX_EDGES]:
+        if not isinstance(e, dict):
+            continue
+        src = str(e.get("from") or e.get("from_node") or "").strip()
+        dst = str(e.get("to") or e.get("to_node") or "").strip()
+        src = raw_to_final.get(src, src)
+        dst = raw_to_final.get(dst, dst)
+        if not src or not dst or src not in seen_ids or dst not in seen_ids:
+            continue
+        if src == dst or (src, dst) in seen_pairs:
+            continue
+        seen_pairs.add((src, dst))
+        edges.append({
+            "from": src,
+            "to": dst,
+            "label": _truncate_label_words(str(e.get("label") or ""), 3, ""),
+        })
 
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        extracted = text[start_idx : end_idx + len("@enduml")].strip()
-    elif start_idx != -1:
-        extracted = text[start_idx:].strip() + "\n@enduml"
-    elif end_idx != -1:
-        extracted = "@startuml\n" + text[: end_idx + len("@enduml")].strip()
+    if len(nodes) < 2 or not edges:
+        return None
+    try:
+        validated = ArchitectureIR(
+            nodes=[ArchitectureNode(**n) for n in nodes],
+            edges=[ArchitectureEdge(**e) for e in edges],
+        )
+        return validated.model_dump(by_alias=True)
+    except Exception:
+        return None
+
+
+def fallback_architecture_ir(
+    paper_title: str = "",
+    abstract: str = "",
+) -> Dict[str, Any]:
+    """
+    Deterministic keyword-derived IR when the LLM path is unavailable.
+    Grounds the core node in the paper title and adapts pipeline labels to
+    detected domain cues. Always schema-valid, zero network calls.
+    """
+    title = (paper_title or "System Architecture").strip().rstrip(".")
+    head = title.split(":")[0].strip()
+    core_label = _truncate_label_words(head, 4, "Core Mechanism")
+    text = f"{title} {abstract or ''}".lower()
+
+    if any(k in text for k in ("consensus", "raft", "paxos", "bft", "byzantine", "quorum")):
+        mid, mid_kind, store = "Coordinator", "process", "Commit Log"
+    elif any(k in text for k in ("gpu", "kernel", "attention", "cuda", "tensor")):
+        mid, mid_kind, store = "Scheduler", "process", "Staging Buffer"
+    elif any(k in text for k in ("checkpoint", "snapshot", "fault toler")):
+        mid, mid_kind, store = "Tracker", "process", "Snapshot Buffer"
+    elif any(k in text for k in ("cxl", "rdma", "cache", "memory", "nvme")):
+        mid, mid_kind, store = "Router", "process", "Cache Tier"
+    elif any(k in text for k in ("serverless", "cold start", "microvm", "faas")):
+        mid, mid_kind, store = "Router", "process", "Snapshot Pool"
     else:
-        cleaned = re.sub(r"^```(?:plantuml)?", "", text, flags=re.IGNORECASE | re.MULTILINE)
-        cleaned = re.sub(r"```$", "", cleaned, flags=re.MULTILINE).strip()
-        extracted = f"@startuml\n{cleaned}\n@enduml"
+        mid, mid_kind, store = "Coordinator", "process", "State Buffer"
 
-    # Step 2: Clean internal backticks or fences inside the extracted block
-    lines = extracted.splitlines()
-    clean_lines = []
-    has_start = False
-    has_end = False
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("```") or (stripped.endswith("```") and len(stripped) <= 15):
-            continue
-        if stripped.lower().startswith("@startuml"):
-            if not has_start:
-                clean_lines.append("@startuml")
-                has_start = True
-            continue
-        if stripped.lower().startswith("@enduml"):
-            has_end = True
-            continue
-        clean_lines.append(line)
-
-    if not has_start:
-        clean_lines.insert(0, "@startuml")
-    clean_lines.append("@enduml")
-
-    body_content = "\n".join(clean_lines[1:-1])
-
-    # Step 3: Inject robust skinparams / theme configuration if missing
-    skinparam_block = []
-    if "skinparam monochrome" not in body_content.lower():
-        skinparam_block.append("skinparam monochrome false")
-    if "skinparam shadowing" not in body_content.lower():
-        skinparam_block.append("skinparam shadowing false")
-    if "skinparam roundcorner" not in body_content.lower():
-        skinparam_block.append("skinparam roundcorner 10")
-    if "skinparam defaultfontname" not in body_content.lower():
-        skinparam_block.append('skinparam defaultFontName "Inter", "Helvetica", sans-serif')
-    if "skinparam defaultfontsize" not in body_content.lower():
-        skinparam_block.append("skinparam defaultFontSize 12")
-    if "skinparam arrowcolor" not in body_content.lower():
-        skinparam_block.append("skinparam ArrowColor #6366f1")
-    if "skinparam arrowthickness" not in body_content.lower():
-        skinparam_block.append("skinparam ArrowThickness 1.5")
-    if "skinparam componentstyle" not in body_content.lower():
-        skinparam_block.append("skinparam componentStyle uml2")
-
-    if skinparam_block:
-        injected = "\n".join(skinparam_block)
-        result = f"@startuml\n{injected}\n{body_content}\n@enduml"
-    else:
-        result = f"@startuml\n{body_content}\n@enduml"
-
-    return result.strip()
+    ir = {
+        "nodes": [
+            {"id": "n1", "label": "Client Workloads", "kind": "input"},
+            {"id": "n2", "label": mid, "kind": mid_kind},
+            {"id": "n3", "label": core_label, "kind": "core"},
+            {"id": "n4", "label": store, "kind": "store"},
+            {"id": "n5", "label": "Results", "kind": "output"},
+        ],
+        "edges": [
+            {"from": "n1", "to": "n2", "label": "submits"},
+            {"from": "n2", "to": "n3", "label": "dispatches"},
+            {"from": "n3", "to": "n4", "label": "persists"},
+            {"from": "n4", "to": "n5", "label": "serves"},
+        ],
+    }
+    validated = validate_architecture_ir(ir)
+    assert validated is not None  # constructed valid by design
+    return validated
 
 
 class ResearchLLMService:
@@ -1727,111 +1758,54 @@ class ResearchLLMService:
             synthesis_cache.set(cache_key, fallback)
             yield fallback
 
-    def generate_fallback_plantuml(self, paper_title: str, abstract: str = "", tldr: str = "") -> str:
-        """Generate professional PlantUML component diagram code for offline/fallback use."""
-        clean_title = (paper_title or "System Architecture").replace('"', "'")
-        return f"""@startuml
-skinparam roundcorner 10
-skinparam shadowing false
-skinparam defaultFontName "Inter", "Helvetica", sans-serif
-skinparam defaultFontSize 12
-skinparam ArrowColor #6366f1
-skinparam ArrowThickness 1.5
-skinparam componentStyle uml2
-skinparam packageStyle rectangle
-skinparam rectangle {{
-    BackgroundColor #0f172a
-    BorderColor #334155
-    FontColor #f8fafc
-}}
-skinparam component {{
-    BackgroundColor #1e293b
-    BorderColor #4f46e5
-    FontColor #f8fafc
-}}
-skinparam database {{
-    BackgroundColor #1e293b
-    BorderColor #06b6d4
-    FontColor #f8fafc
-}}
-skinparam queue {{
-    BackgroundColor #1e293b
-    BorderColor #a855f7
-    FontColor #f8fafc
-}}
-skinparam node {{
-    BackgroundColor #0b1120
-    BorderColor #475569
-    FontColor #e2e8f0
-}}
-
-title {clean_title} - Architectural Dataflow
-
-node "Ingress & Client Layer" {{
-    [Client Workloads / Gateways] as Clients
-    [API Gateway & Ingestion Router] as Gateway
-}}
-
-node "Distributed Compute Cluster" {{
-    package "Compute Nodes (GPU/CPU/Host)" {{
-        [Execution Engine Worker 1] as Worker1
-        [Execution Engine Worker 2] as Worker2
-        [Adaptive Coordinator] as Coord
-    }}
-}}
-
-node "High-Performance State Layer" {{
-    queue "Async Consensus & Event Stream" as MsgQueue
-    [In-Memory Checkpoint Ring Buffer] as CacheRing
-    database "Tiered NVMe / Distributed Storage Mesh" as StorageMesh
-}}
-
-Clients --> Gateway : User RPCs / Tasks
-Gateway --> Coord : Dispatches Jobs
-Coord --> Worker1 : Parallel Execution
-Coord --> Worker2 : Parallel Execution
-Worker1 ..> CacheRing : Low-Latency Snapshot (Zero-Copy)
-Worker2 ..> CacheRing : Low-Latency Snapshot (Zero-Copy)
-Worker1 <--> MsgQueue : Heartbeat & State Sync
-Worker2 <--> MsgQueue : Heartbeat & State Sync
-CacheRing --> StorageMesh : Background Asynchronous Persistence
-@enduml"""
-
-    async def generate_plantuml_architecture(
+    async def generate_architecture_ir(
         self,
         title: str,
         abstract: str = "",
         tldr: str = "",
         custom_api_key: Optional[str] = None
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
-        Extract and generate clean PlantUML Component & Deployment code using AI.
-        Enforces strict PlantUML syntax between @startuml and @enduml with TTL caching.
+        Extract the paper's system architecture as a typed JSON IR
+        (ArchitectureIR: nodes <= 4-word labels, edges <= 3-word labels).
+        Rendered client-side with Cytoscape.js/dagre — no PlantUML, no Kroki.
+        Falls back to a deterministic keyword-derived IR on any failure.
+        Results cached for 1 hour.
         """
-        cache_key = f"plantuml:{title.strip().lower()}"
+        cache_key = f"arch_ir:{title.strip().lower()}"
         cached = synthesis_cache.get(cache_key)
         if cached is not None:
-            logger.info("Synthesis cache HIT for PlantUML architecture %r (0ms latency)", title[:40])
-            return cached
+            try:
+                hit = json.loads(cached)
+                if validate_architecture_ir(hit) is not None:
+                    logger.info("Synthesis cache HIT for architecture IR %r (0ms latency)", title[:40])
+                    return hit
+            except Exception:
+                pass
+
+        def _store(ir: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                synthesis_cache.set(cache_key, json.dumps(ir))
+            except Exception:
+                pass
+            return ir
 
         client = self._get_client(custom_api_key)
         if client is None:
-            logger.info("No OrcaRouter API key provided. Using fallback PlantUML generation.")
-            fallback = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
-            synthesis_cache.set(cache_key, fallback)
-            return fallback
+            logger.info("No OrcaRouter API key provided. Using keyword-derived architecture IR.")
+            return _store(fallback_architecture_ir(title, abstract or tldr))
 
+        context = (abstract or "").strip() or (tldr or "").strip() or "N/A"
         user_prompt = (
-            f"Generate a professional PlantUML Component & Deployment diagram for this academic research paper:\n\n"
+            f"Extract the system architecture concept graph for this academic research paper:\n\n"
             f"Title: {title}\n"
             f"TLDR: {tldr or 'N/A'}\n"
-            f"Abstract:\n{abstract or 'N/A'}\n\n"
-            f"Remember: Output ONLY valid PlantUML code enclosed between @startuml and @enduml. "
-            f"Include the required skinparams and entities (Gateways, Compute Workers, In-Memory Caches, Queues, Persistent Storage)."
+            f"Abstract:\n{context}\n\n"
+            f"Remember: output ONLY the JSON object per the schema (4-10 nodes, 3-12 edges, short labels)."
         )
 
         messages = [
-            {"role": "system", "content": PLANTUML_SYSTEM_PROMPT},
+            {"role": "system", "content": ARCHITECTURE_IR_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt}
         ]
 
@@ -1842,99 +1816,31 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                     primary_model=self.model_name,
                     messages=messages,
                     temperature=0.2,
-                    max_tokens=1000,
+                    max_tokens=600,
                     secondary_model=SECONDARY_MODEL,
                 )
             content = (response.choices[0].message.content or "").strip()
-            clean_code = sanitize_plantuml(content, default_title=title)
-            if not clean_code or len(clean_code.strip().splitlines()) < 3:
-                clean_code = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
-            synthesis_cache.set(cache_key, clean_code)
-            return clean_code
+            cleaned = re.sub(r"^```(?:json)?\s*", "", content, flags=re.MULTILINE)
+            cleaned = re.sub(r"```\s*$", "", cleaned, flags=re.MULTILINE).strip()
+            parsed = None
+            try:
+                parsed = json.loads(cleaned)
+            except Exception:
+                match = re.search(r"\{[\s\S]*\}", cleaned)
+                if match:
+                    try:
+                        parsed = json.loads(match.group(0))
+                    except Exception:
+                        parsed = None
+            validated = validate_architecture_ir(parsed)
+            if validated is None:
+                logger.warning("Architecture IR validation failed; using keyword-derived fallback.")
+                return _store(fallback_architecture_ir(title, abstract or tldr))
+            return _store(validated)
 
         except Exception as e:
-            logger.error("Error generating PlantUML via AI: %s", str(e), exc_info=True)
-            fallback = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
-            synthesis_cache.set(cache_key, fallback)
-            return fallback
-
-    async def render_plantuml_kroki(
-        self,
-        plantuml_code: str,
-        paper_title: str = "",
-        abstract: str = "",
-        tldr: str = "",
-        enable_fallback: bool = True
-    ) -> str:
-        """
-        Asynchronously POST PlantUML plain text to Kroki public service to obtain SVG markup.
-        Endpoint: https://kroki.io/plantuml/svg
-        Reuses pooled shared HTTP client and caches rendered SVG for 1 hour.
-        Logs exact Kroki error response body on non-200 status and seamlessly falls back to
-        guaranteed-valid PlantUML architecture.
-        """
-        clean_code = sanitize_plantuml(plantuml_code, default_title=paper_title)
-        if not clean_code or len(clean_code.strip().splitlines()) < 3:
-            clean_code = sanitize_plantuml(
-                self.generate_fallback_plantuml(paper_title or "System Architecture", abstract, tldr),
-                default_title=paper_title
-            )
-
-        cache_key = f"kroki_svg:{clean_code}"
-        cached = synthesis_cache.get(cache_key)
-        if cached is not None:
-            logger.info("Synthesis cache HIT for Kroki SVG diagram (0ms latency)")
-            return cached
-
-        kroki_url = "https://kroki.io/plantuml/svg"
-        http_client = get_shared_http_client()
-
-        try:
-            response = await http_client.post(
-                kroki_url,
-                content=clean_code.encode("utf-8"),
-                headers={"Content-Type": "text/plain; charset=utf-8"},
-                timeout=12.0
-            )
-            if response.status_code == 200 and "<svg" in response.text:
-                svg_content = response.text
-                synthesis_cache.set(cache_key, svg_content)
-                return svg_content
-
-            logger.error(
-                "Kroki API non-200 response (HTTP %d): %s\n--- PLANTUML SENT ---\n%s",
-                response.status_code,
-                response.text[:500],
-                clean_code
-            )
-        except Exception as http_err:
-            logger.error("Kroki HTTP request exception: %s", str(http_err), exc_info=True)
-
-        # Fallback rendering if the primary generated diagram produced a Kroki error or exception
-        if enable_fallback:
-            logger.warning("Attempting Kroki rendering with sanitized fallback architecture diagram...")
-            fallback_plantuml = sanitize_plantuml(
-                self.generate_fallback_plantuml(paper_title or "System Architecture", abstract, tldr),
-                default_title=paper_title
-            )
-            try:
-                fb_resp = await http_client.post(
-                    kroki_url,
-                    content=fallback_plantuml.encode("utf-8"),
-                    headers={"Content-Type": "text/plain; charset=utf-8"},
-                    timeout=10.0
-                )
-                if fb_resp.status_code == 200 and "<svg" in fb_resp.text:
-                    svg_content = fb_resp.text
-                    synthesis_cache.set(cache_key, svg_content)
-                    return svg_content
-                logger.error("Fallback Kroki rendering also failed (HTTP %d): %s", fb_resp.status_code, fb_resp.text[:200])
-            except Exception as fb_err:
-                logger.error("Fallback Kroki connection failed: %s", str(fb_err), exc_info=True)
-
-        raise RuntimeError(
-            "Kroki diagram rendering failed. Please retry in a few moments."
-        )
+            logger.error("Error generating architecture IR via AI: %s", str(e), exc_info=True)
+            return _store(fallback_architecture_ir(title, abstract or tldr))
 
     async def generate_outreach_email(
         self,

@@ -1767,33 +1767,27 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
 @app.post("/api/diagram", dependencies=[Depends(resolve_access)])
 async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
     """
-    On-demand professional architecture diagram engine using PlantUML & public Kroki API.
-    1. Extracts/maps distributed system architecture into PlantUML via AI.
-    2. Renders into high-resolution SVG via Kroki API with automatic resilient fallback.
+    On-demand architecture concept graph.
+    The AI extracts a typed JSON IR (nodes <= 4-word labels, edges <= 3-word
+    labels); the client renders it interactively with Cytoscape.js + dagre.
+    No PlantUML, no Kroki dependency.
     """
     try:
         effective_key = (payload.orcarouter_key or runtime_config["orcarouter_api_key"] or "").strip()
-        plantuml = await llm_service.generate_plantuml_architecture(
+        ir = await llm_service.generate_architecture_ir(
             title=payload.title,
             abstract=payload.abstract or "",
             tldr=payload.tldr or "",
             custom_api_key=effective_key
         )
-        svg = await llm_service.render_plantuml_kroki(
-            plantuml_code=plantuml,
-            paper_title=payload.title,
-            abstract=payload.abstract or "",
-            tldr=payload.tldr or "",
-            enable_fallback=True
-        )
-        return {"svg": svg, "status": "success", "plantuml": plantuml}
+        return {"ir": ir, "status": "success"}
     except Exception as e:
-        logger.error("Diagram generation failed: %s", str(e), exc_info=True)
+        logger.error("Diagram IR generation failed: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=502,
             content={
                 "error": f"Diagram generation failed: {str(e)}",
-                "details": "Kroki diagram service could not render the architecture."
+                "details": "Architecture graph extraction failed."
             }
         )
 
