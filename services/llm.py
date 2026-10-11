@@ -27,7 +27,9 @@ logger = logging.getLogger("academic_assistant.llm")
 
 DEFAULT_BASE_URL = "https://www.orcarouter.ai/v1"
 DEFAULT_MODEL = "deepseek/deepseek-v4-flash-free"
-SECONDARY_MODEL = "deepseek/deepseek-chat"
+# Secondary fallback model. Override via SECONDARY_MODEL env var; set to blank
+# to disable model fallback (useful when the API key is scoped to one model).
+SECONDARY_MODEL: Optional[str] = os.getenv("SECONDARY_MODEL", "deepseek/deepseek-chat").strip() or None
 
 
 class OutreachEmailRequest(BaseModel):
@@ -520,7 +522,7 @@ async def _call_stream_with_retry(
     if secondary_model and secondary_model != primary_model:
         models_to_try.append(secondary_model)
 
-    last_err: Optional[Exception] = None
+    model_errors: List[str] = []
     for model_idx, model in enumerate(models_to_try):
         attempts = max_retries if model_idx == 0 else 1
         for attempt in range(attempts):
@@ -536,7 +538,6 @@ async def _call_stream_with_retry(
                 stream = await client.chat.completions.create(**kwargs)
                 return stream
             except Exception as e:
-                last_err = e
                 err_str = str(e).lower()
                 is_retryable = (
                     "429" in err_str
@@ -556,8 +557,12 @@ async def _call_stream_with_retry(
                     )
                     await asyncio.sleep(delay)
                 else:
+                    model_errors.append(f"[{model}] {e}")
                     break  # Try next model if any
-    raise last_err or RuntimeError("LLM streaming completion failed after retries")
+    raise RuntimeError(
+        "LLM streaming completion failed after retries. "
+        + " | ".join(model_errors)
+    )
 
 
 async def _call_chat_with_retry(
@@ -578,7 +583,7 @@ async def _call_chat_with_retry(
     if secondary_model and secondary_model != primary_model:
         models_to_try.append(secondary_model)
 
-    last_err: Optional[Exception] = None
+    model_errors: List[str] = []
     for model_idx, model in enumerate(models_to_try):
         attempts = max_retries if model_idx == 0 else 1
         for attempt in range(attempts):
@@ -594,7 +599,6 @@ async def _call_chat_with_retry(
                 response = await client.chat.completions.create(**kwargs)
                 return response
             except Exception as e:
-                last_err = e
                 err_str = str(e).lower()
                 is_retryable = (
                     "429" in err_str
@@ -614,8 +618,12 @@ async def _call_chat_with_retry(
                     )
                     await asyncio.sleep(delay)
                 else:
+                    model_errors.append(f"[{model}] {e}")
                     break
-    raise last_err or RuntimeError("LLM completion failed after retries")
+    raise RuntimeError(
+        "LLM completion failed after retries. "
+        + " | ".join(model_errors)
+    )
 
 
 
