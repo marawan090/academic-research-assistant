@@ -701,6 +701,7 @@
           <i data-lucide="user-round" class="w-3.5 h-3.5"></i>
           <span id="sb-auth-label" class="hidden sm:inline">Sign In</span>
         </button>
+        <span id="sb-credits-badge" class="hidden text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400" title="Remaining AI credits"></span>
 
         <!-- Dark / Light Mode Switcher Toggle -->
         <button id="btn-theme-toggle" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Toggle Dark / Light Mode">
@@ -1501,6 +1502,44 @@
     </div>
   </div>
 
+  <!-- Mandatory Onboarding Modal (profile + invite code; blocks tools until complete) -->
+  <div id="onboarding-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/85 backdrop-blur-md p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-800 dark:text-slate-100">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-brand-600/15 border border-brand-500/30 flex items-center justify-center text-brand-400 shrink-0">
+          <i data-lucide="id-card" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold">Complete Your Profile</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Invite-only access · tools unlock after setup</p>
+        </div>
+      </div>
+      <div id="onboarding-signin-hint" class="hidden text-xs p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+        Please sign in first, then complete your profile below.
+        <button id="btn-onboarding-signin" class="underline font-semibold cursor-pointer">Open Sign In</button>
+      </div>
+      <div class="space-y-2.5">
+        <div>
+          <label for="onboarding-name" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Full Name</label>
+          <input id="onboarding-name" type="text" autocomplete="name" placeholder="e.g., Ada Lovelace"
+            class="w-full bg-slate-50 dark:bg-slate-950 text-xs text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        </div>
+        <div>
+          <label for="onboarding-code" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Academic Access / Referral Code</label>
+          <input id="onboarding-code" type="text" autocomplete="off" placeholder="e.g., AXIOM-RESEARCH-9472" autocapitalize="characters" spellcheck="false"
+            class="w-full bg-slate-50 dark:bg-slate-950 text-xs font-mono uppercase text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        </div>
+      </div>
+      <p id="onboarding-error" class="hidden text-[11px] text-rose-500"></p>
+      <button id="onboarding-submit" class="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-semibold text-xs transition cursor-pointer disabled:opacity-50">
+        <span>Verify & Unlock</span>
+      </button>
+      <button id="onboarding-signout" class="w-full text-center text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer">
+        Sign out instead
+      </button>
+    </div>
+  </div>
+
   <!-- Research History Drawer (sessions + artifacts; sign-in required to populate) -->
   <div id="history-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] hidden flex-col bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-[#1E293B] shadow-2xl">
     <div class="flex-none flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-[#1E293B]">
@@ -1696,14 +1735,34 @@
       }
     }
 
-    // Authenticated fetch wrapper injecting X-Axiom-Key and catching 401/403
+    // Authenticated fetch wrapper injecting X-Axiom-Key (+ Supabase Bearer for
+    // the invite path) and catching 401/402/403. Machine outcomes arrive via
+    // the X-Access-Code header so invite-gate states never trigger the cohort gate.
     async function authenticatedFetch(url, options = {}) {
       const token = localStorage.getItem('axiom_access_token') || '';
       const headers = { ...(options.headers || {}) };
       if (token) {
         headers['X-Axiom-Key'] = token;
       }
+      try {
+        const sbTok = await sbGetToken();
+        if (sbTok) headers['Authorization'] = 'Bearer ' + sbTok;
+      } catch (_) {}
       const response = await fetch(url, { ...options, headers });
+      const machine = response.headers ? response.headers.get('X-Access-Code') : null;
+      if (response.status === 402 || machine === 'CREDITS_EXHAUSTED') {
+        showToast('Out of credits — contact the administrator for a top-up.', 'error');
+        return response;
+      }
+      if (machine === 'ONBOARDING_REQUIRED') {
+        openOnboardingModal();
+        showToast('Complete your profile to unlock the tools.', 'warning');
+        return response;
+      }
+      if (machine === 'CODE_REVOKED') {
+        showToast('Invalid or deactivated access code.', 'error');
+        return response;
+      }
       if (response.status === 401 || response.status === 403) {
         try {
           const clone = response.clone();
@@ -5416,12 +5475,22 @@
           if (session && session.user) {
             sbUser = { id: session.user.id, email: session.user.email };
             sbSessionId = null;
+            try {
+              const tok = session.access_token || '';
+              if (tok) sbAccessTokenCache = tok;
+            } catch (_) {}
             updateSbAuthUI();
             mergeServerBookmarks();
+            checkOnboardingStatus();
           } else {
             sbUser = null;
             sbSessionId = null;
+            sbOnboarded = false;
+            sbCredits = 0;
+            sbAccessTokenCache = '';
             updateSbAuthUI();
+            updateSbCreditsUI();
+            closeOnboardingModal();
           }
         });
         updateSbAuthUI();
@@ -5458,6 +5527,133 @@
       const histClose = document.getElementById('btn-close-history');
       if (histClose) histClose.addEventListener('click', closeHistoryDrawer);
     }
+
+    // --- Invite-Only Onboarding Gate (profile + code + credits) ---
+    // Tools stay locked for signed-in users until profile completion; guests
+    // keep the legacy cohort path. All state lives in sbOnboarded/sbCredits.
+    let sbOnboarded = false;
+    let sbCredits = 0;
+    let sbAccessTokenCache = '';
+
+    async function sbGetToken() {
+      try {
+        if (sbClient) {
+          const { data } = await sbClient.auth.getSession();
+          const tok = (data && data.session && data.session.access_token) || '';
+          if (tok) sbAccessTokenCache = tok;
+        }
+      } catch (_) {}
+      return sbAccessTokenCache || '';
+    }
+
+    function openOnboardingModal() {
+      const modal = document.getElementById('onboarding-modal');
+      if (!modal) return;
+      const hint = document.getElementById('onboarding-signin-hint');
+      const err = document.getElementById('onboarding-error');
+      if (err) err.classList.add('hidden');
+      if (hint) hint.classList.toggle('hidden', !!sbUser);
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    }
+
+    function closeOnboardingModal() {
+      const modal = document.getElementById('onboarding-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function updateSbCreditsUI() {
+      const badge = document.getElementById('sb-credits-badge');
+      if (!badge) return;
+      if (sbUser && sbOnboarded) {
+        badge.textContent = `${sbCredits} credits`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    async function checkOnboardingStatus() {
+      sbOnboarded = false;
+      sbCredits = 0;
+      updateSbCreditsUI();
+      if (!sbUser) return;
+      try {
+        const headers = await sbAuthHeaders();
+        const res = await fetch('/api/onboarding/status', { headers });
+        const data = await res.json().catch(() => ({}));
+        if (data && data.completed) {
+          sbOnboarded = true;
+          sbCredits = data.credits || 0;
+          closeOnboardingModal();
+          updateSbCreditsUI();
+        } else if (data && !data.guest) {
+          updateSbCreditsUI();
+          openOnboardingModal();
+        }
+      } catch (e) {
+        console.warn('Onboarding status check failed:', e);
+      }
+    }
+
+    async function submitOnboarding() {
+      const nameEl = document.getElementById('onboarding-name');
+      const codeEl = document.getElementById('onboarding-code');
+      const errEl = document.getElementById('onboarding-error');
+      const submitBtn = document.getElementById('onboarding-submit');
+      if (errEl) errEl.classList.add('hidden');
+      if (!sbUser) {
+        openSbAuthModal();
+        return;
+      }
+      const fullName = (nameEl && nameEl.value || '').trim();
+      const code = (codeEl && codeEl.value || '').trim();
+      if (!fullName) {
+        if (errEl) { errEl.textContent = 'Please enter your full name.'; errEl.classList.remove('hidden'); }
+        return;
+      }
+      if (!code) {
+        if (errEl) { errEl.textContent = 'Please enter your access code.'; errEl.classList.remove('hidden'); }
+        return;
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const headers = await sbAuthHeaders();
+        const res = await fetch('/api/onboarding/complete', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ full_name: fullName, access_code: code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data && (data.detail || data.error)) || `HTTP ${res.status}`);
+        sbOnboarded = true;
+        sbCredits = (data && data.credits) || 0;
+        updateSbCreditsUI();
+        closeOnboardingModal();
+        showToast(`Welcome, ${data.full_name || fullName}! ${sbCredits} credits granted.`, 'success');
+      } catch (e) {
+        if (errEl) { errEl.textContent = e.message || 'Invalid or deactivated access code.'; errEl.classList.remove('hidden'); }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    (function initOnboardingGate() {
+      const submitBtn = document.getElementById('onboarding-submit');
+      if (submitBtn) submitBtn.addEventListener('click', submitOnboarding);
+      const codeEl = document.getElementById('onboarding-code');
+      if (codeEl) codeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitOnboarding(); });
+      const signoutLink = document.getElementById('onboarding-signout');
+      if (signoutLink) signoutLink.addEventListener('click', async () => {
+        try { if (sbClient) await sbClient.auth.signOut(); } catch (_) {}
+        closeOnboardingModal();
+      });
+      const signinBtn = document.getElementById('btn-onboarding-signin');
+      if (signinBtn) signinBtn.addEventListener('click', () => { closeOnboardingModal(); openSbAuthModal(); });
+    })();
 
     // --- Export Handlers (NotebookLM Pack & Literature Review) ---
     async function exportPapersToNotebookLM(papersToExport, customInquiry) {
@@ -5621,7 +5817,7 @@
 
     // --- Main Research Form Submit Handler: SSE Stream ---
     if (researchForm) {
-      researchForm.addEventListener('submit', (e) => {
+      researchForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const inquiry = queryInput.value.trim();
       // Custom / Advanced Search: combine topic + author + institution (any single field suffices).
@@ -5638,7 +5834,11 @@
         return;
       }
 
-      if (!localStorage.getItem('axiom_access_token')) {
+      if (!localStorage.getItem('axiom_access_token') && !(sbUser && sbOnboarded)) {
+        if (sbUser && !sbOnboarded) {
+          openOnboardingModal();
+          return;
+        }
         showAuthGate('Please authenticate with your cohort access code to execute research.');
         return;
       }
@@ -5797,6 +5997,12 @@
       const axiomToken = localStorage.getItem('axiom_access_token') || '';
       if (axiomToken) {
         params.set('access_code', axiomToken);
+      }
+      // Invite path: EventSource cannot send headers, so the Supabase JWT
+      // travels as sb_token for the credit/profile gate.
+      const sbTok = await sbGetToken();
+      if (sbTok) {
+        params.set('sb_token', sbTok);
       }
 
       const streamUrl = `/api/research/stream?${params.toString()}`;

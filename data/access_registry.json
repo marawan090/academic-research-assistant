@@ -5,101 +5,130 @@
     "expires_at": null,
     "created_at": "2026-09-07T18:23:20.674281+00:00"
   },
-  "AXIOM-ENKT-HRGL": {
-    "type": "researcher",
-    "bound_ip": "192.168.1.100",
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674293+00:00",
-    "bound_at": "2026-09-07T23:55:44.582205+00:00"
-  },
-  "AXIOM-KN76-4YLC": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674296+00:00"
-  },
-  "AXIOM-VHFM-QNTK": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674299+00:00"
-  },
-  "AXIOM-XV6Q-KA86": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674301+00:00"
-  },
-  "AXIOM-U6QD-KYKS": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674302+00:00"
-  },
-  "AXIOM-8W4H-CVKY": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674304+00:00"
-  },
-  "AXIOM-P964-7GY3": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674305+00:00"
-  },
-  "AXIOM-UX2C-6QNM": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674307+00:00"
-  },
-  "AXIOM-3YZQ-C4SC": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674308+00:00"
-  },
-  "AXIOM-4CLH-RXYU": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674310+00:00"
-  },
-  "AXIOM-JQX3-CQK6": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674313+00:00"
-  },
-  "AXIOM-ETWL-38TV": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674315+00:00"
-  },
-  "AXIOM-QSTE-KHS6": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674316+00:00"
-  },
-  "AXIOM-CBF5-H9N8": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674318+00:00"
-  },
-  "AXIOM-8M93-ZJS4": {
-    "type": "researcher",
-    "bound_ip": null,
-    "expires_at": "2026-10-07",
-    "created_at": "2026-09-07T18:23:20.674319+00:00"
-  },
   "AXIOM-MASTER-RESEARCH-2026": {
     "type": "master",
     "bound_ip": null,
     "expires_at": null,
     "created_at": "2026-09-09T14:11:22.892753+00:00"
+  },
+  "AXIOM-RESEARCH-9472": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802807+00:00"
+  },
+  "SWMP-SYSTEMS-3819": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802818+00:00"
+  },
+  "KERNEL-SCHOLAR-5184": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802820+00:00"
+  },
+  "DISTRIBUTED-SYNC-7291": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802822+00:00"
+  },
+  "LATENCY-ZERO-6435": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802824+00:00"
+  },
+  "CONSENSUS-CORE-8203": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802825+00:00"
+  },
+  "VECTOR-SYNTHESIS-1956": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802827+00:00"
+  },
+  "FABRIC-SECURE-4078": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802828+00:00"
+  },
+  "NEURAL-SCALE-8314": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802830+00:00"
+  },
+  "PIPELINE-FLOW-5721": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802831+00:00"
+  },
+  "STORAGE-TIER-9163": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802833+00:00"
+  },
+  "EPBF-TRACING-2847": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802834+00:00"
+  },
+  "CXL-MEMORY-6039": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802836+00:00"
+  },
+  "INFERENCE-ACCEL-4158": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802838+00:00"
+  },
+  "QUANTUM-GATE-7392": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802839+00:00"
+  },
+  "ACCELERATOR-FABRIC-3281": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802841+00:00"
+  },
+  "SERVERLESS-WARM-5920": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802842+00:00"
+  },
+  "COMPUTE-MESH-8471": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802844+00:00"
+  },
+  "ZERO-COPY-1635": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802846+00:00"
+  },
+  "OPTIMAL-STRAGGLER-9512": {
+    "type": "researcher",
+    "bound_ip": null,
+    "expires_at": "2027-12-31",
+    "created_at": "2026-10-11T20:59:44.802847+00:00"
   }
 }

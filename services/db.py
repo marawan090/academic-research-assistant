@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
-from fastapi import Header
+from fastapi import Header, Query
 
 logger = logging.getLogger("academic_assistant.db")
 
@@ -94,13 +94,16 @@ def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
 
 async def get_current_user(
     authorization: Optional[str] = Header(None, alias="Authorization"),
+    sb_token: Optional[str] = Query(None),
 ) -> Optional[Dict[str, Any]]:
     """
-    FastAPI dependency parsing `Authorization: Bearer <access_token>` via
-    `supabase.auth.get_user(token)`. Returns {"id", "email"} or None when
-    unauthenticated/misconfigured — never raises, so guest flows stay intact.
+    FastAPI dependency parsing `Authorization: Bearer <access_token>` (or the
+    `sb_token` query parameter for EventSource streams, which cannot send
+    headers) via `supabase.auth.get_user(token)`. Returns {"id", "email"} or
+    None when unauthenticated/misconfigured — never raises, so guest flows
+    stay intact.
     """
-    token = _extract_bearer(authorization)
+    token = _extract_bearer(authorization) or ((sb_token or "").strip() or None)
     if not token:
         return None
     client = get_supabase_client()

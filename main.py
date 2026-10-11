@@ -50,6 +50,10 @@ from services.llm import (
     generate_compare_matrix,
 )
 from services.telemetry import telemetry_manager
+from services.access import (
+    access_store,
+    verify_admin_password,
+)
 from services.db import (
     get_current_user,
     get_supabase_client,
@@ -72,6 +76,7 @@ ORCAROUTER_API_KEY = os.getenv("ORCAROUTER_API_KEY", "").strip()
 ORCAROUTER_BASE_URL = os.getenv("ORCAROUTER_BASE_URL", "https://www.orcarouter.ai/v1").strip()
 MODEL_NAME = os.getenv("MODEL_NAME", "deepseek/deepseek-v4-flash-free").strip()
 SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip() or "AxiomAdmin#2026!Secure"
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
 
@@ -136,23 +141,28 @@ class AccessRegistryManager:
     MASTER_CODE = "AXIOM-ROOT-V4HEWT"
     MASTER_ADMIN_KEYS: List[str] = ["AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"]
     RESEARCHER_CODES = [
-        "AXIOM-ENKT-HRGL",
-        "AXIOM-KN76-4YLC",
-        "AXIOM-VHFM-QNTK",
-        "AXIOM-XV6Q-KA86",
-        "AXIOM-U6QD-KYKS",
-        "AXIOM-8W4H-CVKY",
-        "AXIOM-P964-7GY3",
-        "AXIOM-UX2C-6QNM",
-        "AXIOM-3YZQ-C4SC",
-        "AXIOM-4CLH-RXYU",
-        "AXIOM-JQX3-CQK6",
-        "AXIOM-ETWL-38TV",
-        "AXIOM-QSTE-KHS6",
-        "AXIOM-CBF5-H9N8",
-        "AXIOM-8M93-ZJS4",
+        "AXIOM-RESEARCH-9472",
+        "SWMP-SYSTEMS-3819",
+        "KERNEL-SCHOLAR-5184",
+        "DISTRIBUTED-SYNC-7291",
+        "LATENCY-ZERO-6435",
+        "CONSENSUS-CORE-8203",
+        "VECTOR-SYNTHESIS-1956",
+        "FABRIC-SECURE-4078",
+        "NEURAL-SCALE-8314",
+        "PIPELINE-FLOW-5721",
+        "STORAGE-TIER-9163",
+        "EPBF-TRACING-2847",
+        "CXL-MEMORY-6039",
+        "INFERENCE-ACCEL-4158",
+        "QUANTUM-GATE-7392",
+        "ACCELERATOR-FABRIC-3281",
+        "SERVERLESS-WARM-5920",
+        "COMPUTE-MESH-8471",
+        "ZERO-COPY-1635",
+        "OPTIMAL-STRAGGLER-9512",
     ]
-    EXPIRATION_DATE = "2026-10-07"
+    EXPIRATION_DATE = "2027-12-31"
 
     def __init__(self, storage_path: Path):
         self.storage_path = storage_path
@@ -180,7 +190,12 @@ class AccessRegistryManager:
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     }
 
-            # 15 Researcher codes: valid for 30 days until 2026-10-07, bound to single IP on first use
+            # 20 invite codes: bound to single IP on first use. Legacy codes not on
+            # the current whitelist are purged so retired tokens stop working.
+            for code in list(loaded.keys()):
+                info = loaded[code]
+                if isinstance(info, dict) and info.get("type") == "researcher" and code not in self.RESEARCHER_CODES:
+                    del loaded[code]
             for code in self.RESEARCHER_CODES:
                 if code not in loaded:
                     loaded[code] = {
@@ -373,13 +388,17 @@ def extract_request_access_key(request: Request) -> Optional[str]:
 def verify_master_admin(request: Request) -> str:
     """
     Validates that the incoming request has Master Admin privileges.
-    Accepts X-Admin-Key / X-Axiom-Key headers, ?key= query parameter, or axiom_admin_session cookie.
+    Accepts the ADMIN_PASSWORD, legacy master keys, X-Admin-Key / X-Axiom-Key
+    headers, ?key= query parameter, or axiom_admin_session cookie.
     Returns HTTP 404 Not Found on failure (instead of 401/403) to ensure security through obscurity
     against scanners and scrapers.
     """
     raw_key = extract_request_access_key(request)
     if not raw_key:
         raise HTTPException(status_code=404, detail="Not Found")
+
+    if verify_admin_password(raw_key):
+        return "ADMIN_PASSWORD_SESSION"
 
     clean_key = raw_key.strip().upper()
     if clean_key in MASTER_ADMIN_KEYS or clean_key == access_registry.MASTER_CODE:
@@ -408,6 +427,9 @@ async def telemetry_and_moderation_middleware(request: Request, call_next):
 
     client_ip = get_client_ip(request)
     raw_key = extract_request_access_key(request)
+    # Never log raw Supabase JWTs in the ring buffer (length + eyJ prefix heuristic).
+    if raw_key and len(raw_key) > 64 and raw_key.startswith("eyJ"):
+        raw_key = "SUPABASE_USER"
     access_key = raw_key if raw_key else "UNAUTHENTICATED / VISITOR"
 
     # 1. Moderation Blacklist Check (check IP and raw_key if present)
@@ -582,6 +604,192 @@ class BroadcastRequest(BaseModel):
 class AdminLimitsRequest(BaseModel):
     global_hourly_limit: Optional[int] = Field(default=None)
     key_hourly_limit: Optional[int] = Field(default=None)
+
+
+# ============================================================================
+# Invite-Only Access Gate, Onboarding, Credits & Admin Code Management
+# Supabase Auth supplies identity; invite codes / profiles / credits live in
+# services/access.py. Metered routes use resolve_access (Supabase path first,
+# legacy Axiom cohort gate as fallback) instead of verify_axiom_access.
+# Machine-readable outcomes travel in the X-Access-Code response header so
+# existing string `detail` parsing on clients never breaks.
+# ============================================================================
+
+class OnboardingCompleteRequest(BaseModel):
+    full_name: str = Field(..., max_length=120)
+    access_code: str = Field(..., max_length=64)
+
+
+class CreditAdjustRequest(BaseModel):
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    code: Optional[str] = None
+    delta: int = 0
+
+
+class CodeDeactivateRequest(BaseModel):
+    code: str
+
+
+def _access_denied(status_code: int, machine_code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail=message,
+        headers={"X-Access-Code": machine_code},
+    )
+
+
+async def resolve_access(
+    request: Request,
+    x_axiom_key: Optional[str] = Header(None, alias="X-Axiom-Key"),
+    access_code: Optional[str] = Query(None),
+    token: Optional[str] = Query(None),
+    sb_token: Optional[str] = Query(None),
+) -> str:
+    """
+    Unified gate for metered endpoints (search + AI generation, 1 credit each).
+    1. Supabase invite path: valid Bearer/sb_token + completed profile + active
+       code + credits>0 -> deduct 1 credit, allow (no cohort code needed).
+    2. Legacy path: existing Axiom cohort gate, unchanged, no credit burn.
+    """
+    sb_user = await get_current_user(request.headers.get("authorization"), sb_token)
+    if sb_user is not None:
+        profile = access_store.get_user(sb_user["id"])
+        if not profile or not profile.get("code"):
+            raise _access_denied(403, "ONBOARDING_REQUIRED", "Profile setup required. Complete onboarding to unlock.")
+        access_store.touch_user(sb_user["id"], get_client_ip(request))
+        ok, msg, status = access_store.deduct_credit(sb_user["id"])
+        if not ok:
+            machine = "CODE_REVOKED" if status == 403 else "CREDITS_EXHAUSTED"
+            raise _access_denied(status, machine, msg)
+        return f"sb:{sb_user['id']}"
+
+    # Legacy cohort path (unchanged behavior).
+    key = x_axiom_key or access_code or token
+    if not key:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            key = auth_header[7:].strip()
+    if not key and os.getenv("AXIOM_TEST_KEY"):
+        key = os.getenv("AXIOM_TEST_KEY")
+    if not key:
+        raise HTTPException(status_code=401, detail="Access token required. Please authenticate via the Cohort Gate.")
+    client_ip = get_client_ip(request)
+    is_valid, msg, status_code, _ = access_registry.validate_code(
+        code=key, client_ip=client_ip, bind_if_unbound=True
+    )
+    if not is_valid:
+        raise HTTPException(status_code=status_code, detail=msg)
+    return key
+
+
+@app.get("/api/onboarding/status")
+async def onboarding_status(request: Request):
+    """Return onboarding state + credit balance for the Supabase caller (guest-safe)."""
+    sb_user = await get_current_user(
+        request.headers.get("authorization"), request.query_params.get("sb_token")
+    )
+    if sb_user is None:
+        return {"completed": False, "guest": True, "credits": 0}
+    profile = access_store.get_user(sb_user["id"])
+    if not profile or not profile.get("code"):
+        return {"completed": False, "guest": False, "credits": 0, "email": sb_user.get("email")}
+    code_active = access_store.is_code_active(profile.get("code", ""))
+    return {
+        "completed": code_active,
+        "guest": False,
+        "email": sb_user.get("email"),
+        "full_name": profile.get("full_name", ""),
+        "code": profile.get("code", ""),
+        "credits": int(profile.get("credits", 0) or 0),
+        "code_active": code_active,
+    }
+
+
+@app.post("/api/onboarding/complete")
+async def onboarding_complete(payload: OnboardingCompleteRequest, request: Request):
+    """
+    Mandatory gated step: full name + invite code. Validates against the active
+    whitelist, binds the code, grants 25 starting credits, records IP + time.
+    """
+    sb_user = await get_current_user(
+        request.headers.get("authorization"), request.query_params.get("sb_token")
+    )
+    if sb_user is None:
+        raise HTTPException(status_code=401, detail="Sign-in required before profile setup.")
+    ok, msg, status, user = access_store.complete_profile(
+        user_id=sb_user["id"],
+        email=sb_user.get("email"),
+        full_name=payload.full_name,
+        access_code=payload.access_code,
+        client_ip=get_client_ip(request),
+    )
+    if not ok:
+        raise HTTPException(status_code=status, detail=msg)
+    assert user is not None
+    return {
+        "status": "ok",
+        "message": msg,
+        "completed": True,
+        "full_name": user.get("full_name", ""),
+        "code": user.get("code", ""),
+        "credits": int(user.get("credits", 0) or 0),
+    }
+
+
+@app.post("/api/admin/code/deactivate")
+async def admin_deactivate_code(payload: CodeDeactivateRequest, request: Request):
+    """
+    Instantly revoke an invite code: whitelist flag off, cohort registry token
+    dropped, telemetry key-ban added — terminating that user/code immediately.
+    """
+    verify_master_admin(request)
+    clean = access_store.normalize_code(payload.code)
+    ok, msg = access_store.deactivate_code(clean)
+    with access_registry._lock:
+        access_registry.tokens.pop(clean, None)
+        access_registry._save_unlocked()
+    telemetry_manager.toggle_block("key", clean, True)
+    if not ok:
+        # Still report if the key wasn't whitelisted but got banned anyway.
+        return {"status": "ok", "message": msg + " Key additionally blacklisted.", "code": clean}
+    return {"status": "ok", "message": msg, "code": clean}
+
+
+@app.post("/api/admin/credits/adjust")
+async def admin_adjust_credits(payload: CreditAdjustRequest, request: Request):
+    """Real-time credit top-up/deduction by user_id, email, or invite code."""
+    verify_master_admin(request)
+    ok, msg, status, user = access_store.adjust_credits(
+        user_id=payload.user_id, email=payload.email, code=payload.code, delta=payload.delta
+    )
+    if not ok:
+        raise HTTPException(status_code=status, detail=msg)
+    assert user is not None
+    return {"status": "ok", "message": msg, "credits": int(user.get("credits", 0) or 0), "user": user}
+
+
+@app.get("/api/admin/telemetry")
+async def admin_telemetry_24h(request: Request):
+    """
+    24-hour activity log: user email/name, client IP, access code used, current
+    credits, status pill (Active/Revoked/Unknown), last active, actions toolbar data.
+    """
+    verify_master_admin(request)
+    cutoff = time.time() - 86400.0
+    with telemetry_manager._lock:
+        events_24h = [e for e in telemetry_manager.events if float(e.get("unix_time", 0)) >= cutoff]
+    rows = access_store.build_activity_rows(events_24h)
+    revoked_codes = [c["code"] for c in access_store.list_codes() if not c.get("active", True)]
+    return {
+        "status": "ok",
+        "window_hours": 24,
+        "row_count": len(rows),
+        "rows": rows,
+        "codes": access_store.list_codes(),
+        "revoked_codes": revoked_codes,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ============================================================================
@@ -1064,7 +1272,7 @@ async def update_runtime_config(payload: ConfigUpdateRequest):
     }
 
 
-@app.post("/api/search", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/search", dependencies=[Depends(resolve_access)])
 async def search_endpoint(payload: SearchRequest):
     """
     Direct asynchronous academic search endpoint.
@@ -1091,7 +1299,7 @@ async def search_endpoint(payload: SearchRequest):
     }
 
 
-@app.get("/api/search/entity", dependencies=[Depends(verify_axiom_access)])
+@app.get("/api/search/entity", dependencies=[Depends(resolve_access)])
 async def search_entity_endpoint(
     entity_type: str = Query(..., description="Entity type: 'author' or 'institution'"),
     name: str = Query(..., description="Researcher or institution name"),
@@ -1117,7 +1325,7 @@ async def search_entity_endpoint(
     }
 
 
-@app.post("/api/synthesize", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/synthesize", dependencies=[Depends(resolve_access)])
 async def synthesize_endpoint(payload: SynthesizeRequest):
     """Non-streaming complete academic synthesis."""
     orca_key = payload.orcarouter_key or runtime_config["orcarouter_api_key"]
@@ -1150,7 +1358,7 @@ def sse_event(data: Any) -> str:
     return "data: " + json.dumps(data) + "\n\n"
 
 
-@app.get("/api/research/stream", dependencies=[Depends(verify_axiom_access)])
+@app.get("/api/research/stream", dependencies=[Depends(resolve_access)])
 async def research_stream_endpoint(
     query: str = Query("", description="User research question, topic, author, or institution name"),
     limit: int = Query(10, ge=1, le=100, description="Target number of papers to retrieve (10, 25, 50, 100)"),
@@ -1463,8 +1671,8 @@ async def research_stream_endpoint(
     )
 
 
-@app.post("/api/paper/synthesize", dependencies=[Depends(verify_axiom_access)])
-@app.post("/api/paper/analyze", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/paper/synthesize", dependencies=[Depends(resolve_access)])
+@app.post("/api/paper/analyze", dependencies=[Depends(resolve_access)])
 async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
     """
     On-demand single-paper LLM synthesis streaming endpoint.
@@ -1514,8 +1722,8 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
     )
 
 
-@app.post("/api/paper/diagram", dependencies=[Depends(verify_axiom_access)])
-@app.post("/api/diagram", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/paper/diagram", dependencies=[Depends(resolve_access)])
+@app.post("/api/diagram", dependencies=[Depends(resolve_access)])
 async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
     """
     On-demand professional architecture diagram engine using PlantUML & public Kroki API.
@@ -1549,7 +1757,7 @@ async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
         )
 
 
-@app.post("/api/paper/outreach-email", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/paper/outreach-email", dependencies=[Depends(resolve_access)])
 async def generate_outreach_email_endpoint(payload: OutreachEmailRequest):
     """
     On-demand Professor Cold Outreach Email Generator.
@@ -1600,7 +1808,7 @@ async def generate_outreach_email_endpoint(payload: OutreachEmailRequest):
         )
 
 
-@app.post("/api/thesis/draft", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/thesis/draft", dependencies=[Depends(resolve_access)])
 async def thesis_draft_endpoint(payload: ThesisProposalRequest):
     """
     On-demand academic thesis proposal generator endpoint.
@@ -1645,7 +1853,7 @@ async def thesis_draft_endpoint(payload: ThesisProposalRequest):
     )
 
 
-@app.post("/api/papers/compare", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/papers/compare", dependencies=[Depends(resolve_access)])
 async def papers_compare_endpoint(payload: PapersCompareRequest):
     """
     Multi-paper comparative systems analysis endpoint.
@@ -1684,7 +1892,7 @@ async def papers_compare_endpoint(payload: PapersCompareRequest):
     )
 
 
-@app.post("/api/paper/compare-matrix", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/paper/compare-matrix", dependencies=[Depends(resolve_access)])
 async def paper_compare_matrix_endpoint(payload: ComparePapersRequest):
     """
     Authoritative cross-paper trade-off matrix endpoint.
