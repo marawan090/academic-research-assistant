@@ -7,6 +7,7 @@ normalizes, deduplicates, and ranks them by relevance and recency.
 import asyncio
 import difflib
 import logging
+import math
 import os
 import re
 import threading
@@ -25,6 +26,225 @@ OPENALEX_API_URL = "https://api.openalex.org/works"
 OPENALEX_AUTHORS_URL = "https://api.openalex.org/authors"
 OPENALEX_INSTITUTIONS_URL = "https://api.openalex.org/institutions"
 TARGET_ARXIV_CATEGORIES = "(cat:cs.DC OR cat:cs.SE OR cat:cs.AI OR cat:cs.AR)"
+
+# ============================================================================
+# Semantic retrieval layer (local, zero-network, bounded-latency).
+# Replaces brittle literal keyword matching with intent-based expansion and
+# concept-vector re-ranking. All helpers below are pure in-memory functions:
+# no blocking API calls, no dense-embedding service dependency.
+# ============================================================================
+
+# Canonical concept -> academically equivalent synonyms / aliases / taxonomy terms.
+# Keys and values are matched case-insensitively against user intent and paper text.
+ACADEMIC_SYNONYM_GRAPH: Dict[str, List[str]] = {
+    "fast": ["efficient", "accelerated", "high-performance", "low-latency"],
+    "training": ["model training", "optimization", "learning"],
+    "neural network": ["deep learning", "neural net", "DNN"],
+    "consumer hardware": ["commodity hardware", "edge devices", "commodity GPU", "consumer GPU"],
+    "fault tolerance": ["fault-tolerant", "resilience", "reliability"],
+    "checkpointing": ["checkpoint", "snapshotting", "state saving"],
+    "distributed": ["decentralized", "geo-distributed", "large-scale distributed"],
+    "consensus": ["agreement protocol", "BFT", "byzantine fault tolerance"],
+    "serverless": ["FaaS", "function-as-a-service"],
+    "cold start": ["cold starts", "initialization latency", "startup latency"],
+    "microvm": ["microVM", "lightweight VM", "firecracker"],
+    "diffusion models": ["diffusion", "generative diffusion", "score-based models"],
+    "state-space models": ["SSM", "structured state space", "mamba"],
+    "gpu kernel": ["CUDA kernel", "GPU optimization"],
+    "attention": ["self-attention", "flash attention", "transformer attention"],
+    "large language model": ["LLM", "foundation model", "pretrained model"],
+    "inference": ["serving", "deployment inference"],
+    "throughput": ["bandwidth", "processing rate"],
+    "scheduling": ["orchestration", "task allocation"],
+    "caching": ["memoization", "result reuse"],
+    "datastore": ["storage engine", "distributed store", "database"],
+    "replication": ["replica management", "data redundancy"],
+    "sharding": ["partitioning", "horizontal scaling"],
+    "vector database": ["embedding store", "similarity search index"],
+    "retrieval": ["RAG", "retrieval-augmented"],
+    "quantization": ["low-precision", "INT8", "model compression"],
+    "pruning": ["sparsification", "model sparsity"],
+    "federated learning": ["decentralized training", "edge training"],
+    "reinforcement learning": ["RL", "policy optimization"],
+    "benchmarking": ["evaluation", "performance measurement"],
+    "observability": ["monitoring", "tracing", "telemetry"],
+    "autoscaling": ["elastic scaling", "dynamic provisioning"],
+    "container": ["docker", "kubernetes pod"],
+    "virtual machine": ["VM", "hypervisor instance"],
+    "network": ["interconnect", "fabric"],
+    "security": ["confidentiality", "threat mitigation"],
+    "privacy": ["differential privacy", "data protection"],
+    "explainability": ["interpretability", "model transparency"],
+    "robustness": ["adversarial robustness", "stability"],
+    "generalization": ["transferability", "out-of-distribution"],
+    "simulation": ["emulation", "digital twin"],
+    "hpc": ["high-performance computing", "supercomputing"],
+    "cloud": ["cloud computing", "public cloud"],
+}
+
+# Small function-word set used ONLY for anchor extraction / histograms — never to
+# gut conceptual phrases out of the user-facing intent string.
+_SEMANTIC_FUNCTION_WORDS = frozenset({
+    "a", "an", "the", "and", "or", "in", "on", "at", "to", "for", "of", "with",
+    "by", "from", "about", "as", "into", "through", "during", "before", "after",
+    "is", "are", "was", "were", "be", "how", "what", "which", "that", "this",
+})
+
+# Reverse token -> canonical concept lookup, built lazily once (thread-safe enough
+# for CPython dict publication; worst case it is rebuilt identically).
+_TOKEN_TO_CONCEPT: Optional[Dict[str, str]] = None
+
+
+def _token_to_concept_map() -> Dict[str, str]:
+    """Map every significant token appearing in the graph to its canonical concept."""
+    global _TOKEN_TO_CONCEPT
+    if _TOKEN_TO_CONCEPT is None:
+        mapping: Dict[str, str] = {}
+        for canonical, synonyms in ACADEMIC_SYNONYM_GRAPH.items():
+            for phrase in [canonical] + list(synonyms):
+                for tok in re.findall(r"[a-z0-9]+", phrase.lower()):
+                    if len(tok) > 2 and tok not in _SEMANTIC_FUNCTION_WORDS:
+                        mapping.setdefault(tok, canonical)
+        _TOKEN_TO_CONCEPT = mapping
+    return _TOKEN_TO_CONCEPT
+
+
+def expand_semantic_concepts(intent_text: str, max_terms: int = 8) -> List[str]:
+    """
+    Return conceptually related academic synonyms/aliases absent from the intent text.
+    Pure local lookup over ACADEMIC_SYNONYM_GRAPH — no network, O(graph) worst case.
+    Empty input yields [] (filter-only bypass; never hallucinates concepts).
+    """
+    if not intent_text or not intent_text.strip() or max_terms <= 0:
+        return []
+    lowered = intent_text.lower()
+    expansions: List[str] = []
+    for canonical, synonyms in ACADEMIC_SYNONYM_GRAPH.items():
+        if canonical in lowered or any(s.lower() in lowered for s in synonyms):
+            for syn in synonyms:
+                if syn.lower() not in lowered and syn not in expansions:
+                    expansions.append(syn)
+                    if len(expansions) >= max_terms:
+                        return expansions
+    return expansions
+
+
+def extract_semantic_groups(
+    intent_text: str,
+    max_groups: int = 3,
+    synonyms_per_group: int = 2,
+) -> List[List[str]]:
+    """
+    Split intent into up to max_groups disjunctive concept groups for boolean APIs.
+    Each group = [anchor phrase/term + up to synonyms_per_group equivalents].
+    Multiword concept phrases in the intent take priority as anchors so phrases
+    like "neural network training" survive instead of being shredded into tokens.
+    """
+    if not intent_text or not intent_text.strip():
+        return []
+    lowered = intent_text.lower()
+    groups: List[List[str]] = []
+    used_anchors: List[str] = []
+
+    # Pass 1: multiword canonical concepts / synonyms present verbatim in intent.
+    for canonical, synonyms in ACADEMIC_SYNONYM_GRAPH.items():
+        if len(groups) >= max_groups:
+            break
+        for phrase in [canonical] + list(synonyms):
+            if " " not in phrase.strip() or phrase.lower() not in lowered:
+                continue
+            anchor = phrase.strip()
+            if anchor.lower() in (a.lower() for a in used_anchors):
+                break
+            equivalents = [s for s in synonyms if s.lower() not in lowered][:synonyms_per_group]
+            groups.append([anchor] + equivalents)
+            used_anchors.append(anchor)
+            break
+
+    # Pass 2: single content-token anchors for remaining intent terms.
+    if len(groups) < max_groups:
+        concept_map = _token_to_concept_map()
+        for tok in re.findall(r"[a-z0-9][a-z0-9\-]*", lowered):
+            if len(groups) >= max_groups:
+                break
+            if len(tok) <= 2 or tok in _SEMANTIC_FUNCTION_WORDS:
+                continue
+            if tok in (a.lower() for a in used_anchors):
+                continue
+            canonical = concept_map.get(tok)
+            if canonical:
+                equivalents = [
+                    s for s in ACADEMIC_SYNONYM_GRAPH[canonical]
+                    if s.lower() not in lowered
+                ][:synonyms_per_group]
+                groups.append([tok] + equivalents)
+            else:
+                groups.append([tok])
+            used_anchors.append(tok)
+
+    return groups[:max_groups]
+
+
+def _sanitize_arxiv_term(term: str) -> str:
+    """Strip characters/operators that would corrupt arXiv boolean syntax."""
+    cleaned = re.sub(r'["():]', " ", term or "")
+    cleaned = re.sub(r"\b(AND|OR|NOT)\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:80]
+
+
+def _concept_histogram(text: str) -> Dict[str, float]:
+    """Bag-of-canonical-concepts vector for semantic cosine scoring."""
+    hist: Dict[str, float] = {}
+    if not text:
+        return hist
+    concept_map = _token_to_concept_map()
+    lowered = text.lower()
+    # Multiword concept phrases count double (phrase-level intent signal).
+    for canonical, synonyms in ACADEMIC_SYNONYM_GRAPH.items():
+        for phrase in [canonical] + list(synonyms):
+            if " " in phrase and phrase.lower() in lowered:
+                hist[canonical] = hist.get(canonical, 0.0) + 2.0
+                break
+    for tok in re.findall(r"[a-z0-9]+", lowered):
+        if len(tok) <= 2 or tok in _SEMANTIC_FUNCTION_WORDS:
+            continue
+        canonical = concept_map.get(tok)
+        if canonical:
+            hist[canonical] = hist.get(canonical, 0.0) + 1.0
+        else:
+            hist[f"tok:{tok}"] = hist.get(f"tok:{tok}", 0.0) + 0.5
+    return hist
+
+
+def semantic_intent_score(query_intent: str, title: str, abstract: str = "") -> float:
+    """
+    Cosine similarity between the user-intent concept vector and a paper's
+    title/abstract concept vectors (synonym-aware: alternative terminology maps
+    to shared canonical concepts). Title weighted 0.7, abstract 0.3.
+    Returns 0.0 for empty intent (filter-only bypass). Bounded O(text) work.
+    """
+    if not query_intent or not query_intent.strip():
+        return 0.0
+    q_hist = _concept_histogram(query_intent)
+    if not q_hist:
+        return 0.0
+
+    def _cosine(a: Dict[str, float], b: Dict[str, float]) -> float:
+        if not a or not b:
+            return 0.0
+        dot = sum(v * b.get(k, 0.0) for k, v in a.items())
+        if dot <= 0:
+            return 0.0
+        na = math.sqrt(sum(v * v for v in a.values()))
+        nb = math.sqrt(sum(v * v for v in b.values()))
+        if na <= 0 or nb <= 0:
+            return 0.0
+        return dot / (na * nb)
+
+    title_sim = _cosine(q_hist, _concept_histogram(title or ""))
+    abstract_sim = _cosine(q_hist, _concept_histogram((abstract or "")[:800]))
+    return max(0.0, min(1.0, 0.7 * title_sim + 0.3 * abstract_sim))
 
 
 class AsyncRateLimiter:
@@ -223,23 +443,24 @@ class Paper(BaseModel):
 
 def clean_academic_query(raw_query: str) -> str:
     """
-    Extract high-signal technical keywords suitable for academic search engines.
-    Strips parenthetical examples, conversational framing, punctuation, and non-essential filler words.
-    Example:
-      "Recent advances and research gaps in distributed checkpointing and fault tolerance
-       for cloud-based HPC scientific simulations (such as reactor or thermal digital twins)"
-      -> "distributed checkpointing fault tolerance cloud HPC simulations"
-    Custom-search hardening: empty/whitespace-only input returns "" (no phantom
-    fallback keywords) so author/institution-only queries are filter-only.
+    Semantic intent normalization (replaces rigid keyword-bag extraction).
+
+    Preserves conceptual phrases, domain context, and natural-language intent so
+    e.g. "fast neural network training on consumer hardware" keeps its full
+    meaning instead of being gutted to isolated tokens. Only conversational
+    framing ("tell me about", "survey of", ...) is stripped; content words,
+    phrases, and modifiers survive. Downstream synonym expansion is handled by
+    expand_semantic_concepts() / extract_semantic_groups() — this function only
+    normalizes, never hallucinates. Empty input returns "" (filter-only bypass).
     """
     if not raw_query or not raw_query.strip():
         return ""
 
-    # 1. Strip content inside parentheses and brackets (e.g. "(such as reactor or thermal digital twins)")
-    cleaned = re.sub(r"\([^)]*\)", " ", raw_query)
-    cleaned = re.sub(r"\[[^\]]*\]", " ", cleaned)
+    # 1. Preserve parenthetical domain context: "(such as reactor or thermal
+    #    digital twins)" previously deleted domain cues; now keep inner content.
+    cleaned = re.sub(r"[()\[\]]", " ", raw_query)
 
-    # 2. Strip conversational, survey, and filler phrases
+    # 2. Strip conversational / survey framing only (intent extraction, not content).
     filler_phrases = [
         r"\brecent advances (and|&) (research )?gaps (in|for|on)\b",
         r"\b(recent|current|latest) advances (in|for|on)\b",
@@ -248,6 +469,8 @@ def clean_academic_query(raw_query: str) -> str:
         r"\bliterature review (of|on|for)\b",
         r"\bsurvey (of|on|for)\b",
         r"\b(can you|please) (find|search|show|tell me about|explain)\b",
+        r"\bcan you please\b",
+        r"\bcan you\b",
         r"\bwhat (is|are|were|do you know about)\b",
         r"\btell me (about|everything about)\b",
         r"\bsearch for (papers on|articles about|research on)?\b",
@@ -267,37 +490,15 @@ def clean_academic_query(raw_query: str) -> str:
     for pat in filler_phrases:
         cleaned = re.sub(pat, " ", cleaned, flags=re.IGNORECASE)
 
-    # 3. Remove non-alphanumeric punctuation except hyphens and spaces
-    cleaned = re.sub(r"[^a-zA-Z0-9\s\-]", " ", cleaned)
-    tokens = cleaned.split()
+    # 3. Light normalization: collapse whitespace, drop stray punctuation runs,
+    #    strip trailing -based modifiers — but KEEP all conceptual words/phrases.
+    cleaned = re.sub(r"-based\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" \t\n\r-–—.,;:!?")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    # 4. Stopwords & generic non-discriminative academic filler
-    stopwords = {
-        "a", "an", "the", "and", "or", "in", "on", "at", "to", "for", "of", "with",
-        "by", "from", "about", "as", "into", "through", "during", "before", "after",
-        "above", "below", "under", "between", "out", "off", "over", "again",
-        "further", "then", "once", "here", "there", "when", "where", "why", "how",
-        "all", "any", "both", "each", "few", "more", "most", "other", "some", "such",
-        "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can",
-        "will", "just", "should", "now", "recent", "advances", "advancements", "current",
-        "latest", "techniques", "methods", "methodologies", "approaches", "gaps", "gap",
-        "research", "study", "studies", "overview", "survey", "thesis", "paper", "papers",
-        "article", "articles", "work", "works", "scientific", "based", "using", "used", "via"
-    }
-
-    filtered_tokens = []
-    for t in tokens:
-        # Strip trailing -based (e.g. cloud-based -> cloud)
-        clean_t = re.sub(r"-based$", "", t, flags=re.IGNORECASE).strip("-")
-        if clean_t and clean_t.lower() not in stopwords and len(clean_t) > 1:
-            filtered_tokens.append(clean_t)
-
-    # If filtering leaves tokens, return them joined; otherwise fallback to original tokens
-    if filtered_tokens:
-        return " ".join(filtered_tokens)
-    elif tokens:
-        return " ".join(tokens)
-    return raw_query.strip()
+    if not cleaned:
+        return raw_query.strip()[:500]
+    return cleaned[:500]
 
 
 def normalize_title(title: str) -> str:
@@ -327,13 +528,17 @@ async def fetch_arxiv_papers(
 ) -> List[Paper]:
     """
     Fetch papers from ArXiv API filtered to CS categories or custom categories.
-    Uses essential terms combined with AND to maximize precision.
-    Supports author filtering (au:...) and parses author affiliation metadata.
+    Semantic retrieval framing: the `keywords` argument is a natural-language
+    intent string (see clean_academic_query). It is expanded into disjunctive
+    boolean concept groups — (variant OR synonym OR alias) AND (next concept …)
+    — so papers using alternative terminology still match, instead of a single
+    strict AND of literal tokens. Supports author filtering (au:...) and parses
+    author affiliation metadata. Empty intent + no author returns [] (no API call).
     """
     papers: List[Paper] = []
-    tokens = keywords.split() if keywords else []
-    
-    if not tokens and not author:
+    intent = (keywords or "").strip()
+
+    if not intent and not (author or "").strip():
         return papers
 
     # Determine category clause
@@ -343,17 +548,23 @@ async def fetch_arxiv_papers(
     else:
         cat_clause = TARGET_ARXIV_CATEGORIES
 
-    # Build search terms clause
-    if tokens:
-        if len(tokens) >= 4:
-            arxiv_terms = tokens[:4]
-        elif len(tokens) >= 2:
-            arxiv_terms = tokens[:len(tokens)]
-        else:
-            arxiv_terms = tokens
-        term_clause = "all:(" + " AND ".join(arxiv_terms) + ")"
-    else:
-        term_clause = ""
+    # Build semantic disjunctive clause: one OR-group per concept, ANDed together.
+    # e.g. intent "fast neural network training on consumer hardware" becomes
+    # (all:"fast" OR all:"efficient") AND (all:"neural network training" OR ...)
+    # Empty intent => no term clause (filter-only query using author below).
+    groups = extract_semantic_groups(intent) if intent else []
+    term_clause = ""
+    if groups:
+        or_clauses = []
+        for group in groups:
+            variants = [_sanitize_arxiv_term(v) for v in group]
+            variants = [v for v in variants if v]
+            if not variants:
+                continue
+            or_clauses.append("(" + " OR ".join(f'all:"{v}"' for v in variants) + ")")
+        if or_clauses:
+            # Bound URL length: arXiv rejects overlong search_query strings.
+            term_clause = " AND ".join(or_clauses)[:800]
 
     # Integrate author filter (sanitized: strip embedded quotes to keep au:"..." valid;
     # empty keywords + author => filter-only query, no empty all:(...) clause prepended)
@@ -400,18 +611,21 @@ async def fetch_arxiv_papers(
     try:
         entries = await _execute_arxiv_query(search_query)
 
-        # Automatic fallback: if 0 results returned and we had >= 3 terms, retry with top 2 core terms
-        if not entries and len(tokens) > 2:
-            relaxed_terms = tokens[:2]
-            relaxed_term_clause = f"all:({' AND '.join(relaxed_terms)})"
-            relaxed_parts = [relaxed_term_clause]
-            if safe_author:
-                relaxed_parts.append(f'au:"{safe_author}"')
-            if cat_clause:
-                relaxed_parts.append(cat_clause)
-            relaxed_query = " AND ".join(relaxed_parts)
-            logger.info("ArXiv returned 0 results for %r. Retrying with relaxed terms: %r", search_query, relaxed_query)
-            entries = await _execute_arxiv_query(relaxed_query)
+        # Semantic fallback: if 0 results, retry with the single most salient
+        # concept group (broadest OR) instead of a truncated literal token prefix.
+        if not entries and groups:
+            first = [_sanitize_arxiv_term(v) for v in groups[0]]
+            first = [v for v in first if v]
+            if first:
+                relaxed_term_clause = "(" + " OR ".join(f'all:"{v}"' for v in first) + ")"
+                relaxed_parts = [relaxed_term_clause]
+                if safe_author:
+                    relaxed_parts.append(f'au:"{safe_author}"')
+                if cat_clause:
+                    relaxed_parts.append(cat_clause)
+                relaxed_query = " AND ".join(relaxed_parts)
+                logger.info("ArXiv returned 0 results for %r. Retrying with relaxed semantic group: %r", search_query, relaxed_query)
+                entries = await _execute_arxiv_query(relaxed_query)
 
         for entry in entries:
             # 1. Title
@@ -519,6 +733,10 @@ async def fetch_semantic_scholar_papers(
 ) -> List[Paper]:
     """
     Fetch papers from Semantic Scholar API with citation counts, TLDRs, and OpenAccess PDFs.
+    Semantic adaptation: the `keywords` argument is a natural-language intent string
+    passed through to S2's native relevance ranker (which is embedding-aware) instead
+    of a boiled-down keyword bag. Candidate chain: full intent -> core-concept
+    variant -> legacy keyword-bag truncation, first non-empty result wins.
     If SEMANTIC_SCHOLAR_API_KEY is provided (via parameter or environment variable),
     it is passed in headers as {"x-api-key": SEMANTIC_SCHOLAR_API_KEY}.
     Otherwise, gracefully falls back to direct unauthenticated public requests.
@@ -538,18 +756,28 @@ async def fetch_semantic_scholar_papers(
     if effective_key:
         headers["x-api-key"] = effective_key
 
-    tokens = keywords.split()
-    # Build candidate queries: primary query, then relaxed queries if multi-word
+    intent_text = (keywords or "").strip()
+    # Semantic candidate chain (NL-first for S2's native relevance ranker):
+    # 1. full natural-language intent (truncated for URL safety)
+    # 2. core-concept variant (concept-group anchors joined as a focused phrase)
+    # 3. legacy keyword-bag truncation (last-resort recall widening)
     candidate_queries = []
-    if len(tokens) >= 4:
-        candidate_queries.append(" ".join(tokens[:4]))
-        candidate_queries.append(" ".join(tokens[:3]))
-        candidate_queries.append(" ".join(tokens[:2]))
-    elif len(tokens) >= 2:
-        candidate_queries.append(keywords)
-        candidate_queries.append(" ".join(tokens[:2]))
-    else:
-        candidate_queries.append(keywords)
+    if intent_text:
+        candidate_queries.append(intent_text[:300])
+        groups = extract_semantic_groups(intent_text)
+        if groups:
+            core_anchors = [_sanitize_arxiv_term(g[0]) for g in groups]
+            core_anchors = [a for a in core_anchors if a]
+            if core_anchors:
+                core_variant = " ".join(core_anchors)[:200]
+                if core_variant.lower() != intent_text[:200].lower():
+                    candidate_queries.append(core_variant)
+        bag_tokens = intent_text.split()
+        if len(bag_tokens) >= 4:
+            candidate_queries.append(" ".join(bag_tokens[:4]))
+            candidate_queries.append(" ".join(bag_tokens[:2]))
+        elif len(bag_tokens) >= 2:
+            candidate_queries.append(" ".join(bag_tokens[:2]))
 
     seen_queries = set()
     queries_to_try = []
@@ -896,11 +1124,16 @@ async def fetch_openalex_papers(
 ) -> List[Paper]:
     """
     Fetch academic papers from OpenAlex works endpoint with has_fulltext:true.
+    Semantic adaptation: the `keywords` argument is a natural-language intent string
+    forwarded as the `search` parameter (OpenAlex relevance-ranked) combined with
+    resolved author/institution ID filters — no boolean keyword shredding. Empty
+    intent with no filters returns [] (filter-only bypass preserved).
     Reconstructs inverted index abstracts, extracts citations, authors, institutions, and open-access PDFs.
     Scales up to 100 papers per page.
     """
     papers: List[Paper] = []
-    clean_kw = keywords.strip() if keywords else ""
+    # Semantic intent string (natural language, phrases preserved); capped for URL safety.
+    clean_kw = (keywords or "").strip()[:300]
 
     filter_parts = ["has_fulltext:true"]
     if author and author.strip():
@@ -1356,16 +1589,22 @@ def deduplicate_and_rank(
     top_k: int = 6,
     similarity_threshold: float = 0.85,
     author: Optional[str] = None,
-    institution: Optional[str] = None
+    institution: Optional[str] = None,
+    query: Optional[str] = None,
 ) -> List[Paper]:
     """
     Deduplicate papers across ArXiv, Semantic Scholar, and OpenAlex by normalized title similarity.
     Merges metadata when duplicates occur (preserving open-access PDFs, TLDRs, institutions, highest citation count, and code_url).
+    Semantic re-ranking: relevance is scored by cosine similarity between the
+    user-intent concept vector (`query`) and each paper's title/abstract concept
+    vectors (synonym-aware, so alternative terminology matches the same underlying
+    concept). Papers discussing the same concept with different wording rank
+    together. `query=None`/empty falls back to filter/code/recency ordering.
     Ranks candidates by:
       0. Author or Institution match (if filters specified)
-      1. Presence of implementation code (code_url present gets highest priority)
-      2. Recency (2025/2026 prioritized over older papers)
-      3. Academic citation count and keyword match quality
+      1. Semantic intent similarity (concept-vector cosine vs title/abstract)
+      2. Presence of implementation code (code_url)
+      3. Recency and academic citation count
     Returns strictly the top_k requested papers (up to 100).
     """
     merged_papers: List[Paper] = []
@@ -1425,17 +1664,24 @@ def deduplicate_and_rank(
     for p in openalex_list:
         merge_candidate(p)
 
-    # Priority Ranking Heuristic:
+    # Semantic relevance ranking (intent-based, synonym-aware):
     author_clean = author.strip().lower() if author else ""
     inst_clean = institution.strip().lower() if institution else ""
+    intent_text = (query or "").strip()
+    # Precompute per-paper semantic scores once (bounded O(papers x text)).
+    semantic_scores: Dict[str, float] = {}
+    if intent_text:
+        for p in merged_papers:
+            semantic_scores[p.id] = semantic_intent_score(intent_text, p.title, p.abstract or "")
 
-    def ranking_score(p: Paper) -> Tuple[int, int, int, int]:
+    def ranking_score(p: Paper) -> Tuple[int, float, int, int, int]:
         author_match = 1 if (author_clean and any(author_clean in a.lower() for a in p.authors)) else 0
         inst_match = 1 if (inst_clean and any(inst_clean in i.lower() for i in p.institutions)) else 0
+        semantic = round(semantic_scores.get(p.id, 0.0), 4) if intent_text else 0.0
         has_code = 1 if p.code_url else 0
         year_score = p.year if p.year is not None else 0
         citation_score = p.citation_count if p.citation_count is not None else 0
-        return (author_match + inst_match, has_code, year_score, citation_score)
+        return (author_match + inst_match, semantic, has_code, year_score, citation_score)
 
     merged_papers.sort(key=ranking_score, reverse=True)
     return merged_papers[:top_k]
@@ -1453,12 +1699,15 @@ async def search_academic_papers(
     **kwargs: Any
 ) -> Tuple[List[Paper], Dict[str, Any]]:
     """
-    High-level concurrent academic search orchestrator.
-    Extracts keywords, launches concurrent requests via asyncio.gather to ArXiv,
-    Semantic Scholar, and OpenAlex. Checks and populates thread-safe in-memory TTL search cache.
-    Discovers implementation code URLs, prioritizes ranking, and seamlessly compensates quota
-    if any single provider fails or hits rate limits.
+    High-level concurrent semantic search orchestrator.
+    Normalizes the inquiry to a semantic intent string, launches concurrent requests
+    via asyncio.gather to ArXiv (disjunctive concept groups), Semantic Scholar
+    (natural-language pass-through), and OpenAlex (intent search + ID filters).
+    Checks and populates thread-safe in-memory TTL search cache.
+    Discovers implementation code URLs, applies semantic re-ranking, and seamlessly
+    compensates quota if any single provider fails or hits rate limits.
     Supports scaling up to 100 papers, author filtering, institution filtering, and category selection.
+    Expansion is local-only (no extra blocking calls); empty intent stays filter-only.
     """
     cache_key = f"{inquiry}|author:{author or ''}|inst:{institution or ''}|cat:{','.join(categories) if categories else ''}|k:{top_k}"
     # 1. Check TTL Cache first
@@ -1470,7 +1719,8 @@ async def search_academic_papers(
             return cached_papers[:top_k], cached_meta
 
     keywords = clean_academic_query(inquiry) if inquiry else ""
-    logger.info("Search cache MISS. Executing academic search for %r (author=%r, inst=%r) -> Keywords: %r", inquiry, author, institution, keywords)
+    semantic_concepts = expand_semantic_concepts(keywords) if keywords else []
+    logger.info("Search cache MISS. Executing semantic search for %r (author=%r, inst=%r) -> Intent: %r | concepts: %r", inquiry, author, institution, keywords, semantic_concepts)
 
     effective_ss_key = (
         semantic_scholar_api_key
@@ -1482,6 +1732,9 @@ async def search_academic_papers(
     metadata: Dict[str, Any] = {
         "raw_inquiry": inquiry,
         "extracted_keywords": keywords,
+        "semantic_intent": keywords,
+        "semantic_concepts": semantic_concepts,
+        "retrieval_mode": "semantic",
         "author_filter": author,
         "institution_filter": institution,
         "categories_filter": categories,
@@ -1562,14 +1815,15 @@ async def search_academic_papers(
     all_candidates = arxiv_papers + ss_papers + openalex_papers
     await discover_paper_code_urls(all_candidates, http_client)
 
-    # Deduplicate, merge metadata, prioritize code & recency, take top k
+    # Deduplicate, merge metadata, apply semantic re-ranking, take top k
     final_papers = deduplicate_and_rank(
         arxiv_papers,
         ss_papers,
         openalex_papers,
         top_k=top_k,
         author=author,
-        institution=institution
+        institution=institution,
+        query=keywords,
     )
     metadata["final_count"] = len(final_papers)
 

@@ -644,27 +644,27 @@
       <!-- Bottom Query Input Dock (Refined spacing & clean border) -->
       <div class="flex-none p-4 bg-white/95 dark:bg-[#111827]/90 border-t border-slate-200 dark:border-[#1E293B] backdrop-blur-md transition-colors">
         
-        <!-- 3-Way Search Mode Switcher -->
-        <div class="flex items-center justify-between mb-2.5 px-1">
-          <div id="search-mode-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B] text-xs">
-            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5" data-mode="topic">
+        <!-- Search Mode Switcher -->
+        <div class="flex items-center justify-between gap-2 mb-2.5 px-1">
+          <div id="search-mode-group" class="inline-flex max-w-full overflow-x-auto rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B] text-xs" role="tablist" aria-label="Search mode">
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0" data-mode="topic">
               <i data-lucide="compass" class="w-3.5 h-3.5"></i>
               <span>Topic Exploration</span>
             </button>
-            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="author">
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0" data-mode="author">
               <i data-lucide="user" class="w-3.5 h-3.5"></i>
               <span>Author Profile</span>
             </button>
-            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="institution">
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0" data-mode="institution">
               <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
               <span>University / Lab</span>
             </button>
-            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5" data-mode="custom">
+            <button type="button" class="search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0" data-mode="custom">
               <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
               <span>Custom Search</span>
             </button>
           </div>
-          <span id="search-mode-label" class="hidden sm:inline-block text-[11px] font-mono text-slate-400 dark:text-slate-500">Multi-source CS index</span>
+          <span id="search-mode-label" class="hidden sm:inline-block shrink-0 ml-2 text-right text-[11px] font-mono text-slate-400 dark:text-slate-500">Multi-source CS index</span>
         </div>
 
         <form id="research-form" class="relative">
@@ -677,11 +677,12 @@
               required
             ></textarea>
             
-            <div class="pr-3 flex items-center space-x-2">
+            <div class="pr-3 flex items-center space-x-2 shrink-0">
               <button
                 type="submit"
                 id="submit-btn"
-                class="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-medium text-xs shadow-md shadow-brand-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
+                aria-label="Run academic search"
+                class="flex items-center justify-center space-x-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0B0F19] text-white font-semibold tracking-wide text-xs shadow-md shadow-brand-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
               >
                 <i data-lucide="send" class="w-3.5 h-3.5 transition group-hover:translate-x-0.5"></i>
                 <span id="btn-text">Research</span>
@@ -690,39 +691,41 @@
           </div>
 
           <!-- Custom / Advanced Search: combined multi-field filters (visible only in Custom mode) -->
-          <div id="custom-search-panel" class="hidden mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
-              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+          <div id="custom-search-panel" class="hidden mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-stretch">
+            <div class="relative flex items-center h-10 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
               <input
                 type="text"
                 id="custom-author-input"
                 placeholder="Author (e.g., Tri Dao) — optional"
                 autocomplete="off"
-                class="w-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 py-2.5 focus:outline-none"
+                aria-label="Custom search author filter"
+                class="w-full h-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 focus:outline-none"
               />
             </div>
-            <div class="relative flex items-center bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
-              <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+            <div class="relative flex items-center h-10 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-[#1E293B] focus-within:border-brand-500 rounded-xl transition shadow-xs">
+              <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
               <input
                 type="text"
                 id="custom-institution-input"
                 placeholder="University / Lab (e.g., Stanford) — optional"
                 autocomplete="off"
-                class="w-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 py-2.5 focus:outline-none"
+                aria-label="Custom search institution filter"
+                class="w-full h-full bg-transparent text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 pl-9 pr-3 focus:outline-none"
               />
             </div>
           </div>
 
           <div class="mt-2.5 flex flex-wrap items-center justify-between gap-y-2 text-xs text-slate-500 dark:text-slate-400 px-1">
             <div class="flex items-center space-x-3">
-              <!-- Dynamic Paper Count Selector -->
+              <!-- Secondary control: paper count (deliberately understated next to the primary action) -->
               <div class="flex items-center space-x-1.5">
-                <span class="font-medium text-slate-600 dark:text-slate-400">Papers:</span>
-                <div id="paper-limit-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B]">
+                <span class="font-normal text-slate-400 dark:text-slate-500">Papers:</span>
+                <div id="paper-limit-group" class="inline-flex rounded-lg bg-slate-100 dark:bg-[#0B0F19] p-0.5 border border-slate-200 dark:border-[#1E293B]" role="group" aria-label="Target paper count">
                   <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer" data-limit="10">10</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="25">25</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="50">50</button>
-                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer" data-limit="100">100</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="25">25</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="50">50</button>
+                  <button type="button" class="paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer" data-limit="100">100</button>
                 </div>
               </div>
 
@@ -782,14 +785,16 @@
       <!-- Instant In-Results Client-Side Filter -->
       <div class="flex-none px-4 py-2 border-b border-slate-200 dark:border-[#1E293B] bg-slate-50/70 dark:bg-[#0B0F19]/60">
         <div class="relative flex items-center">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none shrink-0"></i>
           <input
             type="text"
             id="filter-entity-input"
-            placeholder="Filter loaded papers by author or institution..."
-            class="w-full pl-8 pr-32 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-sans"
+            placeholder="Filter loaded papers..."
+            aria-label="Filter loaded papers by author or institution"
+            title="Filter loaded papers by author or institution"
+            class="w-full pl-9 pr-16 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-brand-500 transition font-sans"
           />
-          <span id="filter-match-count" class="absolute right-2.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 pointer-events-none"></span>
+          <span id="filter-match-count" class="absolute right-1.5 top-1/2 -translate-y-1/2 max-w-[4.5rem] truncate text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-0.5 pointer-events-none empty:hidden"></span>
         </div>
       </div>
 
@@ -1067,7 +1072,7 @@
             <label for="outreach-body" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
               Email Body (Editable, with [BRACKETED_PLACEHOLDERS])
             </label>
-            <span class="text-[10px] text-slate-500 font-mono">Formal • &lt;250 words</span>
+            <span id="outreach-word-count" class="text-[10px] text-slate-500 font-mono tabular-nums" title="Faculty-inbox budget: under 120 words">Concise • &lt;120 words</span>
           </div>
           <textarea
             id="outreach-body"
@@ -1960,6 +1965,12 @@
     .synthesis-content p {
       margin: 0 0 10px 0;
       color: #1e293b;
+      orphans: 3;
+      widows: 3;
+    }
+    .synthesis-content h1 + *, .synthesis-content h2 + *, .synthesis-content h3 + *, .synthesis-content h4 + * {
+      break-before: avoid;
+      page-break-before: avoid;
     }
     .synthesis-content ul, .synthesis-content ol {
       margin: 0 0 10px 0;
@@ -1967,6 +1978,8 @@
     }
     .synthesis-content li {
       margin-bottom: 4px;
+      orphans: 3;
+      widows: 3;
     }
     .synthesis-content strong {
       color: #0f172a;
@@ -2009,6 +2022,11 @@
       background: #f8fafc;
       font-weight: 700;
     }
+    .synthesis-content tr { break-inside: avoid; page-break-inside: avoid; }
+    .synthesis-content blockquote { border-left: 3px solid #94a3b8; margin: 10px 0; padding: 8px 12px; color: #334155; background: #f8fafc; border-radius: 0 6px 6px 0; break-inside: avoid; page-break-inside: avoid; }
+    .synthesis-content a { word-break: break-all; }
+    .citation-meta { border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; padding: 10px 12px; margin: 12px 0; font-size: 11.5px; color: #334155; break-inside: avoid; page-break-inside: avoid; }
+    .citation-meta .cite-title { font-weight: 700; color: #0f172a; margin-bottom: 2px; }
     .katex-display {
       margin: 10px 0 !important;
       padding: 6px 10px !important;
@@ -2214,13 +2232,28 @@
       font-weight: 700;
       margin-top: 18px;
       margin-bottom: 8px;
+      break-after: avoid;
+      break-inside: avoid;
     }
     .synthesis-content h1 { font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
     .synthesis-content h2 { font-size: 14px; }
-    .synthesis-content p { margin: 0 0 10px 0; color: #1e293b; }
+    .synthesis-content h3 { font-size: 13px; }
+    .synthesis-content h1 + *, .synthesis-content h2 + *, .synthesis-content h3 + * {
+      break-before: avoid;
+    }
+    .synthesis-content p { margin: 0 0 10px 0; color: #1e293b; orphans: 3; widows: 3; }
+    .synthesis-content li { orphans: 3; widows: 3; }
     .synthesis-content ul, .synthesis-content ol { margin: 0 0 10px 0; padding-left: 20px; }
     .synthesis-content code { background: #f1f5f9; padding: 2px 4px; border-radius: 3px; font-size: 11.5px; }
-    .synthesis-content pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11.5px; }
+    .synthesis-content pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11.5px; break-inside: avoid; white-space: pre-wrap; word-break: break-word; }
+    .synthesis-content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+    .synthesis-content th, .synthesis-content td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+    .synthesis-content th { background: #f1f5f9; font-weight: 700; }
+    .synthesis-content tr { break-inside: avoid; }
+    .synthesis-content blockquote { border-left: 3px solid #94a3b8; margin: 10px 0; padding: 8px 12px; color: #334155; background: #f8fafc; border-radius: 0 6px 6px 0; break-inside: avoid; }
+    .synthesis-content a { color: #1d4ed8; text-decoration: none; word-break: break-all; }
+    .citation-meta { border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; padding: 10px 12px; margin: 12px 0; font-size: 11.5px; color: #334155; break-inside: avoid; }
+    .citation-meta .cite-title { font-weight: 700; color: #0f172a; margin-bottom: 2px; }
     .katex-display { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 6px; padding: 6px 10px; }
     .print-footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
   </style>
@@ -2284,6 +2317,56 @@
       }
     }
 
+    // --- UX polish: busy-state + PDF fallback helpers (presentation only) ---
+    function setBusyState(btn, busy, busyLabel) {
+      if (!btn) return;
+      if (busy) {
+        if (btn.dataset.origHtml === undefined) btn.dataset.origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        btn.classList.add('opacity-60', 'pointer-events-none');
+        btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span>' + (busyLabel || 'Working…') + '</span>';
+      } else {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.classList.remove('opacity-60', 'pointer-events-none');
+        if (btn.dataset.origHtml !== undefined) {
+          btn.innerHTML = btn.dataset.origHtml;
+          delete btn.dataset.origHtml;
+        }
+        try { if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons(); } catch (_) {}
+      }
+    }
+
+    // Graceful PDF fallback: papers without an open-access direct PDF URL open
+    // their landing page (arXiv abstract / DOI) with a non-blocking toast
+    // instead of failing silently on a dead PDF href.
+    document.addEventListener('click', (e) => {
+      const pdfAnchor = e.target && e.target.closest ? e.target.closest('.btn-open-pdf') : null;
+      if (!pdfAnchor) return;
+      const hasPdf = pdfAnchor.getAttribute('data-has-pdf') === '1';
+      if (hasPdf) return; // direct PDF available: let the native anchor navigation proceed
+      e.preventDefault();
+      const fallback = pdfAnchor.getAttribute('data-fallback-url') || pdfAnchor.getAttribute('href') || '';
+      const title = pdfAnchor.getAttribute('data-paper-title') || 'this paper';
+      if (fallback && fallback !== '#') {
+        try { window.open(fallback, '_blank', 'noopener,noreferrer'); } catch (_) {}
+        showToast(`No open-access PDF for "${title.slice(0, 60)}" — opened landing page instead.`, 'info');
+      } else {
+        showToast(`No PDF or landing page available for "${title.slice(0, 60)}".`, 'error');
+      }
+    });
+
+    // Generic print busy-state (capture phase so it arms before each button's own
+    // print handler runs): brief disabled+spinner prevents duplicate print frames
+    // from rapid double-clicks on paper / matrix / proposal reports.
+    document.addEventListener('click', (e) => {
+      const printBtn = e.target && e.target.closest ? e.target.closest('.btn-print-paper-report, .btn-print-compare, .btn-print-proposal, #btn-print-matrix') : null;
+      if (!printBtn || printBtn.disabled) return;
+      setBusyState(printBtn, true, 'Preparing…');
+      setTimeout(() => setBusyState(printBtn, false), 1500);
+    }, true);
+
     // --- Workspace State & LocalStorage Management ---
     let savedPapers = [];
     try {
@@ -2333,9 +2416,9 @@
       currentSearchMode = mode;
       searchModeBtns.forEach(b => {
         if (b.getAttribute('data-mode') === mode) {
-          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5';
+          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0';
         } else {
-          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5';
+          b.className = 'search-mode-btn px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shrink-0';
         }
       });
       if (queryInput) {
@@ -2403,7 +2486,7 @@
         if (!isNaN(limitVal)) {
           currentPaperLimit = limitVal;
           paperLimitBtns.forEach(b => {
-            b.className = 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer';
+            b.className = 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-medium text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer';
           });
           btn.className = 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer';
           showToast(`Target paper quota set to ${currentPaperLimit}`, 'info');
@@ -2773,13 +2856,15 @@
       if (tabDiscoveredBadge) tabDiscoveredBadge.textContent = currentPapers.length;
       updateWorkspaceBadges();
 
-      // Real-time Instant Match Counter
+      // Real-time Instant Match Counter (compact pill text; bounds reserved via input padding)
       const filterMatchCountEl = document.getElementById('filter-match-count');
       if (filterMatchCountEl) {
         if (rawPool && rawPool.length > 0) {
-          filterMatchCountEl.textContent = `Showing ${displayPapers.length} of ${rawPool.length} loaded papers`;
+          filterMatchCountEl.textContent = `${displayPapers.length}/${rawPool.length}`;
+          filterMatchCountEl.title = `Showing ${displayPapers.length} of ${rawPool.length} loaded papers`;
         } else {
           filterMatchCountEl.textContent = '';
+          filterMatchCountEl.removeAttribute('title');
         }
       }
 
@@ -2843,38 +2928,30 @@
         card.className = 'p-4 rounded-xl bg-white dark:bg-[#0B0F19]/70 border border-slate-200 dark:border-[#1E293B] hover:border-brand-500/50 dark:hover:border-brand-500/50 transition group space-y-3 shadow-xs dark:shadow-sm relative';
         card.setAttribute('data-paper-id', p.id);
 
-        // Source badge styling
-        let sourceBadgeClass = 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20';
-        const srcLower = (p.source || '').toLowerCase();
-        if (srcLower.includes('&') || srcLower.includes(',')) {
-          sourceBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30';
-        } else if (srcLower.includes('openalex')) {
-          sourceBadgeClass = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30';
-        } else if (srcLower.includes('semantic')) {
-          sourceBadgeClass = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30';
-        } else if (srcLower.includes('arxiv')) {
-          sourceBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30';
-        }
+        // Source badge: single muted monochrome treatment (no per-source saturated pills)
+        const sourceBadgeClass = 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700/60';
 
         const codeBadgeHtml = p.code_url
           ? `<a href="${escapeHtml(p.code_url)}" target="_blank" rel="noopener noreferrer"
-                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/90 dark:text-emerald-300 dark:border-emerald-500/40 hover:opacity-90 transition shadow-xs"
-                title="Open-Source Implementation Code (GitHub)">
-               <svg class="w-2.5 h-2.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-               <span>Code</span>
-             </a>`
+                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700/60 hover:text-slate-900 dark:hover:text-slate-200 transition"
+                title="Open-source implementation">
+                <svg class="w-2.5 h-2.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                <span>Code</span>
+              </a>`
           : '';
 
-        const yearHtml = p.year ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60">${p.year}</span>` : '';
+        const yearHtml = p.year ? `<span class="px-2 py-0.5 rounded text-[10px] font-medium tabular-nums bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700/60">${p.year}</span>` : '';
         const citationHtml = p.citation_count !== null && p.citation_count !== undefined
-          ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 flex items-center"><i data-lucide="star" class="w-2.5 h-2.5 mr-1 fill-current text-amber-500"></i>${p.citation_count}</span>`
+          ? `<span class="px-2 py-0.5 rounded text-[10px] font-medium tabular-nums bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/70 dark:text-slate-400 dark:border-slate-700/60 inline-flex items-center"><i data-lucide="star" class="w-2.5 h-2.5 mr-1"></i>${p.citation_count}</span>`
           : '';
 
         const authorsStr = p.authors && p.authors.length > 0
           ? (p.authors.length > 2 ? p.authors.slice(0, 2).join(', ') + ' et al.' : p.authors.join(', '))
           : 'Authors Unlisted';
 
-        const pdfUrl = p.pdf_url || p.url || `https://arxiv.org/abs/${p.id.replace('arxiv:', '')}`;
+        const arxivId = p.id && p.id.includes('arxiv:') ? p.id.replace('arxiv:', '') : '';
+        const landingUrl = p.url || (arxivId ? `https://arxiv.org/abs/${arxivId}` : 'https://semanticscholar.org');
+        const pdfUrl = p.pdf_url || landingUrl;
         const isChecked = selectedPapersForCompare.has(p.id);
         const isSaved = isPaperSaved(p.id);
 
@@ -2930,7 +3007,7 @@
 
           ${p.tldr ? `
             <div class="text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#111827] p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80 leading-relaxed">
-              <span class="font-semibold text-purple-600 dark:text-purple-400">TLDR:</span> ${escapeHtml(p.tldr)}
+              <span class="font-semibold text-slate-700 dark:text-slate-200">TL;DR —</span> ${escapeHtml(p.tldr)}
             </div>
           ` : (p.abstract ? `
             <div class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
@@ -2938,44 +3015,49 @@
             </div>
           ` : '')}
 
-          <!-- Card Action Strip -->
-          <div class="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-[#1E293B] text-[11px] gap-2">
-            <div class="flex items-center space-x-1.5">
+          <!-- Card Action Toolbar: unified icon group (PDF / Cite / Thesis / Outreach) -->
+          <div class="pt-2 border-t border-slate-200 dark:border-[#1E293B]">
+            <div class="flex items-center gap-1 p-1 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/70" role="toolbar" aria-label="Paper actions">
               <a
                 href="${pdfUrl}"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center space-x-1 font-semibold px-2 py-0.5 rounded bg-accent-50 text-accent-700 border border-accent-200 dark:bg-accent-500/10 dark:text-accent-400 dark:border-accent-500/20 hover:opacity-80 transition text-[10px]"
+                data-has-pdf="${p.pdf_url ? '1' : '0'}"
+                data-fallback-url="${escapeHtml(landingUrl)}"
+                data-paper-title="${escapeHtml(p.title)}"
+                class="btn-open-pdf flex-1 inline-flex items-center justify-center space-x-1 font-medium px-2 py-1 rounded-md bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition text-[10px]"
+                title="${p.pdf_url ? 'Open open-access PDF' : 'No direct PDF — opens landing page'}"
               >
-                <i data-lucide="file-down" class="w-3 h-3"></i>
+                <i data-lucide="file-text" class="w-3 h-3"></i>
                 <span>PDF</span>
               </a>
 
               <button
-                class="btn-open-cite inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition text-[10px] cursor-pointer"
-                title="Generate Citations"
+                class="btn-open-cite flex-1 inline-flex items-center justify-center space-x-1 px-2 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 transition text-[10px] cursor-pointer"
+                title="Generate citations"
               >
-                <i data-lucide="quote" class="w-3 h-3 text-brand-500 dark:text-brand-400"></i>
+                <i data-lucide="quote" class="w-3 h-3"></i>
                 <span>Cite</span>
               </button>
-            </div>
 
-            <button
-              type="button"
-              class="btn-thesis-draft text-[10px] font-semibold text-indigo-600 dark:text-indigo-300 hover:underline flex items-center space-x-1 cursor-pointer"
-              title="Generate 250-word Thesis Proposal section"
-            >
-              <i data-lucide="graduation-cap" class="w-3 h-3"></i>
-              <span>Thesis Draft</span>
-            </button>
-            <button
-              type="button"
-              class="btn-outreach-email text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
-              title="Generate Professor Outreach Email"
-            >
-              <span>✉️</span>
-              <span>Outreach</span>
-            </button>
+              <button
+                type="button"
+                class="btn-thesis-draft flex-1 inline-flex items-center justify-center space-x-1 px-2 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 transition text-[10px] cursor-pointer"
+                title="Generate 250-word thesis proposal section"
+              >
+                <i data-lucide="graduation-cap" class="w-3 h-3"></i>
+                <span>Thesis</span>
+              </button>
+
+              <button
+                type="button"
+                class="btn-outreach-email flex-1 inline-flex items-center justify-center space-x-1 px-2 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 transition text-[10px] cursor-pointer"
+                title="Generate professor outreach email"
+              >
+                <i data-lucide="mail" class="w-3 h-3"></i>
+                <span>Outreach</span>
+              </button>
+            </div>
           </div>
 
           <!-- Analysis Depth Control & Synthesis Action -->
@@ -3350,7 +3432,14 @@
       outreachSubjectInput.addEventListener('input', updateMailtoLink);
     }
     if (outreachBodyTextarea) {
-      outreachBodyTextarea.addEventListener('input', updateMailtoLink);
+      outreachBodyTextarea.addEventListener('input', () => {
+        updateMailtoLink();
+        const wcLive = document.getElementById('outreach-word-count');
+        if (wcLive) {
+          const n = (outreachBodyTextarea.value || '').split(/\s+/).filter(Boolean).length;
+          wcLive.textContent = `${n}/120 words`;
+        }
+      });
     }
 
     function openOutreachModal(paper) {
@@ -3385,6 +3474,8 @@
       setOutreachScope('single_paper');
       if (outreachSubjectInput) outreachSubjectInput.value = '';
       if (outreachBodyTextarea) outreachBodyTextarea.value = '';
+      const wcReset = document.getElementById('outreach-word-count');
+      if (wcReset) wcReset.textContent = 'Concise • <120 words';
       updateMailtoLink();
 
       if (outreachModal) {
@@ -3491,7 +3582,8 @@
               authors: authorsArr,
               abstract: currentOutreachPaper.abstract || '',
               target_professor: targetProf,
-              scope_type: currentOutreachScope
+              scope_type: currentOutreachScope,
+              institution_name: (Array.isArray(currentOutreachPaper.institutions) && currentOutreachPaper.institutions[0]) || ''
             })
           });
 
@@ -3503,6 +3595,14 @@
           const data = await res.json();
           if (outreachSubjectInput) outreachSubjectInput.value = data.subject || '';
           if (outreachBodyTextarea) outreachBodyTextarea.value = data.body || '';
+          const wcEl = document.getElementById('outreach-word-count');
+          if (wcEl) {
+            const wc = (typeof data.word_count === 'number')
+              ? data.word_count
+              : ((data.body || '').split(/\s+/).filter(Boolean).length);
+            wcEl.textContent = `${wc}/120 words`;
+            wcEl.title = wc <= 120 ? 'Within faculty-inbox budget' : 'Over budget — trim before sending';
+          }
           updateMailtoLink();
           showToast('Cold outreach email draft generated!', 'success');
         } catch (err) {
@@ -4695,19 +4795,27 @@
     }
 
     if (btnExportNotebookLM) {
-      btnExportNotebookLM.addEventListener('click', () => {
-        exportPapersToNotebookLM(currentPapers, currentInquiry);
+      btnExportNotebookLM.addEventListener('click', async () => {
+        if (btnExportNotebookLM.disabled) return;
+        setBusyState(btnExportNotebookLM, true, 'Packing…');
+        try {
+          await exportPapersToNotebookLM(currentPapers, currentInquiry);
+        } finally {
+          setBusyState(btnExportNotebookLM, false);
+        }
       });
     }
 
     if (btnExportLitReview) {
       btnExportLitReview.addEventListener('click', async () => {
+        if (btnExportLitReview.disabled) return;
         try {
           if (!currentPapers.length) {
             showToast('No papers available to review. Run a research inquiry first.', 'info');
             return;
           }
 
+          setBusyState(btnExportLitReview, true, 'Synthesizing…');
           showToast('Synthesizing IEEE Literature Review...', 'info');
           const res = await authenticatedFetch('/api/export/literature-review', {
             method: 'POST',
@@ -4734,6 +4842,8 @@
         } catch (err) {
           console.error('Export Literature Review failed:', err);
           showToast('Failed to export Literature Review: ' + err.message, 'error');
+        } finally {
+          setBusyState(btnExportLitReview, false);
         }
       });
     }
@@ -4843,21 +4953,22 @@
             <p class="text-xs text-slate-400 stage-detail font-mono text-[11px]">Connecting to academic endpoints...</p>
           </div>
 
-          <div class="synthesis-card bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-3 relative hidden">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
-              <div class="flex items-center space-x-2">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Literature Discovery Overview</span>
+          <div class="synthesis-card bg-slate-900/60 border border-slate-800/60 rounded-xl p-5 shadow-sm space-y-3 relative hidden">
+            <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/60">
+              <div class="flex items-center space-x-2 min-w-0">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                <span class="text-xs font-medium tracking-wide text-slate-300 truncate">Literature overview</span>
               </div>
-              <div class="flex items-center space-x-2">
-                <button class="btn-print-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Print or Save as PDF">
-                  <i data-lucide="printer" class="w-3.5 h-3.5 text-accent-400"></i>
+              <div class="flex items-center space-x-1 shrink-0" role="toolbar" aria-label="Overview actions">
+                <button class="btn-print-report inline-flex items-center space-x-1 px-2 py-1 rounded-md text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition" title="Print or save as PDF">
+                  <i data-lucide="printer" class="w-3.5 h-3.5"></i>
                   <span>PDF / Print</span>
                 </button>
-                <button class="btn-copy-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Markdown">
+                <button class="btn-copy-report inline-flex items-center space-x-1 px-2 py-1 rounded-md text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition" title="Copy Markdown">
                   <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
                   <span>Copy</span>
                 </button>
-                <button class="btn-download-report flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Download .md">
+                <button class="btn-download-report inline-flex items-center space-x-1 px-2 py-1 rounded-md text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition" title="Download .md">
                   <i data-lucide="download" class="w-3.5 h-3.5"></i>
                   <span>Export</span>
                 </button>
@@ -5082,10 +5193,21 @@
 
       if (btnPrintReport) {
         btnPrintReport.addEventListener('click', () => {
-          printTargetedOverviewReport({
-            inquiry: currentInquiry,
-            markdownHtml: markdownBody.innerHTML
-          });
+          if (btnPrintReport.disabled) return;
+          // Print opens a native dialog (no promise); hold a brief busy state
+          // so double-clicks can't spawn duplicate print frames.
+          setBusyState(btnPrintReport, true, 'Preparing…');
+          try {
+            printTargetedOverviewReport({
+              inquiry: currentInquiry,
+              markdownHtml: markdownBody.innerHTML
+            });
+          } catch (err) {
+            console.error('Overview print failed:', err);
+            showToast('Could not generate the PDF preview: ' + (err.message || err), 'error');
+          } finally {
+            setTimeout(() => setBusyState(btnPrintReport, false), 1500);
+          }
         });
       }
 

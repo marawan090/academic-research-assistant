@@ -29,6 +29,7 @@ from services.search import (
     clean_academic_query,
     deduplicate_and_rank,
     discover_paper_code_urls,
+    expand_semantic_concepts,
     fetch_arxiv_papers,
     fetch_entity_papers,
     fetch_openalex_papers,
@@ -936,19 +937,21 @@ async def research_stream_endpoint(
                 yield sse_event({"type": "done", "message": "Literature discovery complete (cache hit)."})
                 return
 
-            # Stage 1: Keyword extraction
-            yield sse_event({"type": "status", "stage": "extract_keywords", "message": "Extracting academic keywords and filtering conversational syntax..."})
+            # Stage 1: Semantic intent extraction (stage names unchanged per SSE contract)
+            yield sse_event({"type": "status", "stage": "extract_keywords", "message": "Extracting semantic intent and conceptual equivalents..."})
             await asyncio.sleep(0.05)
 
             keywords = clean_academic_query(clean_query)
             # Custom-search hardening: author/institution-only queries yield keywords == "".
             # Keep "" for fetchers (filter-only) but show a readable label in the status event.
             keywords_label = keywords or "(filters only — no topic keywords)"
+            semantic_concepts = expand_semantic_concepts(keywords) if keywords else []
             payload = {
                 "type": "status",
                 "stage": "keywords_ready",
                 "keywords": keywords,
-                "message": f"Target keywords: '{keywords_label}'",
+                "semantic_concepts": semantic_concepts,
+                "message": f"Target intent: '{keywords_label}'" + (f" (+{len(semantic_concepts)} related concepts)" if semantic_concepts else ""),
             }
             yield sse_event(payload)
 
@@ -960,6 +963,9 @@ async def research_stream_endpoint(
             metadata: Dict[str, Any] = {
                 "raw_inquiry": clean_query,
                 "extracted_keywords": keywords,
+                "semantic_intent": keywords,
+                "semantic_concepts": semantic_concepts,
+                "retrieval_mode": "semantic",
                 "author_filter": clean_author,
                 "institution_filter": clean_institution,
                 "search_mode": normalized_mode,
@@ -1032,7 +1038,8 @@ async def research_stream_endpoint(
                 openalex_papers,
                 top_k=limit,
                 author=clean_author,
-                institution=clean_institution
+                institution=clean_institution,
+                query=keywords,
             )
             metadata["final_count"] = len(final_papers)
 
@@ -1173,8 +1180,8 @@ async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
 async def generate_outreach_email_endpoint(payload: OutreachEmailRequest):
     """
     On-demand Professor Cold Outreach Email Generator.
-    Generates an intellectually rigorous, publication-grade academic email draft (<250 words)
-    to a paper author or PI with customizable bracketed placeholders.
+    Returns a sub-120-word faculty outreach draft (subject, body, word_count)
+    with bracketed placeholders, built from structured paper metadata.
     """
     if not payload.paper_title or not payload.paper_title.strip():
         return JSONResponse(
@@ -1197,10 +1204,15 @@ async def generate_outreach_email_endpoint(payload: OutreachEmailRequest):
             payload.orcarouter_key = runtime_config["orcarouter_api_key"] or None
 
         result = await llm_service.generate_outreach_email(payload)
+        body_text = str(result.get("body", ""))
+        word_count = result.get("word_count")
+        if not isinstance(word_count, int):
+            word_count = len(body_text.split()) if body_text else 0
         return {
             "status": "success",
             "subject": result.get("subject", ""),
-            "body": result.get("body", ""),
+            "body": body_text,
+            "word_count": word_count,
             "scope_type": payload.scope_type,
             "target_professor": payload.target_professor,
         }
