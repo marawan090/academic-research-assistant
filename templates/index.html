@@ -518,15 +518,35 @@
     html #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: #3f3f46 !important; color: #fafafa !important; box-shadow: none !important; }
     html.dark #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; }
 
+    /* Primary card CTA: quiet affordance, never loud (JS template keeps its own
+       classes; this layer guarantees contrast on the card surface) */
+    html .btn-explain-paper { background-color: rgba(39, 39, 42, 0.8) !important; background-image: none !important; color: #e4e4e7 !important; border: 1px solid rgba(63, 63, 70, 0.7) !important; border-radius: 6px !important; padding: 0.5rem 0.75rem !important; box-shadow: none !important; font-weight: 500 !important; }
+    html .btn-explain-paper:hover:not(:disabled) { background-color: #33373f !important; border-color: #52525b !important; color: #fafafa !important; }
+    html:not(.dark) .btn-explain-paper { background-color: #f4f4f5 !important; color: #27272a !important; border-color: #d4d4d8 !important; }
+    html:not(.dark) .btn-explain-paper:hover:not(:disabled) { background-color: #e4e4e7 !important; border-color: #a1a1aa !important; }
+    html .btn-explain-paper svg { color: #a1a1aa !important; }
+    html .btn-explain-paper:disabled { opacity: 0.45 !important; }
+
+    /* Secondary card toolbar (PDF / Cite / Thesis / Outreach): one quiet row */
+    html #discovered-papers-list [role="toolbar"] a, html #discovered-papers-list [role="toolbar"] button { background-color: #18181b !important; background-image: none !important; color: #d4d4d8 !important; border-color: #27272a !important; box-shadow: none !important; }
+    html #discovered-papers-list [role="toolbar"] a:hover, html #discovered-papers-list [role="toolbar"] button:hover { color: #fafafa !important; border-color: #3f3f46 !important; background-color: #23262e !important; }
+    html #discovered-papers-list [role="toolbar"] svg { color: #a1a1aa !important; }
+    html:not(.dark) #discovered-papers-list [role="toolbar"] a, html:not(.dark) #discovered-papers-list [role="toolbar"] button { background-color: #ffffff !important; color: #52525b !important; border-color: #e4e4e7 !important; }
+    html:not(.dark) #discovered-papers-list [role="toolbar"] a:hover, html:not(.dark) #discovered-papers-list [role="toolbar"] button:hover { color: #09090b !important; border-color: #a1a1aa !important; }
+
     /* Depth segmented on cards (JS sets .bg-brand-600 on the active depth) */
     html .depth-segmented-control .depth-btn.bg-brand-600 { background-color: #3f3f46 !important; color: #fafafa !important; box-shadow: none !important; }
     html.dark .depth-segmented-control .depth-btn.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; }
 
-    /* Workspace + discovery tabs (JS toggles .bg-brand-600 on the active tab) */
-    html #tab-discovered.bg-brand-600, html #tab-saved.bg-brand-600 { background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
-    html:not(.dark) #tab-discovered.bg-brand-600, html:not(.dark) #tab-saved.bg-brand-600 { background-color: #18181b !important; color: #fafafa !important; }
-    html #tab-discovered, html #tab-saved { font-family: 'JetBrains Mono', ui-monospace, monospace !important; font-size: 11px !important; border-radius: 6px !important; box-shadow: none !important; }
-    html #tab-discovered:not(.bg-brand-600), html #tab-saved:not(.bg-brand-600) { color: #71717a !important; }
+    /* Workspace tabs: subtle segmented pair (JS toggles .bg-brand-600 on the active tab).
+       Active = muted zinc fill, never a full-width glaring block; layout held stable
+       with a transparent border on the inactive side. */
+    html #tab-discovered, html #tab-saved { font-family: 'JetBrains Mono', ui-monospace, monospace !important; font-size: 11px !important; border-radius: 6px !important; box-shadow: none !important; padding: 0.375rem 0.75rem !important; border: 1px solid transparent !important; transition: color .15s, background-color .15s, border-color .15s !important; }
+    html #tab-discovered.bg-brand-600, html #tab-saved.bg-brand-600 { background-color: rgba(39, 39, 42, 0.8) !important; color: #f4f4f5 !important; border-color: rgba(63, 63, 70, 0.6) !important; font-weight: 500 !important; }
+    html:not(.dark) #tab-discovered.bg-brand-600, html:not(.dark) #tab-saved.bg-brand-600 { background-color: #e4e4e7 !important; color: #18181b !important; border-color: #d4d4d8 !important; }
+    html #tab-discovered:not(.bg-brand-600), html #tab-saved:not(.bg-brand-600) { color: #a1a1aa !important; background: transparent !important; font-weight: 400 !important; }
+    html #tab-discovered:not(.bg-brand-600):hover, html #tab-saved:not(.bg-brand-600):hover { color: #e4e4e7 !important; }
+    html:not(.dark) #tab-discovered:not(.bg-brand-600):hover, html:not(.dark) #tab-saved:not(.bg-brand-600):hover { color: #18181b !important; }
 
     /* Primary gradient buttons rendered calm: outreach generate, mailto, compare, broadcast */
     html #btn-run-outreach, html #btn-mailto-outreach { background-image: none !important; background-color: #e4e4e7 !important; color: #09090b !important; box-shadow: none !important; }
@@ -539,6 +559,15 @@
     /* Monospace metadata: badges, counters, timers read as instrument readouts */
     html #papers-drawer .uppercase.tracking-wider, html #papers-drawer .tabular-nums { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
     html .stage-timer, html .paper-timer { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
+
+    /* Literature overview card: zinc type system (backend markdown renders blue
+       h3/link/quote accents via .prose-academic; neutralize here, scoped) */
+    html .synthesis-card .markdown-body.prose-academic h1, html .synthesis-card .markdown-body.prose-academic h2, html .synthesis-card .markdown-body.prose-academic h3 { color: #f4f4f5 !important; font-weight: 600 !important; border-bottom-color: #3f3f46 !important; }
+    html .synthesis-card .markdown-body.prose-academic p, html .synthesis-card .markdown-body.prose-academic li { color: #d4d4d8 !important; }
+    html .synthesis-card .markdown-body.prose-academic strong { color: #fafafa !important; }
+    html .synthesis-card .markdown-body.prose-academic a { color: #e4e4e7 !important; text-decoration: underline !important; text-underline-offset: 3px !important; }
+    html .synthesis-card .markdown-body.prose-academic code { background: #27272a !important; color: #e4e4e7 !important; }
+    html .synthesis-card .markdown-body.prose-academic blockquote { border-left: 2px solid #52525b !important; background: rgba(39, 39, 42, 0.4) !important; color: #a1a1aa !important; font-style: normal !important; }
 
     /* Slim status dot: no ping halo (JS rewrites badge classes at runtime; neutralize here) */
     html #server-status-dot.animate-pulse { animation: none !important; }
@@ -818,13 +847,13 @@
       <!-- Drawer Header & Workspace Tabs -->
       <div class="flex-none px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#090A0F]/90 flex items-center justify-between gap-2">
         <!-- Compact workspace counters -->
-        <div class="flex items-center space-x-1 text-xs" role="tablist" aria-label="Workspace">
-          <button id="tab-discovered" class="px-2 py-1 rounded-md font-mono text-[11px] bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 transition flex items-center space-x-1.5 cursor-pointer">
+        <div class="flex items-center gap-1 p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800" role="tablist" aria-label="Workspace">
+          <button id="tab-discovered" class="px-3 py-1.5 rounded-md font-mono text-[11px] font-medium bg-zinc-800 text-zinc-100 border border-zinc-700/60 transition-colors flex items-center space-x-1.5 cursor-pointer">
             <span>discovered</span>
             <span id="tab-discovered-badge" class="tabular-nums opacity-70"><span id="discovered-count">0</span></span>
             <span id="paper-count-badge" class="hidden">0 papers</span>
           </button>
-          <button id="tab-saved" class="px-2 py-1 rounded-md font-mono text-[11px] text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition flex items-center space-x-1.5 cursor-pointer">
+          <button id="tab-saved" class="px-3 py-1.5 rounded-md font-mono text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center space-x-1.5 cursor-pointer">
             <span>saved</span>
             <span id="tab-saved-badge" class="tabular-nums opacity-70">0</span>
           </button>
@@ -859,9 +888,9 @@
             placeholder="Filter loaded papers..."
             aria-label="Filter loaded papers by author or institution"
             title="Filter loaded papers by author or institution"
-            class="w-full pl-8 pr-16 py-1 text-[11px] font-mono bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition"
+            class="w-full pl-8 pr-14 py-1 text-[11px] font-mono bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition"
           />
-          <span id="filter-match-count" class="absolute right-1.5 top-1/2 -translate-y-1/2 max-w-[4.5rem] truncate text-[10px] font-mono tabular-nums text-zinc-500 dark:text-zinc-500 pointer-events-none empty:hidden"></span>
+          <span id="filter-match-count" class="absolute right-2 top-1/2 -translate-y-1/2 max-w-[3.25rem] truncate text-zinc-500 font-mono text-[11px] tabular-nums select-none pointer-events-none empty:hidden"></span>
         </div>
       </div>
 
@@ -1073,6 +1102,7 @@
           <select id="outreach-recipient-select" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-brand-500 focus:outline-none cursor-pointer">
             <!-- Dynamically populated options -->
           </select>
+          <p id="outreach-pi-hint" class="mt-1 text-[10px] font-mono text-slate-400 dark:text-slate-500"></p>
         </div>
 
         <!-- Scope Mode Toggle -->
@@ -3508,25 +3538,70 @@
         outreachPaperTitle.textContent = paper.title || 'Academic Paper';
       }
 
-      // Populate recipient select dynamically
+      // PI auto-resolution: corresponding-author record first, CS last-author
+      // convention otherwise. Mirrors backend detect_likely_pi() ordering.
+      function resolveOutreachPI(names, details) {
+        const clean = (names || []).map(n => (n || '').trim()).filter(Boolean);
+        if (clean.length === 0) return { piIndex: -1, signal: 'none' };
+        if (clean.length === 1) return { piIndex: 0, signal: 'sole_author' };
+        const det = Array.isArray(details) ? details : [];
+        for (let i = 0; i < clean.length; i++) {
+          if (det[i] && det[i].is_corresponding === true) return { piIndex: i, signal: 'corresponding' };
+        }
+        for (let i = clean.length - 1; i >= 0; i--) {
+          if (det[i] && String(det[i].position || '').toLowerCase() === 'last') return { piIndex: i, signal: 'position' };
+        }
+        return { piIndex: clean.length - 1, signal: 'last_author' };
+      }
+
+      // Populate recipient select dynamically (PI pre-selected with badge)
       if (outreachRecipientSelect) {
         outreachRecipientSelect.innerHTML = '';
         let authorsList = [];
         if (Array.isArray(paper.authors) && paper.authors.length > 0) {
-          authorsList = paper.authors;
+          authorsList = paper.authors.map(a => (a || '').trim()).filter(Boolean);
         } else if (typeof paper.authors === 'string' && paper.authors.trim()) {
           authorsList = paper.authors.split(/,|;/).map(a => a.trim()).filter(Boolean);
         } else {
           authorsList = ['Lead Author / Principal Investigator'];
         }
 
-        authorsList.forEach((auth, idx) => {
+        const piRes = resolveOutreachPI(authorsList, paper.author_details);
+        const piName = piRes.piIndex >= 0 ? authorsList[piRes.piIndex] : '';
+        const PI_ROLE = 'Lab Lead / Principal Investigator';
+        const LEAD_ROLE = 'Lead Author / Researcher';
+
+        const signalHints = {
+          corresponding: 'Auto-selected PI · corresponding-author record',
+          position: 'Auto-selected PI · senior-author position',
+          last_author: 'Auto-selected PI · last-author convention',
+          sole_author: 'Single author · auto-selected',
+          none: ''
+        };
+
+        const added = new Set();
+        function addOption(name, badge, role, selected) {
+          if (!name || added.has(name)) return;
+          added.add(name);
           const opt = document.createElement('option');
-          opt.value = auth;
-          opt.textContent = auth;
-          if (idx === 0) opt.selected = true;
+          opt.value = name;
+          opt.textContent = badge ? `${name}  [${badge}]` : name;
+          opt.dataset.role = role;
+          if (selected) opt.selected = true;
           outreachRecipientSelect.appendChild(opt);
+        }
+
+        // PI first and pre-selected; first author offered as the builder alternative.
+        if (piName) addOption(piName, 'PI / Lab Head', PI_ROLE, true);
+        authorsList.forEach((auth, idx) => {
+          if (auth === piName) return;
+          const badge = (idx === 0 && authorsList.length > 1) ? 'Lead Author' : '';
+          const role = (idx === 0 && authorsList.length > 1) ? LEAD_ROLE : 'Co-author';
+          addOption(auth, badge, role, false);
         });
+
+        const piHint = document.getElementById('outreach-pi-hint');
+        if (piHint) piHint.textContent = signalHints[piRes.signal] || '';
       }
 
       setOutreachScope('single_paper');
@@ -3641,7 +3716,9 @@
               abstract: currentOutreachPaper.abstract || '',
               target_professor: targetProf,
               scope_type: currentOutreachScope,
-              institution_name: (Array.isArray(currentOutreachPaper.institutions) && currentOutreachPaper.institutions[0]) || ''
+              institution_name: (Array.isArray(currentOutreachPaper.institutions) && currentOutreachPaper.institutions[0]) || '',
+              recipient_role: (outreachRecipientSelect && outreachRecipientSelect.selectedOptions && outreachRecipientSelect.selectedOptions[0] && outreachRecipientSelect.selectedOptions[0].dataset.role) || '',
+              author_details: Array.isArray(currentOutreachPaper.author_details) ? currentOutreachPaper.author_details : []
             })
           });
 

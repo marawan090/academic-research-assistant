@@ -439,6 +439,117 @@ class Paper(BaseModel):
     primary_category: Optional[str] = None
     url: Optional[str] = None
     code_url: Optional[str] = None
+    # PI-detection signals (populated by OpenAlex parsers; empty for ArXiv/SS).
+    # author_details aligns positionally with `authors`:
+    # [{"name": str, "position": "first"|"middle"|"last"|"", "is_corresponding": bool}]
+    corresponding_author: Optional[str] = None
+    author_details: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+PI_ROLE_HINT = "Lab Lead / Principal Investigator"
+LEAD_AUTHOR_ROLE_HINT = "Lead Author / Researcher"
+
+
+def detect_likely_pi(
+    authors: List[str],
+    author_details: Optional[List[Dict[str, Any]]] = None,
+    author_metrics: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """
+    Resolve the likely Principal Investigator / Lab Head for outreach targeting.
+
+    Signal priority (first hit wins):
+      1. "seniority" — author_metrics[name] with the highest (citations, h-index).
+         Metrics come from OpenAlex author records when callers enrich them;
+         pure/local, no network calls inside this helper.
+      2. "corresponding" — author flagged is_corresponding in OpenAlex authorships.
+      3. "position" — author with explicit position == "last".
+      4. "last_author" — CS convention fallback: final name in the author list.
+      5. "sole_author" — single-author papers (trivially the PI and the builder).
+    Empty author lists yield pi_index -1 / signal "none" (no hallucinated names).
+
+    Returns {"pi_name", "pi_index", "signal", "authors": [
+      {"name", "index", "is_likely_pi", "role_hint"}]} — the flagged entry carries
+    is_likely_pi=True and role_hint="Lab Lead / Principal Investigator".
+    """
+    names = [(a or "").strip() for a in (authors or [])]
+    names = [n for n in names if n]
+    annotated: List[Dict[str, Any]] = []
+    if not names:
+        return {"pi_name": "", "pi_index": -1, "signal": "none", "authors": annotated}
+
+    details = list(author_details or [])
+
+    def _detail_at(i: int) -> Dict[str, Any]:
+        if 0 <= i < len(details) and isinstance(details[i], dict):
+            return details[i]
+        return {}
+
+    pi_index = -1
+    signal = "last_author"
+
+    # 1. Seniority metrics (highest citations, h-index breaks ties).
+    if author_metrics:
+        best_key: Tuple[int, int] = (-1, -1)
+        for i, name in enumerate(names):
+            m = author_metrics.get(name) or {}
+            try:
+                cites = int(m.get("citations") or m.get("cited_by_count") or 0)
+            except (TypeError, ValueError):
+                cites = 0
+            try:
+                h = int(m.get("h_index") or m.get("hindex") or 0)
+            except (TypeError, ValueError):
+                h = 0
+            if (cites, h) > best_key and (cites > 0 or h > 0):
+                best_key = (cites, h)
+                pi_index = i
+        if pi_index >= 0:
+            signal = "seniority"
+
+    # 2. Corresponding-author flag from OpenAlex authorship records.
+    if pi_index < 0:
+        for i, name in enumerate(names):
+            d = _detail_at(i)
+            if d.get("is_corresponding") is True:
+                pi_index = i
+                signal = "corresponding"
+                break
+
+    # 3. Explicit last-position record.
+    if pi_index < 0:
+        for i in range(len(names) - 1, -1, -1):
+            if str(_detail_at(i).get("position") or "").lower() == "last":
+                pi_index = i
+                signal = "position"
+                break
+
+    # 4/5. CS last-author convention (== sole author when len == 1).
+    if pi_index < 0:
+        pi_index = len(names) - 1
+        signal = "sole_author" if len(names) == 1 else "last_author"
+
+    for i, name in enumerate(names):
+        is_pi = (i == pi_index)
+        if is_pi:
+            hint = PI_ROLE_HINT
+        elif i == 0 and len(names) > 1:
+            hint = LEAD_AUTHOR_ROLE_HINT
+        else:
+            hint = "Co-author"
+        annotated.append({
+            "name": name,
+            "index": i,
+            "is_likely_pi": is_pi,
+            "role_hint": hint,
+        })
+
+    return {
+        "pi_name": names[pi_index],
+        "pi_index": pi_index,
+        "signal": signal,
+        "authors": annotated,
+    }
 
 
 def clean_academic_query(raw_query: str) -> str:
@@ -1114,6 +1225,43 @@ async def resolve_openalex_institution_id(
     return None
 
 
+def _extract_openalex_authorship(
+    authorships: Any,
+) -> Tuple[List[str], List[str], Optional[str], List[Dict[str, Any]]]:
+    """
+    Parse OpenAlex authorship records into (authors, institutions,
+    corresponding_author, author_details). Zero network calls — straight
+    field extraction feeding Paper PI-detection signals.
+    """
+    authors: List[str] = []
+    institutions: List[str] = []
+    corresponding: Optional[str] = None
+    details: List[Dict[str, Any]] = []
+    for a in (authorships or []):
+        if not isinstance(a, dict):
+            continue
+        author_obj = a.get("author", {})
+        display = (author_obj.get("display_name") or "").strip() if isinstance(author_obj, dict) else ""
+        if display:
+            authors.append(display)
+        position = str(a.get("author_position") or "").strip().lower()
+        is_corr = a.get("is_corresponding_author") is True
+        if display:
+            if is_corr and corresponding is None:
+                corresponding = display
+            details.append({
+                "name": display,
+                "position": position,
+                "is_corresponding": is_corr,
+            })
+        for inst in a.get("institutions", []):
+            if isinstance(inst, dict) and inst.get("display_name"):
+                iname = inst["display_name"].strip()
+                if iname and iname not in institutions:
+                    institutions.append(iname)
+    return authors, institutions, corresponding, details
+
+
 async def fetch_openalex_papers(
     keywords: str,
     client: httpx.AsyncClient,
@@ -1191,20 +1339,10 @@ async def fetch_openalex_papers(
             if not title:
                 continue
 
-            # Authors & Institutions
-            authorships = item.get("authorships", [])
-            authors = []
-            institutions = []
-            for a in authorships:
-                if isinstance(a, dict):
-                    author_obj = a.get("author", {})
-                    if isinstance(author_obj, dict) and author_obj.get("display_name"):
-                        authors.append(author_obj["display_name"])
-                    for inst in a.get("institutions", []):
-                        if isinstance(inst, dict) and inst.get("display_name"):
-                            iname = inst["display_name"].strip()
-                            if iname and iname not in institutions:
-                                institutions.append(iname)
+            # Authors, Institutions & PI signals (corresponding/position records)
+            authors, institutions, corresponding, details = _extract_openalex_authorship(
+                item.get("authorships", [])
+            )
 
             # Year
             year = item.get("publication_year")
@@ -1244,6 +1382,8 @@ async def fetch_openalex_papers(
                     primary_category=None,
                     url=canonical_url,
                     code_url=None,
+                    corresponding_author=corresponding,
+                    author_details=details,
                 )
             )
 
@@ -1306,19 +1446,9 @@ async def fetch_entity_papers(
         title = (item.get("title") or "").strip()
         if not title:
             return None
-        authorships = item.get("authorships", [])
-        authors = []
-        institutions = []
-        for a in authorships:
-            if isinstance(a, dict):
-                author_obj = a.get("author", {})
-                if isinstance(author_obj, dict) and author_obj.get("display_name"):
-                    authors.append(author_obj["display_name"])
-                for inst in a.get("institutions", []):
-                    if isinstance(inst, dict) and inst.get("display_name"):
-                        iname = inst["display_name"].strip()
-                        if iname and iname not in institutions:
-                            institutions.append(iname)
+        authors, institutions, corresponding, details = _extract_openalex_authorship(
+            item.get("authorships", [])
+        )
         year = item.get("publication_year")
         if not isinstance(year, int):
             year = None
@@ -1343,7 +1473,9 @@ async def fetch_entity_papers(
             source="OpenAlex",
             primary_category=None,
             url=canonical_url,
-            code_url=None
+            code_url=None,
+            corresponding_author=corresponding,
+            author_details=details
         )
 
     if entity_type_clean == "institution":

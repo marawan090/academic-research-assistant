@@ -15,7 +15,13 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import httpx
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from .search import Paper, get_shared_http_client
+from .search import (
+    Paper,
+    PI_ROLE_HINT,
+    LEAD_AUTHOR_ROLE_HINT,
+    detect_likely_pi,
+    get_shared_http_client,
+)
 
 logger = logging.getLogger("academic_assistant.llm")
 
@@ -34,6 +40,9 @@ class OutreachEmailRequest(BaseModel):
     # Structured outreach metadata (all optional; safe fallbacks applied when absent)
     core_method_or_contribution: str = ""
     institution_name: str = ""
+    # PI-detection wiring (all optional; server re-derives when absent)
+    recipient_role: str = ""
+    author_details: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ComparePapersRequest(BaseModel):
@@ -392,12 +401,15 @@ def generate_fallback_outreach_email(
     authors: Optional[List[str]] = None,
     core_method_or_contribution: str = "",
     institution_name: str = "",
+    recipient_role: str = "",
 ) -> Dict[str, Any]:
     """
     Deterministic sub-120-word academic outreach draft (offline fallback).
     Framework: technical hook -> bridge (built artifact or crisp question) ->
     one-line proof -> frictionless low ask. All caller facts are optional;
     safe neutral fallbacks guarantee no empty or dangling placeholders.
+    PI recipients get lab-openings framing; lead researchers get an
+    implementation-exchange ask instead.
     """
     last_name = _extract_professor_last_name(target_professor)
     clean_title = (paper_title or "").strip().rstrip(".") or "your recent paper"
@@ -405,6 +417,14 @@ def generate_fallback_outreach_email(
     method, hook, open_q = _extract_core_method(clean_title, abstract, core_method_or_contribution)
     method_short = _truncate_words(method, 45)
     scope = "holistic_lab" if scope_type == "holistic_lab" else "single_paper"
+
+    # Faculty-leader framing for PIs; implementer framing otherwise.
+    if (recipient_role or "").strip() == PI_ROLE_HINT:
+        ask_line = "Are you accepting students for [Term/Year]?"
+    elif (recipient_role or "").strip() == LEAD_AUTHOR_ROLE_HINT:
+        ask_line = "Would you be open to a brief exchange on the implementation details?"
+    else:
+        ask_line = "Are you accepting students for [Term/Year]?"
 
     if scope == "holistic_lab":
         subject = f"{method_short} inquiry — prospective student"
@@ -425,7 +445,7 @@ def generate_fallback_outreach_email(
         f"I am completing my [Degree/Program] at [University], working on [relevant skill].\n"
         f"- Proof: [link to reproduction repo/demo]\n\n"
         f"Would you have 5 minutes for a quick feedback exchange? "
-        f"Are you accepting students for [Term/Year]?\n\n"
+        f"{ask_line}\n\n"
         f"Sincerely,\n"
         f"[Your Full Name]\n"
         f"[Contact / GitHub]"
@@ -1932,7 +1952,40 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
         )
         institution = (payload.institution_name or "").strip() or "N/A"
 
-        cache_key = f"outreach:v2:{scope}:{target_prof.lower()}:{title.lower()}"
+        # PI resolution: explicit client role wins; otherwise re-derive from
+        # embedded OpenAlex signals (corresponding -> last-author convention).
+        pi_info = detect_likely_pi(
+            authors_list or [target_prof],
+            author_details=payload.author_details or [],
+        )
+        pi_name = pi_info.get("pi_name", "")
+        if (payload.recipient_role or "").strip():
+            recipient_role = payload.recipient_role.strip()[:80]
+        elif target_prof.lower() == (pi_name or "").lower() and pi_name:
+            recipient_role = PI_ROLE_HINT
+        elif authors_list and target_prof.lower() == authors_list[0].lower():
+            recipient_role = LEAD_AUTHOR_ROLE_HINT
+        else:
+            recipient_role = "Co-author"
+        is_pi_recipient = recipient_role == PI_ROLE_HINT
+        if is_pi_recipient:
+            recipient_framing = (
+                "Address them as the faculty leader: frame the question toward their "
+                "group's vision and prospective lab openings. Do NOT mistake them for "
+                "the hands-on student implementer."
+            )
+        elif recipient_role == LEAD_AUTHOR_ROLE_HINT:
+            recipient_framing = (
+                "Address them as the lead researcher who built the work: focus on "
+                "implementation details and reproduction."
+            )
+        else:
+            recipient_framing = "Address them as a contributing co-author of the work."
+        where = f" at {institution}" if institution != "N/A" else ""
+        recipient_line = f"Recipient: {target_prof} (Role: {recipient_role}{where})"
+
+        role_slug = re.sub(r"[^a-z0-9]+", "-", recipient_role.lower()).strip("-") or "auto"
+        cache_key = f"outreach:v2:{scope}:{target_prof.lower()}:{title.lower()}:{role_slug}"
         cached_json = synthesis_cache.get(cache_key)
         if cached_json is not None:
             try:
@@ -1956,6 +2009,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 authors=authors_list,
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
+                recipient_role=recipient_role,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -1971,6 +2025,8 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
             f"- Suggested Open Question: {open_q}\n"
             f"- Lead Author Institution: {institution}\n"
             f"- Target Professor: {target_prof}\n"
+            f"- {recipient_line}\n"
+            f"- Recipient Framing: {recipient_framing}\n"
             f"- Scope Mode: {scope}\n\n"
             f"Remember: body strictly under 120 words, low-friction ask only, bracketed "
             f"placeholders for applicant facts, and output strictly JSON with keys "
@@ -2032,6 +2088,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 authors=authors_list,
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
+                recipient_role=recipient_role,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -2046,6 +2103,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
                 authors=authors_list,
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
+                recipient_role=recipient_role,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
