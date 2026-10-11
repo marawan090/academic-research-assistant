@@ -1,6 +1,6 @@
 """
 Academic Research Assistant - FastAPI Main Application.
-Provides concurrent academic search, streaming LLM synthesis via OrcaRouter/DeepSeek,
+Provides concurrent academic search, streaming LLM synthesis via OrcaRouter/AI,
 and a modern responsive single-page web interface.
 """
 
@@ -50,6 +50,12 @@ from services.llm import (
     generate_compare_matrix,
 )
 from services.telemetry import telemetry_manager
+from services.db import (
+    get_current_user,
+    get_supabase_client,
+    get_user_client,
+    is_configured as supabase_configured,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -95,7 +101,7 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI App with Lifespan
 app = FastAPI(
     title="Academic Research Assistant",
-    description="Asynchronous Academic Research Assistant with ArXiv, Semantic Scholar, and OrcaRouter DeepSeek Synthesis",
+    description="Asynchronous Academic Research Assistant with ArXiv, Semantic Scholar, and OrcaRouter AI Synthesis",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -578,6 +584,373 @@ class AdminLimitsRequest(BaseModel):
     key_hourly_limit: Optional[int] = Field(default=None)
 
 
+# ============================================================================
+# Supabase Persistence API (sessions history, artifacts, saved papers)
+# Auth: Supabase Bearer tokens via get_current_user — fully independent of the
+# Axiom cohort gate so guest/offline search pipelines are never affected.
+# Writes require auth (401); reads fall back gracefully ([]) for guests.
+# ============================================================================
+
+class SessionCreateRequest(BaseModel):
+    title: str = Field(default="Untitled session", max_length=200)
+    search_mode: str = Field(default="topic", max_length=32)
+    query_params: Optional[Dict[str, Any]] = Field(default=None)
+    discovered_paper_ids: Optional[List[str]] = Field(default=None)
+    session_id: Optional[str] = Field(default=None, description="If set, update this session instead of inserting")
+
+
+class MessageCreateRequest(BaseModel):
+    session_id: str
+    role: str = Field(max_length=16)
+    content: str
+
+
+class ArtifactCreateRequest(BaseModel):
+    session_id: Optional[str] = Field(default=None)
+    artifact_type: str = Field(max_length=32)
+    title: str = Field(default="", max_length=200)
+    target_paper_id: Optional[str] = Field(default=None, max_length=128)
+    content: str
+
+
+class SavedPaperCreateRequest(BaseModel):
+    paper_id: str = Field(max_length=256)
+    paper_metadata: Optional[Dict[str, Any]] = Field(default=None)
+
+
+ARTIFACT_TYPES = {"outreach", "thesis", "ieee_review"}
+
+
+def _require_supabase():
+    """Return (client_or_None, error_response_or_None)."""
+    client = get_supabase_client()
+    if client is None:
+        return None, JSONResponse(
+            status_code=503,
+            content={"error": "History backend not configured (Supabase unavailable)."},
+        )
+    return client, None
+
+
+def _require_user(user: Optional[Dict[str, Any]]):
+    if not user:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Authentication required. Please sign in."},
+        )
+    return None
+
+
+@app.get("/api/history/sessions")
+async def list_history_sessions(user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """Return the current user's sessions ordered by created_at desc (guest: [])."""
+    if not user:
+        return {"sessions": []}
+    client, err = _require_supabase()
+    if err is not None:
+        return {"sessions": []}
+    try:
+        uclient = get_user_client(user["token"])
+        res = (
+            (uclient or client).table("research_sessions")
+            .select("*")
+            .eq("user_id", user["id"])
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return {"sessions": res.data or []}
+    except Exception as e:
+        logger.error("Failed to list history sessions: %s", str(e))
+        return {"sessions": []}
+
+
+@app.post("/api/history/sessions")
+async def create_history_session(
+    payload: SessionCreateRequest,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Create (or update, when session_id is given) a research session. Auth required."""
+    auth_err = _require_user(user)
+    if auth_err is not None:
+        return auth_err
+    client, err = _require_supabase()
+    if err is not None:
+        return err
+    assert user is not None
+    try:
+        uclient = get_user_client(user["token"]) or client
+        if payload.session_id:
+            res = (
+                uclient.table("research_sessions")
+                .update({
+                    "title": payload.title,
+                    "search_mode": payload.search_mode,
+                    "query_params": payload.query_params or {},
+                    "discovered_paper_ids": payload.discovered_paper_ids or [],
+                })
+                .eq("id", payload.session_id)
+                .eq("user_id", user["id"])
+                .execute()
+            )
+            rows = res.data or []
+            if not rows:
+                raise HTTPException(status_code=404, detail="Session not found.")
+            return {"status": "ok", "session_id": rows[0].get("id", payload.session_id)}
+        res = (
+            uclient.table("research_sessions")
+            .insert({
+                "user_id": user["id"],
+                "title": payload.title,
+                "search_mode": payload.search_mode,
+                "query_params": payload.query_params or {},
+                "discovered_paper_ids": payload.discovered_paper_ids or [],
+            })
+            .execute()
+        )
+        rows = res.data or []
+        if not rows or not rows[0].get("id"):
+            raise HTTPException(status_code=502, detail="Session insert returned no id.")
+        return {"status": "ok", "session_id": rows[0]["id"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to create history session: %s", str(e))
+        return JSONResponse(status_code=502, content={"error": f"Failed to save session: {str(e)}"})
+
+
+@app.get("/api/history/sessions/{session_id}")
+async def get_history_session(
+    session_id: str,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Return session details plus related session_messages (guest/foreign: 404-safe {})."""
+    if not user:
+        return {"session": None, "messages": []}
+    client, err = _require_supabase()
+    if err is not None:
+        return {"session": None, "messages": []}
+    try:
+        uclient = get_user_client(user["token"]) or client
+        sess = (
+            uclient.table("research_sessions")
+            .select("*")
+            .eq("id", session_id)
+            .eq("user_id", user["id"])
+            .execute()
+        )
+        rows = sess.data or []
+        if not rows:
+            return {"session": None, "messages": []}
+        msgs = (
+            uclient.table("session_messages")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return {"session": rows[0], "messages": msgs.data or []}
+    except Exception as e:
+        logger.error("Failed to fetch history session %s: %s", session_id, str(e))
+        return {"session": None, "messages": []}
+
+
+@app.post("/api/history/messages")
+async def append_history_message(
+    payload: MessageCreateRequest,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Append a {session_id, role, content} message. Auth required."""
+    auth_err = _require_user(user)
+    if auth_err is not None:
+        return auth_err
+    client, err = _require_supabase()
+    if err is not None:
+        return err
+    assert user is not None
+    if payload.role not in ("user", "assistant", "system"):
+        return JSONResponse(status_code=400, content={"error": "role must be user|assistant|system."})
+    try:
+        uclient = get_user_client(user["token"]) or client
+        own = (
+            uclient.table("research_sessions")
+            .select("id")
+            .eq("id", payload.session_id)
+            .eq("user_id", user["id"])
+            .execute()
+        )
+        if not (own.data or []):
+            raise HTTPException(status_code=404, detail="Session not found.")
+        res = (
+            uclient.table("session_messages")
+            .insert({
+                "session_id": payload.session_id,
+                "role": payload.role,
+                "content": payload.content,
+            })
+            .execute()
+        )
+        rows = res.data or []
+        return {"status": "ok", "message_id": rows[0].get("id") if rows else None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to append history message: %s", str(e))
+        return JSONResponse(status_code=502, content={"error": f"Failed to save message: {str(e)}"})
+
+
+@app.get("/api/artifacts")
+async def list_artifacts(
+    artifact_type: Optional[str] = Query(None, description="Filter: outreach|thesis|ieee_review"),
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Fetch the current user's saved artifacts (guest: [])."""
+    if not user:
+        return {"artifacts": []}
+    client, err = _require_supabase()
+    if err is not None:
+        return {"artifacts": []}
+    try:
+        uclient = get_user_client(user["token"]) or client
+        q = (
+            uclient.table("saved_artifacts")
+            .select("*")
+            .eq("user_id", user["id"])
+            .order("created_at", desc=True)
+        )
+        if artifact_type:
+            q = q.eq("artifact_type", artifact_type)
+        res = q.execute()
+        return {"artifacts": res.data or []}
+    except Exception as e:
+        logger.error("Failed to list artifacts: %s", str(e))
+        return {"artifacts": []}
+
+
+@app.post("/api/artifacts")
+async def create_artifact(
+    payload: ArtifactCreateRequest,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Save an outreach/thesis/ieee_review artifact. Auth required."""
+    auth_err = _require_user(user)
+    if auth_err is not None:
+        return auth_err
+    client, err = _require_supabase()
+    if err is not None:
+        return err
+    assert user is not None
+    if payload.artifact_type not in ARTIFACT_TYPES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "artifact_type must be one of: outreach, thesis, ieee_review."},
+        )
+    if not payload.content.strip():
+        return JSONResponse(status_code=400, content={"error": "content cannot be empty."})
+    try:
+        uclient = get_user_client(user["token"]) or client
+        res = (
+            uclient.table("saved_artifacts")
+            .insert({
+                "user_id": user["id"],
+                "session_id": payload.session_id,
+                "artifact_type": payload.artifact_type,
+                "title": payload.title,
+                "target_paper_id": payload.target_paper_id,
+                "content": payload.content,
+            })
+            .execute()
+        )
+        rows = res.data or []
+        return {"status": "ok", "artifact_id": rows[0].get("id") if rows else None}
+    except Exception as e:
+        logger.error("Failed to save artifact: %s", str(e))
+        return JSONResponse(status_code=502, content={"error": f"Failed to save artifact: {str(e)}"})
+
+
+@app.get("/api/papers/saved")
+async def list_saved_papers(user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """Return the current user's bookmarked papers (guest: [])."""
+    if not user:
+        return {"papers": []}
+    client, err = _require_supabase()
+    if err is not None:
+        return {"papers": []}
+    try:
+        uclient = get_user_client(user["token"]) or client
+        res = (
+            uclient.table("saved_papers")
+            .select("*")
+            .eq("user_id", user["id"])
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return {"papers": res.data or []}
+    except Exception as e:
+        logger.error("Failed to list saved papers: %s", str(e))
+        return {"papers": []}
+
+
+@app.post("/api/papers/saved")
+async def save_paper_bookmark(
+    payload: SavedPaperCreateRequest,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Bookmark a paper (idempotent). Auth required."""
+    auth_err = _require_user(user)
+    if auth_err is not None:
+        return auth_err
+    client, err = _require_supabase()
+    if err is not None:
+        return err
+    assert user is not None
+    if not payload.paper_id.strip():
+        return JSONResponse(status_code=400, content={"error": "paper_id cannot be empty."})
+    try:
+        uclient = get_user_client(user["token"]) or client
+        existing = (
+            uclient.table("saved_papers")
+            .select("paper_id")
+            .eq("user_id", user["id"])
+            .eq("paper_id", payload.paper_id)
+            .execute()
+        )
+        if existing.data:
+            return {"status": "ok", "paper_id": payload.paper_id, "deduped": True}
+        uclient.table("saved_papers").insert({
+            "user_id": user["id"],
+            "paper_id": payload.paper_id,
+            "paper_metadata": payload.paper_metadata or {},
+        }).execute()
+        return {"status": "ok", "paper_id": payload.paper_id, "deduped": False}
+    except Exception as e:
+        logger.error("Failed to save paper bookmark: %s", str(e))
+        return JSONResponse(status_code=502, content={"error": f"Failed to save paper: {str(e)}"})
+
+
+@app.delete("/api/papers/saved/{paper_id}")
+async def delete_paper_bookmark(
+    paper_id: str,
+    user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Remove a bookmark. Auth required."""
+    auth_err = _require_user(user)
+    if auth_err is not None:
+        return auth_err
+    client, err = _require_supabase()
+    if err is not None:
+        return err
+    assert user is not None
+    try:
+        uclient = get_user_client(user["token"]) or client
+        uclient.table("saved_papers").delete().eq("user_id", user["id"]).eq(
+            "paper_id", paper_id
+        ).execute()
+        return {"status": "ok", "paper_id": paper_id}
+    except Exception as e:
+        logger.error("Failed to delete paper bookmark: %s", str(e))
+        return JSONResponse(status_code=502, content={"error": f"Failed to remove paper: {str(e)}"})
+
+
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui(request: Request):
@@ -931,7 +1304,7 @@ async def research_stream_endpoint(
                     f"- **Discovered Papers**: **{len(selected_papers)}** high-signal papers retrieved from cache ({source_breakdown}).\n"
                     f"- **Sidebar Available**: All identified papers are rendered with metadata, citations, and PDF links in the **Discovered Papers** sidebar.\n\n"
                     f"> [!TIP]\n"
-                    f"> Click **'Explain Paper with DeepSeek'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
+                    f"> Click **'Explain Paper with AI'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
                 )
                 yield sse_event({"type": "token", "content": overview_summary})
                 yield sse_event({"type": "done", "message": "Literature discovery complete (cache hit)."})
@@ -1068,7 +1441,7 @@ async def research_stream_endpoint(
                 f"- **Multi-Source Repositories**: Cross-referenced ArXiv CS, Semantic Scholar, and OpenAlex.\n"
                 f"- **Sidebar Available**: All identified papers are rendered with metadata, citations, open-source code links, and PDF links in the **Discovered Papers** sidebar.\n\n"
                 f"> [!TIP]\n"
-                f"> Click **'Explain Paper with DeepSeek'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
+                f"> Click **'Explain Paper with AI'** on any paper card in the sidebar to generate a focused, on-demand breakdown covering its problem statement, technical approach, research gaps, and proposed thesis extensions."
             )
             yield sse_event({"type": "token", "content": overview_summary})
 
@@ -1112,7 +1485,7 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
             payload_msg = {
                 "type": "status",
                 "stage": "starting",
-                "message": f"Initiating DeepSeek [{depth_norm.capitalize()}] synthesis for '{paper_title}' with {model_display}...",
+                "message": f"Initiating AI [{depth_norm.capitalize()}] synthesis for '{paper_title}' with {model_display}...",
             }
             yield sse_event(payload_msg)
 
@@ -1146,7 +1519,7 @@ async def analyze_single_paper_endpoint(payload: SinglePaperAnalyzeRequest):
 async def generate_paper_diagram_endpoint(payload: PaperDiagramRequest):
     """
     On-demand professional architecture diagram engine using PlantUML & public Kroki API.
-    1. Extracts/maps distributed system architecture into PlantUML via DeepSeek.
+    1. Extracts/maps distributed system architecture into PlantUML via AI.
     2. Renders into high-resolution SVG via Kroki API with automatic resilient fallback.
     """
     try:

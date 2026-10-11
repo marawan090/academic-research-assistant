@@ -6,7 +6,7 @@
   *An open-source initiative by **SWMP Labs** — Technology for a Smarter Tomorrow*
 </div>
 
-A production-grade, asynchronous Academic Research Assistant built with **FastAPI**, **concurrent API fetching** (ArXiv & Semantic Scholar), **on-demand OrcaRouter/DeepSeek LLM synthesis**, and a responsive single-page web interface (**Tailwind CSS + Marked.js**). Engineered under the **SWMP Labs Core Research Suite**.
+A production-grade, asynchronous Academic Research Assistant built with **FastAPI**, **concurrent API fetching** (ArXiv & Semantic Scholar), **on-demand OrcaRouter/AI LLM synthesis**, and a responsive single-page web interface (**Tailwind CSS + Marked.js**). Engineered under the **SWMP Labs Core Research Suite**.
 
 ---
 
@@ -19,7 +19,7 @@ A production-grade, asynchronous Academic Research Assistant built with **FastAP
    - Extracts paper titles, author rosters, publication years, abstracts, TLDRs, citation counts, and direct Open Access PDF hyperlinks.
    - Intelligent deduplication engine using normalized title similarity (`difflib.SequenceMatcher >= 0.85`), recency ranking, and top-6 curation.
 
-2. **LLM Synthesis & Reasoning (OrcaRouter & DeepSeek)**:
+2. **LLM Synthesis & Reasoning (OrcaRouter & AI)**:
    - Uses the official `openai.AsyncOpenAI` SDK configured for OrcaRouter (`https://orcarouter.com/v1`, model `deepseek/deepseek-v4-flash-free`).
    - Acts as an expert Senior Distributed Systems & Academic Computing Researcher.
    - Strict 4-point paper breakdown:
@@ -38,7 +38,7 @@ A production-grade, asynchronous Academic Research Assistant built with **FastAP
      - *Fetching ArXiv (cs.DC, cs.SE, cs.AI, cs.AR)*
      - *Querying Semantic Scholar*
      - *Deduplicating & Ranking Papers*
-     - *Synthesizing with DeepSeek*
+     - *Synthesizing with AI*
    - **Discovered Papers Side Drawer**:
      - Badges for publication year, citation count, and repository source.
      - Direct `[PDF Access]` action button.

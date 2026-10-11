@@ -1,6 +1,6 @@
 """
 OrcaRouter LLM Synthesis Service.
-Leverages OpenAI-compatible AsyncOpenAI SDK pointed to OrcaRouter (DeepSeek model)
+Leverages OpenAI-compatible AsyncOpenAI SDK pointed to OrcaRouter (AI model)
 to synthesize academic research inquiries and paper metadata into deep, structured analyses.
 """
 
@@ -1087,7 +1087,7 @@ class ResearchLLMService:
         lines = [
             "> [!NOTE]",
             f"> **Live LLM Notice**: {reason}",
-            "> Showing heuristic academic breakdown generated from retrieved paper abstracts and TLDRs. Configure `ORCAROUTER_API_KEY` in `.env` to enable real-time DeepSeek reasoning.",
+            "> Showing heuristic academic breakdown generated from retrieved paper abstracts and TLDRs. Configure `ORCAROUTER_API_KEY` in `.env` to enable real-time AI reasoning.",
             "",
             f"# Academic Synthesis: {inquiry}",
             "",
@@ -1154,7 +1154,7 @@ class ResearchLLMService:
             fallback_text = self.generate_fallback_synthesis(
                 inquiry,
                 papers,
-                "OrcaRouter API key not configured. To activate DeepSeek LLM synthesis, set `ORCAROUTER_API_KEY` in `.env` or input it in the top settings bar."
+                "OrcaRouter API key not configured. To activate AI LLM synthesis, set `ORCAROUTER_API_KEY` in `.env` or input it in the top settings bar."
             )
             # Stream in realistic chunks for smooth UI rendering
             chunk_size = 40
@@ -1238,7 +1238,7 @@ class ResearchLLMService:
 
         return (
             f"USER RESEARCH INQUIRY / CONTEXT:\n{inquiry or 'General Distributed Systems and Academic Computing'}\n\n"
-            f"TARGET PAPER FOR DEEPSEEK ANALYSIS (Depth: {depth_normalized.upper()}):\n"
+            f"TARGET PAPER FOR AI ANALYSIS (Depth: {depth_normalized.upper()}):\n"
             f"Title: {paper.title}{year_str}\n"
             f"Authors: {authors_str}\n"
             f"Source Repository: {paper.source}{citations_str}\n"
@@ -1805,7 +1805,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
         custom_api_key: Optional[str] = None
     ) -> str:
         """
-        Extract and generate clean PlantUML Component & Deployment code using DeepSeek.
+        Extract and generate clean PlantUML Component & Deployment code using AI.
         Enforces strict PlantUML syntax between @startuml and @enduml with TTL caching.
         """
         cache_key = f"plantuml:{title.strip().lower()}"
@@ -1853,7 +1853,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
             return clean_code
 
         except Exception as e:
-            logger.error("Error generating PlantUML via DeepSeek: %s", str(e), exc_info=True)
+            logger.error("Error generating PlantUML via AI: %s", str(e), exc_info=True)
             fallback = sanitize_plantuml(self.generate_fallback_plantuml(title, abstract, tldr), default_title=title)
             synthesis_cache.set(cache_key, fallback)
             return fallback
@@ -1941,7 +1941,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
         payload: OutreachEmailRequest
     ) -> Dict[str, Any]:
         """
-        Generate a sub-120-word faculty cold-outreach email draft via DeepSeek
+        Generate a sub-120-word faculty cold-outreach email draft via AI
         or deterministic fallback. Returns {"subject", "body", "word_count"}.
         The prompt consumes structured metadata (title, authors, derived or
         explicit core method, institution) with safe fallbacks; output passes
@@ -2102,7 +2102,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
             return fallback
 
         except Exception as e:
-            logger.error("Error generating outreach email via DeepSeek: %s", str(e), exc_info=True)
+            logger.error("Error generating outreach email via AI: %s", str(e), exc_info=True)
             fallback = generate_fallback_outreach_email(
                 paper_title=title,
                 target_professor=target_prof,
@@ -2123,7 +2123,7 @@ CacheRing --> StorageMesh : Background Asynchronous Persistence
     ) -> str:
         """
         Generate a publication-grade cross-paper trade-off matrix in Markdown table format
-        contrasting 2 to 4 academic papers using DeepSeek or heuristic fallback.
+        contrasting 2 to 4 academic papers using AI or heuristic fallback.
         """
         if not papers or len(papers) < 2 or len(papers) > 4:
             raise ValueError("Must provide between 2 and 4 papers for comparison matrix.")

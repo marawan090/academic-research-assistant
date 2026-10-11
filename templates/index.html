@@ -63,6 +63,9 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- Supabase JS (sessions history, artifacts, saved papers; optional — app works offline without it) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- Instant Theme Initializer (Prevents FOUC) -->
   <script>
     (function() {
@@ -688,6 +691,17 @@
           <i data-lucide="compass" class="w-4 h-4"></i>
         </button>
 
+        <!-- History Toggle -->
+        <button id="btn-history-toggle" class="flex items-center space-x-1 p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Research History">
+          <i data-lucide="history" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Supabase Sign In / Profile Trigger -->
+        <button id="btn-sb-auth" class="flex items-center space-x-1.5 px-2 py-1.5 rounded-md text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Sign in to sync history & artifacts">
+          <i data-lucide="user-round" class="w-3.5 h-3.5"></i>
+          <span id="sb-auth-label" class="hidden sm:inline">Sign In</span>
+        </button>
+
         <!-- Dark / Light Mode Switcher Toggle -->
         <button id="btn-theme-toggle" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Toggle Dark / Light Mode">
           <i data-lucide="sun" id="theme-icon" class="w-4 h-4"></i>
@@ -1196,6 +1210,10 @@
             <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
             <span id="copy-outreach-label">📋 Copy Full Email</span>
           </button>
+          <button id="btn-save-outreach-artifact" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition cursor-pointer" title="Save draft to Artifacts (sign-in required)">
+            <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>
+            <span>Save</span>
+          </button>
           <a id="btn-mailto-outreach" href="#" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-semibold text-xs shadow-md shadow-brand-500/20 transition cursor-pointer" target="_blank" rel="noopener noreferrer">
             <span>↗️</span>
             <span>Open in Mail Client</span>
@@ -1449,6 +1467,67 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Supabase Auth Modal (Email + Password; optional, guest flows unaffected) -->
+  <div id="sb-auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-slate-800 dark:text-slate-100">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h3 id="sb-auth-title" class="text-base font-bold">Sign In</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sync sessions history, artifacts & saved papers.</p>
+        </div>
+        <button id="sb-auth-close" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Close">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="space-y-2.5">
+        <input id="sb-auth-email" type="email" autocomplete="email" placeholder="Email address"
+          class="w-full bg-slate-50 dark:bg-slate-950 text-xs text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        <input id="sb-auth-password" type="password" autocomplete="current-password" placeholder="Password (min 6 chars)"
+          class="w-full bg-slate-50 dark:bg-slate-950 text-xs text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+      </div>
+      <p id="sb-auth-error" class="hidden text-[11px] text-rose-500"></p>
+      <button id="sb-auth-submit" class="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-semibold text-xs transition cursor-pointer disabled:opacity-50">
+        <span id="sb-auth-submit-label">Sign In</span>
+      </button>
+      <button id="sb-auth-mode-toggle" class="w-full text-center text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer">
+        New here? Create an account
+      </button>
+      <button id="sb-auth-signout" class="hidden w-full text-center text-[11px] text-rose-500 hover:text-rose-400 transition cursor-pointer">
+        Sign out
+      </button>
+    </div>
+  </div>
+
+  <!-- Research History Drawer (sessions + artifacts; sign-in required to populate) -->
+  <div id="history-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] hidden flex-col bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-[#1E293B] shadow-2xl">
+    <div class="flex-none flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-[#1E293B]">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-semibold">Research History</span>
+      </div>
+      <button id="btn-close-history" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Close History">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-5">
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Past Sessions</p>
+        <div id="history-sessions-list" class="space-y-2"></div>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Saved Artifacts</p>
+        <div id="history-artifacts-list" class="space-y-2"></div>
+      </div>
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Synced Bookmarks</p>
+        <div id="history-papers-list" class="space-y-2"></div>
+      </div>
+    </div>
+    <div class="flex-none px-4 py-2.5 border-t border-slate-200 dark:border-[#1E293B] text-[11px] font-mono text-slate-400 dark:text-slate-500">
+      <span>Guest mode: search works fully offline. Sign in to persist.</span>
     </div>
   </div>
 
@@ -1948,7 +2027,7 @@
         : 'Authors Unlisted';
       const year = paper.year || '';
       const pdfUrl = paper.pdf_url || paper.url || (paper.id ? `https://arxiv.org/abs/${paper.id.replace('arxiv:', '')}` : '');
-      const depthBadge = depthFormatted || 'DeepSeek Synthesis';
+      const depthBadge = depthFormatted || 'AI Synthesis';
       const hasDiagram = Boolean(diagramSvg && diagramSvg.includes('<svg'));
 
       const printDocHtml = `<!DOCTYPE html>
@@ -2744,7 +2823,8 @@
 
     function toggleSavePaper(paper) {
       const idx = savedPapers.findIndex(p => p.id === paper.id);
-      if (idx >= 0) {
+      const added = idx < 0;
+      if (!added) {
         savedPapers.splice(idx, 1);
         showToast('Paper removed from Saved workspace', 'info');
       } else {
@@ -2754,6 +2834,8 @@
       localStorage.setItem('axiom_saved_papers', JSON.stringify(savedPapers));
       updateWorkspaceBadges();
       renderPapersView();
+      // Cloud sync when signed in (guests stay local-only, silent)
+      syncBookmarkToServer(paper, added);
     }
 
     function updateWorkspaceBadges() {
@@ -3162,6 +3244,26 @@
                 <i data-lucide="mail" class="w-3 h-3"></i>
                 <span>Outreach</span>
               </button>
+
+              <button
+                type="button"
+                data-paper-id="${escapeHtml(p.id)}"
+                class="btn-export-single-notebooklm inline-flex items-center justify-center px-2 py-1 rounded-md text-zinc-400 hover:text-zinc-200 border border-zinc-800 bg-zinc-900/60 transition text-[10px] cursor-pointer shrink-0"
+                title="Export this paper to NotebookLM"
+                aria-label="Export this paper to NotebookLM"
+              >
+                <i data-lucide="file-box" class="w-3 h-3"></i>
+              </button>
+
+              <button
+                type="button"
+                data-paper-id="${escapeHtml(p.id)}"
+                class="btn-export-single-ieee inline-flex items-center justify-center px-2 py-1 rounded-md text-zinc-400 hover:text-zinc-200 border border-zinc-800 bg-zinc-900/60 transition text-[10px] cursor-pointer shrink-0"
+                title="Export IEEE Review for this paper"
+                aria-label="Export IEEE Review for this paper"
+              >
+                <i data-lucide="download" class="w-3 h-3"></i>
+              </button>
             </div>
           </div>
 
@@ -3182,10 +3284,10 @@
             <button
               type="button"
               class="btn-explain-paper w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 dark:bg-brand-600/20 dark:hover:bg-brand-600/35 dark:text-brand-300 dark:border-brand-500/30 flex items-center justify-center space-x-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
-              title="Synthesize paper with DeepSeek"
+              title="Synthesize paper with AI"
             >
               <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500 dark:text-brand-400"></i>
-              <span class="explain-btn-label">Explain Paper with DeepSeek</span>
+              <span class="explain-btn-label">Explain Paper with AI</span>
             </button>
           </div>
         `;
@@ -3244,6 +3346,22 @@
           });
         }
 
+        // Single-Paper Export Listeners (NotebookLM pack / IEEE review for this card only)
+        const singleNbBtn = card.querySelector('.btn-export-single-notebooklm');
+        if (singleNbBtn) {
+          singleNbBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportSinglePaperToNotebookLM(p, singleNbBtn);
+          });
+        }
+        const singleIeeeBtn = card.querySelector('.btn-export-single-ieee');
+        if (singleIeeeBtn) {
+          singleIeeeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportSinglePaperReview(p, singleIeeeBtn);
+          });
+        }
+
         // Analysis Depth Selection Listener
         let cardDepth = 'balanced';
         const depthBtns = card.querySelectorAll('.depth-btn');
@@ -3266,13 +3384,13 @@
               } else if (cardDepth === 'deep') {
                 explainBtnLabel.textContent = 'Deep Dive (~700w)';
               } else {
-                explainBtnLabel.textContent = 'Explain Paper with DeepSeek';
+                explainBtnLabel.textContent = 'Explain Paper with AI';
               }
             }
           });
         });
 
-        // Explain Paper with DeepSeek Listener
+        // Explain Paper with AI Listener
         const explainBtn = card.querySelector('.btn-explain-paper');
         if (explainBtn) {
           explainBtn.addEventListener('click', (e) => {
@@ -3698,6 +3816,19 @@
           }
           showToast('Full outreach email copied to clipboard!', 'success');
         });
+      });
+    }
+
+    const btnSaveOutreachArtifact = document.getElementById('btn-save-outreach-artifact');
+    if (btnSaveOutreachArtifact) {
+      btnSaveOutreachArtifact.addEventListener('click', () => {
+        const subj = outreachSubjectInput ? outreachSubjectInput.value : '';
+        const body = outreachBodyTextarea ? outreachBodyTextarea.value : '';
+        if (!body || !body.trim()) { showToast('Generate the draft first, then save.', 'warning'); return; }
+        const targetId = (currentOutreachPaper && currentOutreachPaper.id) || null;
+        const title = subj || ((currentOutreachPaper && currentOutreachPaper.title) || 'Outreach draft');
+        const fullText = subj ? `Subject: ${subj}\n\n${body}` : body;
+        saveArtifactToServer('outreach', title, targetId, fullText);
       });
     }
 
@@ -4154,6 +4285,10 @@
                   <i data-lucide="download" class="w-3.5 h-3.5"></i>
                   <span>Export</span>
                 </button>
+                <button class="btn-save-thesis-artifact flex items-center space-x-1 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer" title="Save draft to Artifacts (sign-in required)">
+                  <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>
+                  <span>Save</span>
+                </button>
               </div>
             </div>
 
@@ -4274,6 +4409,17 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             showToast('Proposal downloaded as Markdown', 'success');
+          });
+        }
+
+        const btnSaveThesis = assistantContainer.querySelector('.btn-save-thesis-artifact');
+        if (btnSaveThesis) {
+          btnSaveThesis.addEventListener('click', () => {
+            if (!accumulatedMarkdown || !accumulatedMarkdown.trim()) {
+              showToast('Generate the draft first, then save.', 'warning');
+              return;
+            }
+            saveArtifactToServer('thesis', paper.title || 'Thesis draft', paper.id || null, accumulatedMarkdown);
           });
         }
       }
@@ -4459,7 +4605,7 @@
       }
     }
 
-    // --- On-Demand Deep Single Paper Analysis with DeepSeek & Mermaid ---
+    // --- On-Demand Deep Single Paper Analysis with AI & Mermaid ---
     async function triggerSinglePaperAnalysis(paper, btn, card, depth = 'balanced') {
       if (!paper) return;
 
@@ -4510,7 +4656,7 @@
               <div class="space-y-1">
                 <div class="flex items-center space-x-2 flex-wrap gap-y-1">
                   <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-brand-500/15 text-brand-300 border border-brand-500/30">
-                    DeepSeek ${depthLabel.toUpperCase()} Synthesis
+                    AI ${depthLabel.toUpperCase()} Synthesis
                   </span>
                   <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700/60">${paper.year || 'Academic Paper'}</span>
                   <span class="text-[11px] font-mono text-slate-500 paper-timer">0s</span>
@@ -4561,7 +4707,7 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span class="status-text">Reasoning with DeepSeek (${depthLabel.toUpperCase()} depth): Streaming synthesis...</span>
+              <span class="status-text">Reasoning with AI (${depthLabel.toUpperCase()} depth): Streaming synthesis...</span>
             </div>
 
             <div class="markdown-body prose-academic text-sm text-slate-200 min-h-[60px]"></div>
@@ -4834,7 +4980,7 @@
                 statusText.textContent = data.message;
               } else if (data.type === 'done') {
                 statusBanner.className = 'status-banner flex items-center space-x-2 text-xs font-mono text-emerald-300 bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40';
-                statusBanner.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i><span>DeepSeek [${depthFormatted}] Synthesis Complete</span>`;
+                statusBanner.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i><span>AI [${depthFormatted}] Synthesis Complete</span>`;
                 lucide.createIcons();
                 renderMathInContainer(markdownBody);
               } else if (data.type === 'error') {
@@ -4852,7 +4998,7 @@
           await renderMermaidInContainer(markdownBody);
         }
         renderMathInContainer(markdownBody);
-        showToast(`DeepSeek synthesis for "${paper.title.slice(0, 30)}..." complete!`, 'success');
+        showToast(`AI synthesis for "${paper.title.slice(0, 30)}..." complete!`, 'success');
 
       } catch (err) {
         clearInterval(timerInterval);
@@ -4863,7 +5009,7 @@
         showToast('Paper synthesis error: ' + err.message, 'error');
       } finally {
         btn.disabled = false;
-        let defaultLabel = 'Explain Paper with DeepSeek';
+        let defaultLabel = 'Explain Paper with AI';
         if (depthLabel === 'quick') defaultLabel = 'Quick Synthesis (~100w)';
         else if (depthLabel === 'deep') defaultLabel = 'Deep Dive (~700w)';
         btn.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-400"></i><span class="explain-btn-label">${defaultLabel}</span>`;
@@ -4908,6 +5054,411 @@
       }
     }
 
+    // --- Supabase Persistence Layer (optional cloud sync; guests run 100% offline) ---
+    // Publishable anon key is public-by-design. NEVER route these calls through
+    // authenticatedFetch(): its 401 handler would nuke the Axiom cohort session.
+    const SB_URL = 'https://qvlrgqunoodvdkkdsvnq.supabase.co';
+    const SB_ANON_KEY = 'sb_publishable_4tZ31-7PursiX2nArIcTCQ_4hAyytxv';
+    const SB_SIGNIN_REQUIRED_MSG = 'Please sign in to save your history and artifacts.';
+    let sbClient = null;
+    let sbUser = null; // {id, email} once Supabase session resolves
+    let sbSessionId = null; // active persisted research session for artifact linkage
+    let sbAuthMode = 'signin';
+
+    function sbReady() { return !!(sbClient && sbUser); }
+
+    async function sbAuthHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      try {
+        if (!sbClient) return headers;
+        const { data } = await sbClient.auth.getSession();
+        const tok = data && data.session && data.session.access_token;
+        if (tok) headers['Authorization'] = 'Bearer ' + tok;
+      } catch (_) {}
+      return headers;
+    }
+
+    async function sbFetch(path, options = {}) {
+      const headers = await sbAuthHeaders();
+      Object.assign(headers, options.headers || {});
+      return fetch(path, { ...options, headers });
+    }
+
+    function updateSbAuthUI() {
+      const label = document.getElementById('sb-auth-label');
+      if (label) {
+        if (sbUser && sbUser.email) {
+          label.textContent = String(sbUser.email).split('@')[0].slice(0, 18);
+        } else {
+          label.textContent = 'Sign In';
+        }
+      }
+      const trigger = document.getElementById('btn-sb-auth');
+      if (trigger) trigger.title = (sbUser && sbUser.email) ? `Signed in as ${sbUser.email} (click to sign out)` : 'Sign in to sync history & artifacts';
+      const signoutBtn = document.getElementById('sb-auth-signout');
+      if (signoutBtn) signoutBtn.classList.toggle('hidden', !sbUser);
+    }
+
+    function openSbAuthModal() {
+      const modal = document.getElementById('sb-auth-modal');
+      if (!modal) return;
+      const err = document.getElementById('sb-auth-error');
+      if (err) err.classList.add('hidden');
+      modal.classList.remove('hidden');
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    }
+
+    function closeSbAuthModal() {
+      const modal = document.getElementById('sb-auth-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function setSbAuthMode(mode) {
+      sbAuthMode = mode === 'signup' ? 'signup' : 'signin';
+      const title = document.getElementById('sb-auth-title');
+      const submitLabel = document.getElementById('sb-auth-submit-label');
+      const toggle = document.getElementById('sb-auth-mode-toggle');
+      const isSignup = sbAuthMode === 'signup';
+      if (title) title.textContent = isSignup ? 'Create Account' : 'Sign In';
+      if (submitLabel) submitLabel.textContent = isSignup ? 'Sign Up' : 'Sign In';
+      if (toggle) toggle.textContent = isSignup ? 'Have an account? Sign in' : 'New here? Create an account';
+    }
+
+    async function handleSbAuthSubmit() {
+      const emailEl = document.getElementById('sb-auth-email');
+      const passEl = document.getElementById('sb-auth-password');
+      const errEl = document.getElementById('sb-auth-error');
+      const submitBtn = document.getElementById('sb-auth-submit');
+      const email = (emailEl && emailEl.value || '').trim();
+      const password = (passEl && passEl.value || '');
+      function showErr(msg) {
+        if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+      }
+      if (errEl) errEl.classList.add('hidden');
+      if (!sbClient) { showErr('Auth service unavailable (offline). Search still works as a guest.'); return; }
+      if (!email || !password || password.length < 6) { showErr('Enter a valid email and a 6+ character password.'); return; }
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const fn = sbAuthMode === 'signup'
+          ? sbClient.auth.signUp({ email, password })
+          : sbClient.auth.signInWithPassword({ email, password });
+        const { data, error } = await fn;
+        if (error) throw error;
+        if (sbAuthMode === 'signup' && data && !data.session) {
+          showToast('Account created! Check your email to confirm, then sign in.', 'success');
+          setSbAuthMode('signin');
+          return;
+        }
+        closeSbAuthModal();
+        showToast('Signed in — history & artifacts sync enabled.', 'success');
+      } catch (e) {
+        showErr(e.message || 'Authentication failed.');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    async function mergeServerBookmarks() {
+      if (!sbReady()) return;
+      try {
+        const res = await sbFetch('/api/papers/saved');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const rows = (data && data.papers) || [];
+        let added = 0;
+        rows.forEach(r => {
+          const meta = (r && r.paper_metadata) || {};
+          const pid = (r && r.paper_id) || meta.id;
+          if (!pid || isPaperSaved(pid)) return;
+          savedPapers.push(Object.keys(meta).length > 1 ? meta : { id: pid, title: meta.title || pid, authors: meta.authors || [] });
+          added++;
+        });
+        if (added > 0) {
+          localStorage.setItem('axiom_saved_papers', JSON.stringify(savedPapers));
+          updateWorkspaceBadges();
+          renderPapersView();
+          showToast(`Synced ${added} bookmark${added === 1 ? '' : 's'} from your account.`, 'success');
+        }
+      } catch (e) {
+        console.warn('Bookmark merge skipped:', e);
+      }
+    }
+
+    async function syncBookmarkToServer(paper, added) {
+      if (!sbReady()) return; // guest: local-only, silent
+      try {
+        if (added) {
+          await sbFetch('/api/papers/saved', {
+            method: 'POST',
+            body: JSON.stringify({ paper_id: paper.id, paper_metadata: paper })
+          });
+        } else {
+          await sbFetch('/api/papers/saved/' + encodeURIComponent(paper.id), { method: 'DELETE' });
+        }
+      } catch (e) {
+        console.warn('Bookmark sync skipped:', e);
+      }
+    }
+
+    async function persistResearchSession(inquiry, overviewMarkdown) {
+      if (!sbReady()) return; // guest: no silent writes, no toasts
+      try {
+        const ids = (currentPapers || []).map(p => p && p.id).filter(Boolean);
+        const sres = await sbFetch('/api/history/sessions', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: String(inquiry || 'Untitled session').slice(0, 120),
+            search_mode: currentSearchMode,
+            query_params: { query: inquiry, limit: currentPaperLimit },
+            discovered_paper_ids: ids
+          })
+        });
+        if (!sres.ok) return;
+        const sdata = await sres.json().catch(() => ({}));
+        if (!sdata.session_id) return;
+        sbSessionId = sdata.session_id;
+        await sbFetch('/api/history/messages', {
+          method: 'POST',
+          body: JSON.stringify({ session_id: sbSessionId, role: 'user', content: String(`Mode: ${currentSearchMode}\n${inquiry || ''}`).slice(0, 8000) })
+        });
+        if (overviewMarkdown) {
+          await sbFetch('/api/history/messages', {
+            method: 'POST',
+            body: JSON.stringify({ session_id: sbSessionId, role: 'assistant', content: String(overviewMarkdown).slice(0, 8000) })
+          });
+        }
+      } catch (e) {
+        console.warn('Session persist skipped:', e);
+      }
+    }
+
+    async function saveArtifactToServer(artifactType, title, targetPaperId, content) {
+      if (!sbReady()) { showToast(SB_SIGNIN_REQUIRED_MSG, 'warning'); return false; }
+      if (!content || !String(content).trim()) { showToast('Nothing to save yet.', 'warning'); return false; }
+      try {
+        const res = await sbFetch('/api/artifacts', {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: sbSessionId,
+            artifact_type: artifactType,
+            title: String(title || '').slice(0, 200),
+            target_paper_id: targetPaperId || null,
+            content: String(content)
+          })
+        });
+        if (res.status === 401) { showToast(SB_SIGNIN_REQUIRED_MSG, 'warning'); return false; }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast('Saved to Artifacts!', 'success');
+        return true;
+      } catch (e) {
+        showToast('Failed to save artifact: ' + e.message, 'error');
+        return false;
+      }
+    }
+
+    function openHistoryDrawer() {
+      const drawer = document.getElementById('history-drawer');
+      if (!drawer) return;
+      drawer.classList.remove('hidden');
+      drawer.classList.add('flex');
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+      loadHistoryDrawer();
+    }
+
+    function closeHistoryDrawer() {
+      const drawer = document.getElementById('history-drawer');
+      if (!drawer) return;
+      drawer.classList.add('hidden');
+      drawer.classList.remove('flex');
+    }
+
+    function historyEmptyRow(text) {
+      return `<p class="text-[11px] text-slate-400 dark:text-slate-500 px-1 py-2">${escapeHtml(text)}</p>`;
+    }
+
+    async function loadHistoryDrawer() {
+      const sessList = document.getElementById('history-sessions-list');
+      const artList = document.getElementById('history-artifacts-list');
+      const papersList = document.getElementById('history-papers-list');
+      if (!sbReady()) {
+        const msg = 'Sign in to view synced history.';
+        if (sessList) sessList.innerHTML = historyEmptyRow(msg);
+        if (artList) artList.innerHTML = historyEmptyRow(msg);
+        if (papersList) papersList.innerHTML = historyEmptyRow(msg);
+        return;
+      }
+      if (sessList) sessList.innerHTML = historyEmptyRow('Loading sessions…');
+      if (artList) artList.innerHTML = historyEmptyRow('Loading artifacts…');
+      if (papersList) papersList.innerHTML = historyEmptyRow('Loading bookmarks…');
+      try {
+        const [sres, ares, pres] = await Promise.all([
+          sbFetch('/api/history/sessions'),
+          sbFetch('/api/artifacts'),
+          sbFetch('/api/papers/saved')
+        ]);
+        const sdata = await sres.json().catch(() => ({}));
+        const adata = await ares.json().catch(() => ({}));
+        const pdata = await pres.json().catch(() => ({}));
+        renderHistorySessions(sessList, (sdata && sdata.sessions) || []);
+        renderHistoryArtifacts(artList, (adata && adata.artifacts) || []);
+        renderHistoryPapers(papersList, (pdata && pdata.papers) || []);
+      } catch (e) {
+        console.warn('History load failed:', e);
+        if (sessList) sessList.innerHTML = historyEmptyRow('Could not load history.');
+      }
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    }
+
+    function renderHistorySessions(container, sessions) {
+      if (!container) return;
+      if (!sessions.length) { container.innerHTML = historyEmptyRow('No saved sessions yet.'); return; }
+      container.innerHTML = '';
+      sessions.forEach(s => {
+        const ids = Array.isArray(s.discovered_paper_ids) ? s.discovered_paper_ids : [];
+        const when = s.created_at ? new Date(s.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'w-full text-left px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-brand-500/50 transition cursor-pointer';
+        item.innerHTML = `
+          <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(s.title || 'Untitled session')}</span>
+          <span class="block text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">${escapeHtml(s.search_mode || 'topic')} · ${ids.length} papers${when ? ' · ' + escapeHtml(when) : ''}</span>
+        `;
+        item.addEventListener('click', () => restoreHistorySession(s.id));
+        container.appendChild(item);
+      });
+    }
+
+    function renderHistoryArtifacts(container, artifacts) {
+      if (!container) return;
+      if (!artifacts.length) { container.innerHTML = historyEmptyRow('No saved artifacts yet.'); return; }
+      container.innerHTML = '';
+      artifacts.forEach(a => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'w-full text-left px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-brand-500/50 transition cursor-pointer';
+        item.title = 'Click to copy content';
+        item.innerHTML = `
+          <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mb-1">${escapeHtml(a.artifact_type || 'artifact')}</span>
+          <span class="block text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${escapeHtml(a.title || 'Untitled')}</span>
+        `;
+        item.addEventListener('click', () => {
+          if (a.content) {
+            navigator.clipboard.writeText(a.content).then(() => showToast('Artifact copied to clipboard!', 'success'));
+          }
+        });
+        container.appendChild(item);
+      });
+    }
+
+    function renderHistoryPapers(container, rows) {
+      if (!container) return;
+      if (!rows.length) { container.innerHTML = historyEmptyRow('No synced bookmarks.'); return; }
+      container.innerHTML = '';
+      rows.forEach(r => {
+        const meta = (r && r.paper_metadata) || {};
+        const title = meta.title || r.paper_id || 'Saved paper';
+        const link = meta.pdf_url || meta.url || '';
+        const item = document.createElement('div');
+        item.className = 'px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800';
+        item.innerHTML = `
+          <span class="block text-xs font-medium text-slate-800 dark:text-slate-200 line-clamp-2">${escapeHtml(title)}</span>
+          ${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Open paper ↗</a>` : `<span class="block text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">${escapeHtml(r.paper_id || '')}</span>`}
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    async function restoreHistorySession(sessionId) {
+      if (!sessionId) return;
+      try {
+        const res = await sbFetch('/api/history/sessions/' + encodeURIComponent(sessionId));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const sess = data && data.session;
+        if (!sess) { showToast('Session no longer available.', 'warning'); return; }
+        const qp = (sess && sess.query_params) || {};
+        const mode = (sess && sess.search_mode) || 'topic';
+        if (queryInput) {
+          queryInput.value = qp.query || '';
+          queryInput.style.height = 'auto';
+        }
+        if (typeof setMode === 'function') setMode(mode);
+        const lim = parseInt(qp.limit);
+        if (!isNaN(lim) && [10, 25, 50, 100].includes(lim)) {
+          currentPaperLimit = lim;
+          document.querySelectorAll('.paper-limit-btn').forEach(b => {
+            const on = parseInt(b.getAttribute('data-limit')) === lim;
+            b.className = on
+              ? 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold bg-brand-600 text-white transition shadow-xs cursor-pointer'
+              : 'paper-limit-btn px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer';
+          });
+        }
+        closeHistoryDrawer();
+        showToast('Session restored — re-running search…', 'success');
+        if (researchForm) {
+          if (typeof researchForm.requestSubmit === 'function') researchForm.requestSubmit();
+          else researchForm.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+      } catch (e) {
+        console.error('Session restore failed:', e);
+        showToast('Failed to restore session: ' + e.message, 'error');
+      }
+    }
+
+    function initSupabaseLayer() {
+      try {
+        if (!window.supabase || !window.supabase.createClient) {
+          console.warn('Supabase CDN unavailable — guest mode (search unaffected).');
+          return;
+        }
+        sbClient = window.supabase.createClient(SB_URL, SB_ANON_KEY);
+        sbClient.auth.onAuthStateChange(async (event, session) => {
+          if (session && session.user) {
+            sbUser = { id: session.user.id, email: session.user.email };
+            sbSessionId = null;
+            updateSbAuthUI();
+            mergeServerBookmarks();
+          } else {
+            sbUser = null;
+            sbSessionId = null;
+            updateSbAuthUI();
+          }
+        });
+        updateSbAuthUI();
+      } catch (e) {
+        console.warn('Supabase init failed — guest mode:', e);
+      }
+
+      const trigger = document.getElementById('btn-sb-auth');
+      if (trigger) {
+        trigger.addEventListener('click', async () => {
+          if (sbUser && sbClient) {
+            try { await sbClient.auth.signOut(); showToast('Signed out.', 'info'); }
+            catch (e) { showToast('Sign-out failed: ' + e.message, 'error'); }
+          } else {
+            openSbAuthModal();
+          }
+        });
+      }
+      const closeBtn = document.getElementById('sb-auth-close');
+      if (closeBtn) closeBtn.addEventListener('click', closeSbAuthModal);
+      const modal = document.getElementById('sb-auth-modal');
+      if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeSbAuthModal(); });
+      const modeToggle = document.getElementById('sb-auth-mode-toggle');
+      if (modeToggle) modeToggle.addEventListener('click', () => setSbAuthMode(sbAuthMode === 'signup' ? 'signin' : 'signup'));
+      const submitBtn = document.getElementById('sb-auth-submit');
+      if (submitBtn) submitBtn.addEventListener('click', handleSbAuthSubmit);
+      const signoutBtn = document.getElementById('sb-auth-signout');
+      if (signoutBtn) signoutBtn.addEventListener('click', async () => {
+        try { if (sbClient) await sbClient.auth.signOut(); closeSbAuthModal(); showToast('Signed out.', 'info'); }
+        catch (e) { showToast('Sign-out failed: ' + e.message, 'error'); }
+      });
+      const histToggle = document.getElementById('btn-history-toggle');
+      if (histToggle) histToggle.addEventListener('click', openHistoryDrawer);
+      const histClose = document.getElementById('btn-close-history');
+      if (histClose) histClose.addEventListener('click', closeHistoryDrawer);
+    }
+
     // --- Export Handlers (NotebookLM Pack & Literature Review) ---
     async function exportPapersToNotebookLM(papersToExport, customInquiry) {
       try {
@@ -4943,6 +5494,74 @@
       } catch (err) {
         console.error('Export to NotebookLM failed:', err);
         showToast('Failed to export to NotebookLM: ' + err.message, 'error');
+      }
+    }
+
+    // --- Single-Paper Exports (per-card actions; bulk handlers below untouched) ---
+    function singlePaperSlug(paper) {
+      return ((paper && paper.title) || 'paper').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'paper';
+    }
+
+    async function downloadExportBlob(res, filename) {
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportSinglePaperToNotebookLM(paper, btn) {
+      if (!paper) return;
+      if (btn && btn.disabled) return;
+      if (btn) setBusyState(btn, true, '…');
+      try {
+        showToast('Packing this paper for NotebookLM...', 'info');
+        const res = await authenticatedFetch('/api/export/notebooklm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            papers: [paper],
+            inquiry: (paper.title || currentInquiry || 'Academic Systems Literature'),
+            notes: 'Single-paper pack via SWMP Labs'
+          })
+        });
+        await downloadExportBlob(res, `NotebookLM_${singlePaperSlug(paper)}_${Date.now()}.md`);
+        showToast('Paper exported to NotebookLM pack!', 'success');
+      } catch (err) {
+        console.error('Single-paper NotebookLM export failed:', err);
+        showToast('Failed to export paper: ' + err.message, 'error');
+      } finally {
+        if (btn) setBusyState(btn, false);
+      }
+    }
+
+    async function exportSinglePaperReview(paper, btn) {
+      if (!paper) return;
+      if (btn && btn.disabled) return;
+      if (btn) setBusyState(btn, true, '…');
+      try {
+        showToast('Synthesizing single-paper IEEE Review...', 'info');
+        const res = await authenticatedFetch('/api/export/literature-review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inquiry: (paper.title || currentInquiry || 'Distributed Systems Architecture'),
+            papers: [paper],
+            synthesis_content: ''
+          })
+        });
+        await downloadExportBlob(res, `IEEE_Review_${singlePaperSlug(paper)}_${Date.now()}.md`);
+        showToast('Single-paper IEEE Review downloaded!', 'success');
+      } catch (err) {
+        console.error('Single-paper IEEE Review export failed:', err);
+        showToast('Failed to export IEEE Review: ' + err.message, 'error');
+      } finally {
+        if (btn) setBusyState(btn, false);
       }
     }
 
@@ -5124,6 +5743,10 @@
                   <i data-lucide="download" class="w-3.5 h-3.5"></i>
                   <span>Export</span>
                 </button>
+                <button class="btn-save-overview-artifact inline-flex items-center space-x-1 px-2 py-1 rounded-md text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition cursor-pointer" title="Save overview to Artifacts (sign-in required)">
+                  <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>
+                  <span>Save</span>
+                </button>
               </div>
             </div>
 
@@ -5151,6 +5774,7 @@
 
       feedContainer.scrollTo({ top: feedContainer.scrollHeight, behavior: 'smooth' });
       currentInquiry = inquiry;
+      sbSessionId = null; // fresh research run; persisted on stream completion
 
       const startTime = Date.now();
       const timerInterval = setInterval(() => {
@@ -5274,13 +5898,14 @@
             clearInterval(timerInterval);
             stepDiscovery.classList.add('bg-emerald-500/20', 'border-emerald-500/40', 'text-emerald-300');
             stageHeading.textContent = 'Literature Discovery Complete';
-            stageDetail.textContent = 'All papers retrieved. Click "Explain Paper with DeepSeek" on any paper card in the sidebar to analyze.';
+            stageDetail.textContent = 'All papers retrieved. Click "Explain Paper with AI" on any paper card in the sidebar to analyze.';
             setFormLoading(false);
             eventSource.close();
             activeEventSource = null;
             await renderMermaidInContainer(markdownBody);
             renderMathInContainer(markdownBody);
             showToast('Literature discovery complete!', 'success');
+            persistResearchSession(inquiry, accumulatedMarkdown);
           } else if (type === 'error') {
             streamDone = true;
             clearInterval(timerInterval);
@@ -5368,6 +5993,17 @@
           navigator.clipboard.writeText(accumulatedMarkdown).then(() => {
             showToast('Full Markdown report copied!', 'success');
           });
+        });
+      }
+
+      const btnSaveOverview = assistantContainer.querySelector('.btn-save-overview-artifact');
+      if (btnSaveOverview) {
+        btnSaveOverview.addEventListener('click', () => {
+          if (!accumulatedMarkdown || !accumulatedMarkdown.trim()) {
+            showToast('Run a search first, then save the overview.', 'warning');
+            return;
+          }
+          saveArtifactToServer('ieee_review', `${currentInquiry || 'Research overview'} — Overview`, null, accumulatedMarkdown);
         });
       }
 
@@ -5929,6 +6565,7 @@
     initServerHealthCheck();
     initOnboardingTour();
     initBroadcastBanner();
+    initSupabaseLayer();
   </script>
 </body>
 </html>
