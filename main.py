@@ -2105,29 +2105,34 @@ async def export_literature_review_endpoint(payload: LiteratureReviewExportReque
 # ============================================================================
 
 @app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
 async def admin_dashboard_page(request: Request):
     """
-    Renders the protected Admin Observability Dashboard.
-    Enforces Master Admin Key verification (via header, query param, or cookie).
-    Returns 404 Not Found on unauthorized access for security obscurity against scrapers.
+    Serves the Admin login shell (admin.html) publicly — no gate here.
+    Authentication happens inside the page (password modal) and on every
+    /api/admin/* data endpoint, which stay strictly gated. When a valid key
+    is supplied via ?key=/cookie/header, the session cookie is (re)set for
+    convenience; otherwise the page loads unauthenticated showing login.
+    Note: /api/admin/... paths never collide with these page routes.
     """
     try:
         admin_key = verify_master_admin(request)
     except HTTPException:
-        raise HTTPException(status_code=404, detail="Not Found")
+        admin_key = None
 
     response = templates.TemplateResponse(
         request=request,
         name="admin.html",
-        context={"admin_key": admin_key}
+        context={"admin_key": admin_key or ""},
     )
-    response.set_cookie(
-        key="axiom_admin_session",
-        value=admin_key,
-        max_age=86400 * 30,
-        httponly=False,
-        samesite="lax",
-    )
+    if admin_key:
+        response.set_cookie(
+            key="axiom_admin_session",
+            value=admin_key,
+            max_age=86400 * 30,
+            httponly=False,
+            samesite="lax",
+        )
     return response
 
 
