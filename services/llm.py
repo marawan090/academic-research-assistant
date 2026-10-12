@@ -38,6 +38,7 @@ class OutreachEmailRequest(BaseModel):
     abstract: str = ""
     target_professor: str
     scope_type: str = "single_paper"  # Options: "single_paper" | "holistic_lab"
+    tone: str = "application"  # Options: "application" | "collaboration"
     orcarouter_key: Optional[str] = None
     # Structured outreach metadata (all optional; safe fallbacks applied when absent)
     core_method_or_contribution: str = ""
@@ -197,12 +198,17 @@ HARD CONSTRAINTS (violating any of these fails the task):
 9. SCOPE MODES:
    - "single_paper": hook on the paper's core method, bottleneck, and one open question.
    - "holistic_lab": hook on the lab's trajectory using the paper as springboard; still name the paper once.
-10. FORMAT: output strictly valid JSON with no markdown fences, backticks, or preamble. Start with '{' and end with '}'. Compute word_count as whitespace-separated tokens of the body:
+10. TONES (follow the Tone field exactly):
+   - "application" (Prospective Graduate/RA Application): the writer seeks a position. CTA is admission-facing and low friction: "Are you accepting students for [Term/Year]?" plus the 5-minute feedback exchange. Subject pattern: "Question on [Method] — prospective student".
+   - "collaboration" (Academic Collaboration/Inquiry): the writer proposes a technical exchange, NOT a position. No admission ask, no degree/program self-introduction beyond one clause. CTA is peer inquiry only: "Would you be open to a brief technical exchange on [Proposed Extension]?" Subject pattern: "Quick thought regarding [Specific Paper Title]".
+11. CONTRIBUTION CITATION (mandatory): name one concrete contribution from the paper — the exact method/mechanism and, when known, where it lives (e.g. "§3.2 IO-aware tiling", "the online-softmax formulation"). Then state: (a) one specific research gap or limitation IN THAT CONTRIBUTION, (b) one crisp methodology-tied question about it, (c) one concrete extension proposal or value-add (reproduction, measurement, edge-case evaluation). Vague praise ("impressive results", "elegant design") without a named mechanism counts as flattery — forbidden.
+12. FORMAT: output strictly valid JSON with no markdown fences, backticks, or preamble. Start with '{' and end with '}'. Compute word_count as whitespace-separated tokens of the body:
 {
   "subject": "Question on [Method] — prospective student",
   "body": "Dear Professor [Last Name],\\n\\n...",
   "word_count": 0
 }
+Note: the 120-word ceiling above already satisfies any looser "under 150 words" budget — never exceed 120.
 """
 
 
@@ -212,6 +218,10 @@ HARD CONSTRAINTS (violating any of these fails the task):
 # ============================================================================
 
 OUTREACH_MAX_WORDS = 120
+
+# Tailored outreach tones. "application" seeks a position (admission-facing
+# CTA); "collaboration" proposes a peer technical exchange (no admission ask).
+OUTREACH_TONES = ("application", "collaboration")
 
 # Banned AI/spam vocabulary -> neutral replacement ("" drops the phrase).
 OUTREACH_BANNED_TERMS = {
@@ -281,6 +291,12 @@ def _truncate_words(text: str, max_chars: int) -> str:
         return clean
     cut = clean[:max_chars].rsplit(" ", 1)[0].strip()
     return cut or clean[:max_chars].strip()
+
+
+def _truncate_nwords(text: str, max_words: int) -> str:
+    """Truncate to max_words whitespace-separated tokens (for subject lines)."""
+    words = re.sub(r"\s+", " ", (text or "").strip()).split()
+    return " ".join(words[:max(1, max_words)])
 
 
 def _extract_core_method(
@@ -404,6 +420,7 @@ def generate_fallback_outreach_email(
     core_method_or_contribution: str = "",
     institution_name: str = "",
     recipient_role: str = "",
+    tone: str = "application",
 ) -> Dict[str, Any]:
     """
     Deterministic sub-120-word academic outreach draft (offline fallback).
@@ -411,7 +428,8 @@ def generate_fallback_outreach_email(
     one-line proof -> frictionless low ask. All caller facts are optional;
     safe neutral fallbacks guarantee no empty or dangling placeholders.
     PI recipients get lab-openings framing; lead researchers get an
-    implementation-exchange ask instead.
+    implementation-exchange ask instead. Tone "collaboration" switches to a
+    peer technical-exchange CTA with no admission ask in any branch.
     """
     last_name = _extract_professor_last_name(target_professor)
     clean_title = (paper_title or "").strip().rstrip(".") or "your recent paper"
@@ -419,9 +437,15 @@ def generate_fallback_outreach_email(
     method, hook, open_q = _extract_core_method(clean_title, abstract, core_method_or_contribution)
     method_short = _truncate_words(method, 45)
     scope = "holistic_lab" if scope_type == "holistic_lab" else "single_paper"
+    tone_norm = (tone or "application").strip().lower()
+    if tone_norm not in OUTREACH_TONES:
+        tone_norm = "application"
 
     # Faculty-leader framing for PIs; implementer framing otherwise.
-    if (recipient_role or "").strip() == PI_ROLE_HINT:
+    # Collaboration tone always uses the peer technical-exchange ask.
+    if tone_norm == "collaboration":
+        ask_line = "Would you be open to a brief technical exchange on [Proposed Extension]?"
+    elif (recipient_role or "").strip() == PI_ROLE_HINT:
         ask_line = "Are you accepting students for [Term/Year]?"
     elif (recipient_role or "").strip() == LEAD_AUTHOR_ROLE_HINT:
         ask_line = "Would you be open to a brief exchange on the implementation details?"
@@ -429,13 +453,21 @@ def generate_fallback_outreach_email(
         ask_line = "Are you accepting students for [Term/Year]?"
 
     if scope == "holistic_lab":
-        subject = f"{method_short} inquiry — prospective student"
+        subject = (
+            f"Quick thought regarding \"{_truncate_nwords(short_title, 8)}\""
+            if tone_norm == "collaboration" else
+            f"{method_short} inquiry — prospective student"
+        )
         hook_para = (
             f"Your lab's work on {method}, especially \"{short_title}\", stood out — "
             f"particularly {hook}. I am checking whether {open_q}."
         )
     else:
-        subject = f"Question on {method_short} — prospective student"
+        subject = (
+            f"Quick thought regarding \"{_truncate_nwords(short_title, 8)}\""
+            if tone_norm == "collaboration" else
+            f"Question on {method_short} — prospective student"
+        )
         hook_para = (
             f"Your work on {method} in \"{short_title}\" stood out — "
             f"particularly {hook}. I am checking whether {open_q}."
@@ -658,6 +690,15 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
 """
 
 
+ACADEMIC_GROUNDING_DIRECTIVE = """
+ACADEMIC GROUNDING & ANTI-HALLUCINATION DIRECTIVE (highest priority, overrides all stylistic defaults):
+- Ground EVERY factual claim strictly in the provided paper title, abstract, TLDR, or metadata. Never invent benchmarks, metrics, datasets, author affiliations, venues, or results not present in the input.
+- When the input does not specify a detail, say so explicitly (e.g. "The abstract does not report X") instead of filling the gap. Mark any inference with "The abstract implies ..." — never state it as fact.
+- Use precise systems terminology; prefer structured bullets over paragraphs. Name mechanisms, not vibes.
+- Every gaps/limitations section MUST close with one explicit "Unknowns / Not Stated" bullet listing what cannot be determined from the input.
+- BANNED openers and transitions (never emit): "In conclusion", "It is worth noting that", "It goes without saying", "delves into", "embarks on", "In today's fast-paced world", "Overall,", "First and foremost". Begin each section directly with substance — no preamble, no throat-clearing.
+"""
+
 SYSTEM_PROMPT = """You are an elite, distinguished Senior Distributed Systems and Academic Computing Researcher (IEEE/ACM Fellow caliber).
 Your role is to deeply analyze, cross-examine, and synthesize recent academic research papers to address the user's specific inquiry.
 
@@ -699,7 +740,7 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
   $$L_{\\text{loss}} = \\frac{1}{N} \\sum_{i=1}^N (y_i - \\hat{y}_i)^2$$
 - DO NOT wrap LaTeX equations in backticks or code blocks.
 - Use standardized Unicode for simple units and metrics (e.g., 99.9%, 15 ms, 4.2 GB/s, ->).
-"""
+""" + ACADEMIC_GROUNDING_DIRECTIVE
 
 
 SINGLE_PAPER_QUICK_SYSTEM_PROMPT = """You are an elite Senior Distributed Systems and Academic Computing Researcher.
@@ -715,7 +756,8 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
 - Format ALL mathematical formulas, variables, and complexities strictly in LaTeX with single dollar signs ($O(N \\log N)$, $\\lambda$) or standalone double dollar signs ($$...$$).
 - Never wrap LaTeX in backticks.
 - Use standardized Unicode for simple units and metrics (e.g., 99.9%, 15 ms, ->).
-"""
+""" + ACADEMIC_GROUNDING_DIRECTIVE
+
 
 SINGLE_PAPER_BALANCED_SYSTEM_PROMPT = """You are an elite Senior Distributed Systems and Academic Computing Researcher.
 Your task is to provide a crisp, rigorous 4-section summary (~250-350 words) of the target academic paper.
@@ -747,7 +789,8 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
   $$L_{\\text{loss}} = \\frac{1}{N} \\sum_{i=1}^N (y_i - \\hat{y}_i)^2$$
 - DO NOT wrap LaTeX equations in backticks or code blocks.
 - Use standardized Unicode for simple units and metrics (e.g., 99.9%, 15 ms, 4.2 GB/s, ->).
-"""
+""" + ACADEMIC_GROUNDING_DIRECTIVE
+
 
 SINGLE_PAPER_DEEP_SYSTEM_PROMPT = """You are an elite Senior Distributed Systems and Academic Computing Researcher (IEEE/ACM Fellow caliber).
 Your role is to deeply analyze, cross-examine, and deconstruct a specific academic research paper within the context of the user's research inquiry.
@@ -790,7 +833,7 @@ MATHEMATICAL NOTATION & TECHNICAL SYMBOLS DIRECTIVE:
   $$L_{\\text{loss}} = \\frac{1}{N} \\sum_{i=1}^N (y_i - \\hat{y}_i)^2$$
 - DO NOT wrap LaTeX equations in backticks or code blocks.
 - Use standardized Unicode for simple units and metrics (e.g., 99.9%, 15 ms, 4.2 GB/s, ->).
-"""
+""" + ACADEMIC_GROUNDING_DIRECTIVE
 
 ARCHITECTURE_IR_SYSTEM_PROMPT = """You are a systems architecture extractor. Given an academic paper's title and abstract, output ONLY a JSON object describing its system architecture as a small concept graph for a top-to-bottom dagre dataflow layout.
 
@@ -1855,6 +1898,9 @@ class ResearchLLMService:
         """
         target_prof = payload.target_professor.strip() or "Professor"
         scope = "holistic_lab" if payload.scope_type == "holistic_lab" else "single_paper"
+        tone = (payload.tone or "application").strip().lower()
+        if tone not in OUTREACH_TONES:
+            tone = "application"
         title = payload.paper_title.strip()
         abstract = payload.abstract.strip()
 
@@ -1897,9 +1943,14 @@ class ResearchLLMService:
             recipient_framing = "Address them as a contributing co-author of the work."
         where = f" at {institution}" if institution != "N/A" else ""
         recipient_line = f"Recipient: {target_prof} (Role: {recipient_role}{where})"
+        tone_line = (
+            "Tone: application (Prospective Graduate/RA Application) — admission-facing low-friction CTA."
+            if tone == "application" else
+            "Tone: collaboration (Academic Collaboration/Inquiry) — peer technical exchange, NO admission ask, NO degree self-introduction beyond one clause."
+        )
 
         role_slug = re.sub(r"[^a-z0-9]+", "-", recipient_role.lower()).strip("-") or "auto"
-        cache_key = f"outreach:v2:{scope}:{target_prof.lower()}:{title.lower()}:{role_slug}"
+        cache_key = f"outreach:v2:{scope}:{target_prof.lower()}:{title.lower()}:{role_slug}:{tone}"
         cached_json = synthesis_cache.get(cache_key)
         if cached_json is not None:
             try:
@@ -1924,6 +1975,7 @@ class ResearchLLMService:
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
                 recipient_role=recipient_role,
+                tone=tone,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -1941,6 +1993,7 @@ class ResearchLLMService:
             f"- Target Professor: {target_prof}\n"
             f"- {recipient_line}\n"
             f"- Recipient Framing: {recipient_framing}\n"
+            f"- {tone_line}\n"
             f"- Scope Mode: {scope}\n\n"
             f"Remember: body strictly under 120 words, low-friction ask only, bracketed "
             f"placeholders for applicant facts, and output strictly JSON with keys "
@@ -2003,6 +2056,7 @@ class ResearchLLMService:
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
                 recipient_role=recipient_role,
+                tone=tone,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
@@ -2018,6 +2072,7 @@ class ResearchLLMService:
                 core_method_or_contribution=payload.core_method_or_contribution or "",
                 institution_name=payload.institution_name or "",
                 recipient_role=recipient_role,
+                tone=tone,
             )
             synthesis_cache.set(cache_key, json.dumps(fallback))
             return fallback
