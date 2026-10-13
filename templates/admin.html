@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin · Access & Credits Control</title>
-  <link rel="icon" type="image/jpeg" href="/static/axiom_logo.jpg">
+  <link rel="icon" type="image/jpeg" href="/static/swmp_logo.jpg">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -47,7 +47,7 @@
     <div class="max-w-7xl mx-auto h-full flex items-center justify-between gap-3">
       <div class="flex items-center space-x-2.5 min-w-0">
         <div class="relative w-7 h-7 rounded-md overflow-hidden ring-1 ring-zinc-700 shrink-0 bg-black">
-          <img src="/static/axiom_logo.jpg" alt="Axiom Logo" class="w-full h-full object-cover" />
+          <img src="/static/swmp_logo.jpg" alt="SWMP Labs logo" class="w-full h-full object-cover" />
         </div>
         <h1 class="text-sm font-semibold tracking-tight truncate">Admin <span class="text-zinc-500 font-mono text-xs">/ access · credits</span></h1>
         <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-zinc-400 border border-zinc-800">RESTRICTED</span>
@@ -182,11 +182,11 @@
       const urlKey = urlParams.get('key') || urlParams.get('admin_key');
       if (urlKey) {
         activeKey = urlKey.trim();
-        setCookie('axiom_admin_session', activeKey);
+        setCookie('swmp_admin_session', activeKey);
         window.history.replaceState({}, document.title, window.location.pathname);
         return activeKey;
       }
-      const cookieKey = getCookie('axiom_admin_session');
+      const cookieKey = getCookie('swmp_admin_session');
       if (cookieKey) {
         activeKey = cookieKey.trim();
         return activeKey;
@@ -447,7 +447,7 @@
     document.getElementById('btn-manual-refresh')?.addEventListener('click', fetchTelemetry);
 
     document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
-      deleteCookie('axiom_admin_session');
+      deleteCookie('swmp_admin_session');
       activeKey = null;
       window.location.href = '/';
     });
@@ -474,7 +474,7 @@
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setCookie('axiom_admin_session', activeKey);
+        setCookie('swmp_admin_session', activeKey);
         document.getElementById('passkey-modal').classList.add('hidden');
         document.getElementById('passkey-error').classList.add('hidden');
         showToast('Admin session authenticated!', 'success');

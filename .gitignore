@@ -10,3 +10,8 @@ venv/
 htmlcov/
 *.log
 .DS_Store
+*.tmp
+# Runtime/state files (persisted locally, never committed).
+data/access_registry.json
+data/access_store.json
+data/admin_state.json

@@ -27,6 +27,37 @@ OPENALEX_AUTHORS_URL = "https://api.openalex.org/authors"
 OPENALEX_INSTITUTIONS_URL = "https://api.openalex.org/institutions"
 TARGET_ARXIV_CATEGORIES = "(cat:cs.DC OR cat:cs.SE OR cat:cs.AI OR cat:cs.AR)"
 
+REQUEST_USER_AGENT = "SWMP-Labs-Research/1.0"
+
+
+def _openalex_contact() -> str:
+    """Optional contact email for the OpenAlex polite pool (OPENALEX_MAILTO env)."""
+    return (os.getenv("OPENALEX_MAILTO") or "").strip()
+
+
+def _openalex_user_agent() -> str:
+    contact = _openalex_contact()
+    if contact:
+        return f"{REQUEST_USER_AGENT} (mailto:{contact})"
+    return REQUEST_USER_AGENT
+
+
+def _openalex_mailto_suffix() -> str:
+    """'&mailto=<contact>' for inline OpenAlex URLs, or '' when unconfigured."""
+    contact = _openalex_contact()
+    if not contact:
+        return ""
+    return f"&mailto={quote_plus(contact)}"
+
+
+def _openalex_params(base: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach the mailto contact to OpenAlex query params when configured."""
+    params = dict(base)
+    contact = _openalex_contact()
+    if contact:
+        params["mailto"] = contact
+    return params
+
 # ============================================================================
 # Semantic retrieval layer (local, zero-network, bounded-latency).
 # Replaces brittle literal keyword matching with intent-based expansion and
@@ -706,7 +737,7 @@ async def fetch_arxiv_papers(
                 params=params,
                 timeout=timeout,
                 follow_redirects=True,
-                headers={"User-Agent": "AxiomResearchAI/1.0 (academic-assistant@gemini.ai)"}
+                headers={"User-Agent": REQUEST_USER_AGENT}
             )
         if response.status_code != 200:
             logger.warning("ArXiv API returned status %d: %s", response.status_code, response.text[:200])
@@ -862,7 +893,7 @@ async def fetch_semantic_scholar_papers(
         return papers
 
     headers = {
-        "User-Agent": "AxiomResearchAI/1.0 (academic-assistant@gemini.ai)"
+        "User-Agent": REQUEST_USER_AGENT
     }
     if effective_key:
         headers["x-api-key"] = effective_key
@@ -1104,7 +1135,8 @@ async def resolve_openalex_author_id(
 ) -> Optional[Tuple[str, str]]:
     """
     Step 1 of Author Resolution:
-    Query GET https://api.openalex.org/authors?search={encoded_name}&per-page=1&mailto=admin@swmplabs.org
+    Query GET https://api.openalex.org/authors?search={encoded_name}&per-page=1
+    (contact appended from OPENALEX_MAILTO when configured).
     Returns (author_id, display_name) if found, else None.
     """
     clean_name = (name or "").strip()
@@ -1118,15 +1150,14 @@ async def resolve_openalex_author_id(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
+        "User-Agent": _openalex_user_agent(),
         "Accept": "application/json",
     }
-    params = {
+    params = _openalex_params({
         "search": clean_name,
         "per-page": 1,
         "select": "id,display_name,works_count",
-        "mailto": "admin@swmplabs.org"
-    }
+    })
     try:
         async with openalex_limiter:
             resp = await http_client.get(
@@ -1168,7 +1199,8 @@ async def resolve_openalex_institution_id(
 ) -> Optional[Tuple[str, str]]:
     """
     Step 1 of Institution Resolution:
-    Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1&mailto=admin@swmplabs.org
+    Query GET https://api.openalex.org/institutions?search={encoded_name}&per-page=1
+    (contact appended from OPENALEX_MAILTO when configured).
     Returns (institution_id, display_name) if found, else None.
     """
     clean_name = (name or "").strip()
@@ -1182,15 +1214,14 @@ async def resolve_openalex_institution_id(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
+        "User-Agent": _openalex_user_agent(),
         "Accept": "application/json",
     }
-    params = {
+    params = _openalex_params({
         "search": clean_name,
         "per-page": 1,
         "select": "id,display_name,works_count,country_code",
-        "mailto": "admin@swmplabs.org"
-    }
+    })
     try:
         async with openalex_limiter:
             resp = await http_client.get(
@@ -1311,10 +1342,16 @@ async def fetch_openalex_papers(
     if clean_kw:
         params["search"] = clean_kw
 
-    params["mailto"] = "admin@swmplabs.org"
+    params = _openalex_params({
+        "filter": ",".join(filter_parts),
+        "select": "id,doi,title,publication_year,authorships,abstract_inverted_index,open_access,cited_by_count",
+        "per-page": min(max(limit, 5), 100),
+    })
+    if clean_kw:
+        params["search"] = clean_kw
 
     headers = {
-        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
+        "User-Agent": _openalex_user_agent(),
         "Accept": "application/json",
     }
 
@@ -1436,7 +1473,7 @@ async def fetch_entity_papers(
 
     http_client = client or get_shared_http_client()
     headers = {
-        "User-Agent": "AxiomResearchAssistant/1.0 (mailto:admin@swmplabs.org)",
+        "User-Agent": _openalex_user_agent(),
         "Accept": "application/json",
     }
 
@@ -1488,7 +1525,7 @@ async def fetch_entity_papers(
             inst_id, inst_disp_name = KNOWN_INSTITUTIONS[clean_name.lower()]
             logger.info("Matched known institution %r -> ID: %s (%s)", clean_name, inst_id, inst_disp_name)
         else:
-            inst_lookup_url = f"https://api.openalex.org/institutions?search={quote_plus(clean_name)}&per-page=1&mailto=admin@swmplabs.org"
+            inst_lookup_url = f"https://api.openalex.org/institutions?search={quote_plus(clean_name)}&per-page=1{_openalex_mailto_suffix()}"
             try:
                 async with openalex_limiter:
                     inst_res = await http_client.get(inst_lookup_url, headers=headers, timeout=12.0)
@@ -1507,7 +1544,7 @@ async def fetch_entity_papers(
 
         # Query works using institution ID if resolved
         if inst_id:
-            works_url = f"https://api.openalex.org/works?filter=institutions.id:{inst_id}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            works_url = f"https://api.openalex.org/works?filter=institutions.id:{inst_id}&sort=cited_by_count:desc&per-page={effective_limit}{_openalex_mailto_suffix()}"
             try:
                 async with openalex_limiter:
                     works_res = await http_client.get(works_url, headers=headers, timeout=15.0)
@@ -1528,7 +1565,7 @@ async def fetch_entity_papers(
         # Fallback 1: Filter raw_affiliation_strings.search
         if not papers:
             logger.info("Triggering Fallback 1 for institution %r (raw_affiliation_strings)", clean_name)
-            fb1_url = f"https://api.openalex.org/works?filter=raw_affiliation_strings.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            fb1_url = f"https://api.openalex.org/works?filter=raw_affiliation_strings.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}{_openalex_mailto_suffix()}"
             try:
                 async with openalex_limiter:
                     fb1_res = await http_client.get(fb1_url, headers=headers, timeout=15.0)
@@ -1549,7 +1586,7 @@ async def fetch_entity_papers(
         # Fallback 2: General search scope
         if not papers:
             logger.info("Triggering Fallback 2 for institution %r (general search)", clean_name)
-            fb2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            fb2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}{_openalex_mailto_suffix()}"
             try:
                 async with openalex_limiter:
                     fb2_res = await http_client.get(fb2_url, headers=headers, timeout=15.0)
@@ -1586,7 +1623,7 @@ async def fetch_entity_papers(
             auth_id, author_disp_name = KNOWN_AUTHORS[clean_name.lower()]
 
         # Endpoint 1: Filter raw_author_name.search
-        ep1_url = f"https://api.openalex.org/works?filter=raw_author_name.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+        ep1_url = f"https://api.openalex.org/works?filter=raw_author_name.search:{quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}{_openalex_mailto_suffix()}"
         try:
             async with openalex_limiter:
                 ep1_res = await http_client.get(ep1_url, headers=headers, timeout=15.0)
@@ -1607,7 +1644,7 @@ async def fetch_entity_papers(
         # Endpoint 2: Fallback to General search
         if not papers:
             logger.info("Triggering Endpoint 2 fallback for author %r (general search)", clean_name)
-            ep2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}&mailto=admin@swmplabs.org"
+            ep2_url = f"https://api.openalex.org/works?search={quote_plus(clean_name)}&sort=cited_by_count:desc&per-page={effective_limit}{_openalex_mailto_suffix()}"
             try:
                 async with openalex_limiter:
                     ep2_res = await http_client.get(ep2_url, headers=headers, timeout=15.0)

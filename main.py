@@ -73,13 +73,60 @@ logger = logging.getLogger("academic_assistant.main")
 load_dotenv()
 
 # App Configuration
-ORCAROUTER_API_KEY = os.getenv("ORCAROUTER_API_KEY", "").strip()
-ORCAROUTER_BASE_URL = os.getenv("ORCAROUTER_BASE_URL", "https://www.orcarouter.ai/v1").strip()
-MODEL_NAME = os.getenv("MODEL_NAME", "deepseek/deepseek-v4-flash-free").strip()
-SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip() or "AxiomAdmin#2026!Secure"
+ORCAROUTER_API_KEY = (os.getenv("ORCAROUTER_API_KEY") or "").strip()
+ORCAROUTER_BASE_URL = (os.getenv("ORCAROUTER_BASE_URL") or "https://www.orcarouter.ai/v1").strip()
+MODEL_NAME = (os.getenv("MODEL_NAME") or "deepseek/deepseek-v4-flash-free").strip()
+SEMANTIC_SCHOLAR_API_KEY = (os.getenv("SEMANTIC_SCHOLAR_API_KEY") or "").strip()
+# Security credentials: env-only, no fallback literals. Empty = capability disabled.
+ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or "").strip()
+ENVIRONMENT = (os.getenv("ENVIRONMENT") or "").strip().lower()
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
+
+
+def _parse_csv_env(name: str) -> List[str]:
+    """Parse a comma-separated env var into cleaned upper-cased tokens (empty = [])."""
+    raw = os.getenv(name) or ""
+    return [t.strip().upper() for t in raw.split(",") if t.strip()]
+
+
+def _cors_origins() -> List[str]:
+    raw = os.getenv("ALLOWED_ORIGINS") or ""
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    if origins:
+        return origins
+    return [
+        "https://app.swmp-labs.tech",
+        "https://swmp-labs.tech",
+        "https://www.swmp-labs.tech",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
+
+def _mask_key(value: Optional[str]) -> str:
+    """Short public fingerprint for logs/telemetry: first 4 chars + '...'. Never raw."""
+    text = (value or "").strip()
+    if len(text) <= 4:
+        return "****"
+    return text[:4] + "..."
+
+
+def _test_backdoor_key() -> Optional[str]:
+    """Test-only bypass key. Honored ONLY when ENVIRONMENT=test; otherwise None."""
+    if ENVIRONMENT != "test":
+        return None
+    return (os.getenv("SWMP_TEST_KEY") or "").strip() or None
+
+
+if not ADMIN_PASSWORD:
+    logger.warning("ADMIN_PASSWORD is empty: admin password login disabled.")
+if not (os.getenv("MASTER_CODE") or "").strip():
+    logger.warning("MASTER_CODE is empty: master-code admin path disabled.")
+if not _parse_csv_env("MASTER_ADMIN_KEYS"):
+    logger.warning("MASTER_ADMIN_KEYS is empty: no master admin keys loaded.")
+if not _parse_csv_env("RESEARCHER_CODES"):
+    logger.warning("RESEARCHER_CODES is empty: researcher seeding and purge disabled.")
 
 
 @asynccontextmanager
@@ -96,18 +143,18 @@ async def lifespan(app: FastAPI):
         follow_redirects=True,
     )
     set_shared_http_client(pool_client)
-    logger.info("Axiom Connection Pool initialized: max_keepalive=20, max_connections=50")
+    logger.info("SWMP Labs connection pool initialized: max_keepalive=20, max_connections=50")
     try:
         yield
     finally:
         await close_shared_http_client()
-        logger.info("Axiom Connection Pool closed successfully")
+        logger.info("SWMP Labs connection pool closed successfully")
 
 
 # Initialize FastAPI App with Lifespan
 app = FastAPI(
-    title="Academic Research Assistant",
-    description="Asynchronous Academic Research Assistant with ArXiv, Semantic Scholar, and OrcaRouter AI Synthesis",
+    title="SWMP Labs",
+    description="SWMP Labs literature discovery and synthesis: ArXiv, Semantic Scholar, OpenAlex search with AI synthesis",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -115,7 +162,7 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -135,35 +182,45 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # ============================================================================
-# Axiom Access Registry & IP-Binding Security Gate
+# SWMP Labs Access Registry & IP-Binding Security Gate
 # ============================================================================
 
+def _registry_master_code() -> str:
+    return ((os.getenv("MASTER_CODE") or "").strip().upper())
+
+
+def _registry_master_keys() -> List[str]:
+    return _parse_csv_env("MASTER_ADMIN_KEYS")
+
+
+def _registry_researcher_codes() -> List[str]:
+    return _parse_csv_env("RESEARCHER_CODES")
+
+
+def _registry_expiry() -> Optional[str]:
+    raw = (os.getenv("RESEARCHER_CODE_EXPIRY") or "").strip()
+    return raw or None
+
+
 class AccessRegistryManager:
-    MASTER_CODE = "AXIOM-ROOT-V4HEWT"
-    MASTER_ADMIN_KEYS: List[str] = ["AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"]
-    RESEARCHER_CODES = [
-        "AXIOM-RESEARCH-9472",
-        "SWMP-SYSTEMS-3819",
-        "KERNEL-SCHOLAR-5184",
-        "DISTRIBUTED-SYNC-7291",
-        "LATENCY-ZERO-6435",
-        "CONSENSUS-CORE-8203",
-        "VECTOR-SYNTHESIS-1956",
-        "FABRIC-SECURE-4078",
-        "NEURAL-SCALE-8314",
-        "PIPELINE-FLOW-5721",
-        "STORAGE-TIER-9163",
-        "EPBF-TRACING-2847",
-        "CXL-MEMORY-6039",
-        "INFERENCE-ACCEL-4158",
-        "QUANTUM-GATE-7392",
-        "ACCELERATOR-FABRIC-3281",
-        "SERVERLESS-WARM-5920",
-        "COMPUTE-MESH-8471",
-        "ZERO-COPY-1635",
-        "OPTIMAL-STRAGGLER-9512",
-    ]
-    EXPIRATION_DATE = "2027-12-31"
+
+    # Env-driven credentials (no fallback literals). Properties read the
+    # current environment so rotation applies without a restart.
+    @property
+    def MASTER_CODE(self) -> str:
+        return _registry_master_code()
+
+    @property
+    def MASTER_ADMIN_KEYS(self) -> List[str]:
+        return _registry_master_keys()
+
+    @property
+    def RESEARCHER_CODES(self) -> List[str]:
+        return _registry_researcher_codes()
+
+    @property
+    def EXPIRATION_DATE(self) -> Optional[str]:
+        return _registry_expiry()
 
     def __init__(self, storage_path: Path):
         self.storage_path = storage_path
@@ -181,8 +238,12 @@ class AccessRegistryManager:
                 except Exception as e:
                     logger.error("Failed to load access registry from %s: %s", self.storage_path, str(e))
 
-            # Master codes: unrestricted access, no expiration, multi-IP
-            for m_code in self.MASTER_ADMIN_KEYS:
+            # Master codes: unrestricted access, no expiration, multi-IP.
+            # Empty env = disabled: seed nothing, delete nothing.
+            master_seeds = list(self.MASTER_ADMIN_KEYS)
+            if self.MASTER_CODE and self.MASTER_CODE not in master_seeds:
+                master_seeds.append(self.MASTER_CODE)
+            for m_code in master_seeds:
                 if m_code not in loaded:
                     loaded[m_code] = {
                         "type": "master",
@@ -191,20 +252,29 @@ class AccessRegistryManager:
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     }
 
-            # 20 invite codes: bound to single IP on first use. Legacy codes not on
-            # the current whitelist are purged so retired tokens stop working.
-            for code in list(loaded.keys()):
-                info = loaded[code]
-                if isinstance(info, dict) and info.get("type") == "researcher" and code not in self.RESEARCHER_CODES:
-                    del loaded[code]
-            for code in self.RESEARCHER_CODES:
-                if code not in loaded:
-                    loaded[code] = {
-                        "type": "researcher",
-                        "bound_ip": None,
-                        "expires_at": self.EXPIRATION_DATE,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                    }
+            # Researcher codes: bound to single IP on first use. Legacy codes
+            # not on the current whitelist are purged so retired tokens stop
+            # working — UNLESS the whitelist env is empty, in which case the
+            # purge is skipped entirely and nothing stored is touched.
+            researcher_codes = self.RESEARCHER_CODES
+            if not researcher_codes:
+                logger.warning(
+                    "RESEARCHER_CODES is empty: researcher seeding and purge "
+                    "disabled; existing registry tokens preserved."
+                )
+            else:
+                for code in list(loaded.keys()):
+                    info = loaded[code]
+                    if isinstance(info, dict) and info.get("type") == "researcher" and code not in researcher_codes:
+                        del loaded[code]
+                for code in researcher_codes:
+                    if code not in loaded:
+                        loaded[code] = {
+                            "type": "researcher",
+                            "bound_ip": None,
+                            "expires_at": self.EXPIRATION_DATE,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
 
             self.tokens = loaded
             self._save_unlocked()
@@ -246,7 +316,7 @@ class AccessRegistryManager:
                     if current_date > expiry_date:
                         return False, "Code has expired.", 403, token_data
                 except Exception as e:
-                    logger.error("Error parsing expiration for code %s: %s", clean_code, str(e))
+                    logger.error("Error parsing expiration for code %s: %s", _mask_key(clean_code), str(e))
 
             # 3. Researcher code: check IP binding
             bound_ip = token_data.get("bound_ip")
@@ -255,11 +325,11 @@ class AccessRegistryManager:
                     token_data["bound_ip"] = client_ip
                     token_data["bound_at"] = datetime.now(timezone.utc).isoformat()
                     self._save_unlocked()
-                    logger.info("Bound researcher code %s permanently to client IP %s", clean_code, client_ip)
+                    logger.info("Bound researcher code %s permanently to client IP %s", _mask_key(clean_code), client_ip)
                 return True, "Cohort researcher access verified.", 200, token_data
 
             if bound_ip != client_ip:
-                logger.warning("Code %s rejected: bound to %s, received from %s", clean_code, bound_ip, client_ip)
+                logger.warning("Code %s rejected: bound to %s, received from %s", _mask_key(clean_code), bound_ip, client_ip)
                 return False, "Code is locked to another machine/IP.", 403, token_data
 
             return True, "Cohort researcher access verified.", 200, token_data
@@ -305,7 +375,10 @@ ip_rate_limiter = IPRateLimiter(max_failures=5, lockout_seconds=900)
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract original client IP from X-Forwarded-For, X-Real-IP, or direct connection."""
+    """Extract original client IP honoring proxies: Cloudflare, X-Forwarded-For, X-Real-IP, or direct."""
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip()
@@ -317,25 +390,25 @@ def get_client_ip(request: Request) -> str:
     return "127.0.0.1"
 
 
-async def verify_axiom_access(
+async def verify_access_key(
     request: Request,
-    x_axiom_key: Optional[str] = Header(None, alias="X-Axiom-Key"),
+    x_swmp_key: Optional[str] = Header(None, alias="X-SWMP-Key"),
     access_code: Optional[str] = Query(None),
     token: Optional[str] = Query(None),
 ) -> str:
     """
     FastAPI dependency that enforces Cohort Gate access verification.
-    Accepts X-Axiom-Key header or query parameter (access_code / token) for EventSource SSE.
+    Accepts X-SWMP-Key header or query parameter (access_code / token) for EventSource SSE.
     """
-    key = x_axiom_key or access_code or token
+    key = x_swmp_key or access_code or token
     if not key:
         auth_header = request.headers.get("authorization")
         if auth_header and auth_header.lower().startswith("bearer "):
             key = auth_header[7:].strip()
 
-    # Fallback for automated test suites if AXIOM_TEST_KEY environment variable is provided
-    if not key and os.getenv("AXIOM_TEST_KEY"):
-        key = os.getenv("AXIOM_TEST_KEY")
+    # Test-only bypass key, honored solely when ENVIRONMENT=test.
+    if not key:
+        key = _test_backdoor_key()
 
     if not key:
         raise HTTPException(
@@ -355,7 +428,19 @@ async def verify_axiom_access(
     return key
  
  
-MASTER_ADMIN_KEYS: set[str] = {"AXIOM-MASTER-RESEARCH-2026", "AXIOM-ROOT-V4HEWT"}
+def _master_admin_keys() -> Set[str]:
+    """Master admin keys from MASTER_ADMIN_KEYS env (comma-separated). Empty = none."""
+    return set(_parse_csv_env("MASTER_ADMIN_KEYS"))
+
+
+MASTER_ADMIN_KEYS: Set[str] = _master_admin_keys()
+
+
+def _refresh_master_admin_keys() -> Set[str]:
+    """Re-read master keys from the current environment (rotation without restart)."""
+    global MASTER_ADMIN_KEYS
+    MASTER_ADMIN_KEYS = _master_admin_keys()
+    return MASTER_ADMIN_KEYS
 
 
 def extract_request_access_key(request: Request) -> Optional[str]:
@@ -365,7 +450,7 @@ def extract_request_access_key(request: Request) -> Optional[str]:
     """
     key = (
         request.headers.get("x-admin-key")
-        or request.headers.get("x-axiom-key")
+        or request.headers.get("x-swmp-key")
     )
     if not key:
         auth_header = request.headers.get("authorization")
@@ -380,8 +465,8 @@ def extract_request_access_key(request: Request) -> Optional[str]:
         )
     if not key:
         key = (
-            request.cookies.get("axiom_access_token")
-            or request.cookies.get("axiom_admin_session")
+            request.cookies.get("swmp_access_token")
+            or request.cookies.get("swmp_admin_session")
         )
     return key.strip() if key else None
 
@@ -389,8 +474,8 @@ def extract_request_access_key(request: Request) -> Optional[str]:
 def verify_master_admin(request: Request) -> str:
     """
     Validates that the incoming request has Master Admin privileges.
-    Accepts the ADMIN_PASSWORD, legacy master keys, X-Admin-Key / X-Axiom-Key
-    headers, ?key= query parameter, or axiom_admin_session cookie.
+    Accepts the ADMIN_PASSWORD, legacy master keys, X-Admin-Key / X-SWMP-Key
+    headers, ?key= query parameter, or swmp_admin_session cookie.
     Returns HTTP 404 Not Found on failure (instead of 401/403) to ensure security through obscurity
     against scanners and scrapers.
     """
@@ -401,8 +486,9 @@ def verify_master_admin(request: Request) -> str:
     if verify_admin_password(raw_key):
         return "ADMIN_PASSWORD_SESSION"
 
+    master_keys = _refresh_master_admin_keys()
     clean_key = raw_key.strip().upper()
-    if clean_key in MASTER_ADMIN_KEYS or clean_key == access_registry.MASTER_CODE:
+    if clean_key in master_keys or (access_registry.MASTER_CODE and clean_key == access_registry.MASTER_CODE):
         return clean_key
 
     # Check registered tokens for master role
@@ -448,7 +534,7 @@ async def telemetry_and_moderation_middleware(request: Request, call_next):
         is_admin_override = False
         if path.startswith("/admin") or path.startswith("/api/admin"):
             clean_k = (raw_key or "").strip().upper()
-            if clean_k in MASTER_ADMIN_KEYS:
+            if clean_k in _refresh_master_admin_keys():
                 is_admin_override = True
 
         if not is_admin_override:
@@ -589,7 +675,7 @@ class LiteratureReviewExportRequest(BaseModel):
 
 
 class AuthVerifyRequest(BaseModel):
-    access_code: str = Field(..., description="Axiom Cohort Access Code")
+    access_code: str = Field(..., description="SWMP Labs cohort access code")
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -619,7 +705,7 @@ class AdminLimitsRequest(BaseModel):
 # Invite-Only Access Gate, Onboarding, Credits & Admin Code Management
 # Supabase Auth supplies identity; invite codes / profiles / credits live in
 # services/access.py. Metered routes use resolve_access (Supabase path first,
-# legacy Axiom cohort gate as fallback) instead of verify_axiom_access.
+# legacy cohort gate as fallback) instead of verify_access_key.
 # Machine-readable outcomes travel in the X-Access-Code response header so
 # existing string `detail` parsing on clients never breaks.
 # ============================================================================
@@ -650,31 +736,53 @@ def _access_denied(status_code: int, machine_code: str, message: str) -> HTTPExc
 
 async def resolve_access(
     request: Request,
+    x_swmp_key: Optional[str] = Header(None, alias="X-SWMP-Key"),
+    access_code: Optional[str] = Query(None),
+    token: Optional[str] = Query(None),
     sb_token: Optional[str] = Query(None),
 ) -> str:
     """
-    Strict dual-gate for all 12 metered endpoints (search + AI generation).
-    Requires BOTH a validated invite code AND an active Supabase session with
-    a completed profile. Each allowed call deducts 1 credit. Cohort-only keys
-    are NOT sufficient here (401 AUTH_REQUIRED). Guests get 401, incomplete
-    profiles 403 ONBOARDING_REQUIRED, revoked codes 403 CODE_REVOKED, empty
-    balances 402 CREDITS_EXHAUSTED — machine codes in X-Access-Code.
+    Three-tier gate for all 12 metered endpoints (search + AI generation).
+    1. Supabase invite path: completed profile + active code + credits>0 ->
+       deduct 1 code credit, allow.
+    2. Cohort credential path: valid SWMP Labs access code -> allow, no burn.
+    3. Guest IP trial path: no credential presented -> auto-provision 10
+       trial credits per IP, deduct 1 per call; exhausted IPs get 402
+       TRIAL_EXHAUSTED. All trial accounting is strictly server-side.
     """
     sb_user = await get_current_user(request.headers.get("authorization"), sb_token)
-    if sb_user is None:
-        raise _access_denied(
-            401, "AUTH_REQUIRED",
-            "Authentication required. Sign in and complete onboarding to use search.",
+    if sb_user is not None:
+        profile = access_store.get_user(sb_user["id"])
+        if not profile or not profile.get("code"):
+            raise _access_denied(403, "ONBOARDING_REQUIRED", "Profile setup required. Complete onboarding to unlock.")
+        access_store.touch_user(sb_user["id"], get_client_ip(request))
+        ok, msg, status = access_store.deduct_credit(sb_user["id"])
+        if not ok:
+            machine = "CODE_REVOKED" if status == 403 else "CREDITS_EXHAUSTED"
+            raise _access_denied(status, machine, msg)
+        return f"sb:{sb_user['id']}"
+
+    key = x_swmp_key or access_code or token
+    if not key:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            key = auth_header[7:].strip()
+    if not key:
+        key = _test_backdoor_key()
+    if key:
+        client_ip = get_client_ip(request)
+        is_valid, msg, status_code, _ = access_registry.validate_code(
+            code=key, client_ip=client_ip, bind_if_unbound=True
         )
-    profile = access_store.get_user(sb_user["id"])
-    if not profile or not profile.get("code"):
-        raise _access_denied(403, "ONBOARDING_REQUIRED", "Profile setup required. Complete onboarding to unlock.")
-    access_store.touch_user(sb_user["id"], get_client_ip(request))
-    ok, msg, status = access_store.deduct_credit(sb_user["id"])
+        if not is_valid:
+            raise HTTPException(status_code=status_code, detail=msg)
+        return key
+
+    guest_ip = get_client_ip(request)
+    ok, msg, status = access_store.deduct_guest(guest_ip)
     if not ok:
-        machine = "CODE_REVOKED" if status == 403 else "CREDITS_EXHAUSTED"
-        raise _access_denied(status, machine, msg)
-    return f"sb:{sb_user['id']}"
+        raise _access_denied(status, "TRIAL_EXHAUSTED", msg)
+    return f"guest:{guest_ip}"
 
 
 @app.get("/api/onboarding/status")
@@ -698,6 +806,36 @@ async def onboarding_status(request: Request):
         "code": profile.get("code", ""),
         "credits": code_credits if code_credits is not None else 0,
         "code_active": code_active,
+    }
+
+
+@app.get("/api/trial/status")
+async def trial_status(request: Request):
+    """
+    Transparent credit readout for the header badge. Authenticated callers
+    see their code balance; guests see their IP trial balance (read-only —
+    rows are only provisioned on actual metered use). Never 401s.
+    """
+    from services.access import GUEST_TRIAL_CREDITS
+
+    sb_user = await get_current_user(
+        request.headers.get("authorization"), request.query_params.get("sb_token")
+    )
+    if sb_user is not None:
+        code_credits = access_store.user_credits(sb_user["id"])
+        return {
+            "authenticated": True,
+            "balance": code_credits if code_credits is not None else 0,
+            "trial_total": GUEST_TRIAL_CREDITS,
+            "exhausted": (code_credits or 0) <= 0,
+        }
+    st = access_store.guest_status(get_client_ip(request), create=False)
+    return {
+        "authenticated": False,
+        "balance": st["balance"],
+        "trial_total": GUEST_TRIAL_CREDITS,
+        "total_consumed": st["total_consumed"],
+        "exhausted": st["balance"] <= 0,
     }
 
 
@@ -822,9 +960,9 @@ async def admin_telemetry_24h(request: Request):
 
 
 # ============================================================================
-# Supabase Persistence API (sessions history, artifacts, saved papers)
+# Supabase persistence API (sessions history, artifacts, saved papers)
 # Auth: Supabase Bearer tokens via get_current_user — fully independent of the
-# Axiom cohort gate so guest/offline search pipelines are never affected.
+# cohort gate so guest/offline search pipelines are never affected.
 # Writes require auth (401); reads fall back gracefully ([]) for guests.
 # ============================================================================
 
@@ -1192,6 +1330,13 @@ async def delete_paper_bookmark(
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui(request: Request):
     """Serve the single-page application UI."""
+    # Supabase web credentials (publishable only) for the browser layer.
+    # Empty when unconfigured: the UI stays in guest mode.
+    supabase_url = (os.getenv("SUPABASE_URL") or "").strip()
+    supabase_anon_key = (
+        (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+        or (os.getenv("SUPABASE_KEY") or "").strip()
+    )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -1200,6 +1345,8 @@ async def serve_ui(request: Request):
             "has_orcarouter_key": bool(runtime_config["orcarouter_api_key"]),
             "has_ss_key": bool(runtime_config["semantic_scholar_api_key"]),
             "base_url": runtime_config["orcarouter_base_url"],
+            "supabase_url": supabase_url,
+            "supabase_anon_key": supabase_anon_key,
         }
     )
 
@@ -1329,7 +1476,7 @@ async def api_health_check():
     return {"status": "online", "version": "1.0.0"}
 
 
-@app.post("/api/config", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/config", dependencies=[Depends(verify_access_key)])
 async def update_runtime_config(payload: ConfigUpdateRequest):
     """Update runtime API keys or endpoints directly from the UI without restart."""
     global llm_service
@@ -2014,7 +2161,7 @@ async def paper_compare_matrix_endpoint(payload: ComparePapersRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate trade-off matrix: {str(e)}")
 
 
-@app.post("/api/export/notebooklm", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/export/notebooklm", dependencies=[Depends(verify_access_key)])
 async def export_notebooklm_endpoint(payload: NotebookLMExportRequest):
     """
     Bundle discovered papers into a single clean Markdown source pack
@@ -2063,7 +2210,7 @@ async def export_notebooklm_endpoint(payload: NotebookLMExportRequest):
 
     content = "\n".join(lines)
     clean_filename = re.sub(r"[^a-zA-Z0-9]", "_", payload.inquiry)[:35]
-    filename = f"Axiom_NotebookLM_{clean_filename or 'Source_Pack'}.md"
+    filename = f"SWMP_NotebookLM_{clean_filename or 'Source_Pack'}.md"
 
     return Response(
         content=content,
@@ -2072,7 +2219,7 @@ async def export_notebooklm_endpoint(payload: NotebookLMExportRequest):
     )
 
 
-@app.post("/api/export/literature-review", dependencies=[Depends(verify_axiom_access)])
+@app.post("/api/export/literature-review", dependencies=[Depends(verify_access_key)])
 async def export_literature_review_endpoint(payload: LiteratureReviewExportRequest):
     """
     Generate and export an IEEE-styled formal literature review document
@@ -2171,7 +2318,7 @@ async def admin_dashboard_page(request: Request):
     )
     if admin_key:
         response.set_cookie(
-            key="axiom_admin_session",
+            key="swmp_admin_session",
             value=admin_key,
             max_age=86400 * 30,
             httponly=False,

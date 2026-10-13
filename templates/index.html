@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SWMP Labs</title>
-  <link rel="icon" type="image/jpeg" href="/static/axiom_logo.jpg">
+  <link rel="icon" type="image/jpeg" href="/static/swmp_logo.jpg">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -75,12 +75,42 @@
   <!-- Instant Theme Initializer (Prevents FOUC) -->
   <script>
     (function() {
-      const savedTheme = localStorage.getItem('axiom_theme') || 'dark';
+      const savedTheme = localStorage.getItem('swmp_theme') || 'dark';
       if (savedTheme === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
+    })();
+  </script>
+
+  <!-- One-time brand storage migration: copies legacy localStorage keys to the
+       new swmp_* keys and removes the old ones. This block is intentionally the
+       only remaining occurrence of the previous key names. -->
+  <script>
+    (function() {
+      try {
+        var pairs = [
+          ['axiom_theme', 'swmp_theme'],
+          ['axiom_access_token', 'swmp_access_token'],
+          ['axiom_saved_papers', 'swmp_saved_papers']
+        ];
+        for (var i = 0; i < pairs.length; i++) {
+          var oldKey = pairs[i][0], newKey = pairs[i][1];
+          var existing = null;
+          try { existing = localStorage.getItem(newKey); } catch (_) {}
+          if (existing !== null && existing !== undefined) {
+            try { localStorage.removeItem(oldKey); } catch (_) {}
+            continue;
+          }
+          var legacy = null;
+          try { legacy = localStorage.getItem(oldKey); } catch (_) {}
+          if (legacy !== null && legacy !== undefined) {
+            try { localStorage.setItem(newKey, legacy); } catch (_) {}
+            try { localStorage.removeItem(oldKey); } catch (_) {}
+          }
+        }
+      } catch (_) {}
     })();
   </script>
 
@@ -589,7 +619,7 @@
             </span>
             <span id="broadcast-modal-time" class="text-[11px] font-mono text-slate-400"></span>
           </div>
-          <h3 class="text-base font-bold text-white mt-2 mb-2">Important Axiom Notice</h3>
+          <h3 class="text-base font-bold text-white mt-2 mb-2">Important Notice</h3>
           <div id="broadcast-modal-text" class="text-sm text-slate-200 leading-relaxed break-words bg-slate-950/60 p-3.5 rounded-xl border border-slate-800"></div>
         </div>
       </div>
@@ -631,7 +661,7 @@
       <!-- Brand mark + wordmark -->
       <div class="flex items-center space-x-2.5 min-w-0">
         <div class="relative w-7 h-7 rounded-md overflow-hidden ring-1 ring-zinc-300 dark:ring-zinc-700 shrink-0 bg-black flex items-center justify-center">
-          <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+          <img src="/static/swmp_logo.jpg" alt="SWMP Labs logo" class="w-full h-full object-cover" />
         </div>
         <h1 class="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
           SWMP <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-accent-400">Labs</span>
@@ -642,7 +672,7 @@
       <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
 
         <!-- Status: plain dot + muted text (no glow pill) -->
-        <div id="server-status-badge" class="cohort-status-pill system-health-indicator flex items-center space-x-1.5 px-2 py-1 text-xs text-zinc-500 dark:text-zinc-400" title="Axiom Engine Health Status">
+        <div id="server-status-badge" class="cohort-status-pill system-health-indicator flex items-center space-x-1.5 px-2 py-1 text-xs text-zinc-500 dark:text-zinc-400" title="SWMP Labs engine health status">
           <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
           <span id="server-status-text" class="font-mono text-[11px]">Engine: Active</span>
         </div>
@@ -658,6 +688,7 @@
           <span id="sb-auth-label" class="hidden sm:inline">Sign In</span>
         </button>
         <span id="sb-credits-badge" class="hidden text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400" title="Remaining AI credits"></span>
+        <span id="guest-trial-badge" class="hidden text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400" title="Free guest trial credits on this network"></span>
 
         <!-- Dark / Light Mode Switcher Toggle -->
         <button id="btn-theme-toggle" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Toggle Dark / Light Mode">
@@ -665,7 +696,7 @@
         </button>
 
         <!-- Support Project Button (ghost) -->
-        <button id="btn-support-modal" class="flex items-center space-x-1.5 px-2 py-1.5 rounded-md text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Support Axiom Research Project">
+        <button id="btn-support-modal" class="flex items-center space-x-1.5 px-2 py-1.5 rounded-md text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/80 transition cursor-pointer" title="Support SWMP Labs">
           <i data-lucide="coffee" class="w-3.5 h-3.5"></i>
           <span class="hidden sm:inline">Support</span>
         </button>
@@ -693,7 +724,7 @@
 
           <div class="space-y-2">
             <div class="inline-flex relative w-9 h-9 rounded-md overflow-hidden ring-1 ring-zinc-300 dark:ring-zinc-700 bg-black items-center justify-center mx-auto">
-              <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+              <img src="/static/swmp_logo.jpg" alt="SWMP Labs logo" class="w-full h-full object-cover" />
             </div>
             <h2 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
               SWMP <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-accent-400">Labs</span>
@@ -1254,10 +1285,10 @@
   <div id="auth-gate-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4 hidden">
     <div class="bg-slate-900 border border-slate-800/90 rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
       
-      <!-- Axiom & SWMP Labs Logos -->
+      <!-- SWMP Labs logos -->
       <div class="flex items-center justify-center space-x-3">
         <div class="relative w-12 h-12 rounded-xl overflow-hidden shadow-lg shadow-brand-500/30 ring-1 ring-brand-500/50 bg-black flex items-center justify-center">
-          <img src="/static/axiom_logo.jpg" alt="Axiom Research Logo" class="w-full h-full object-cover" />
+          <img src="/static/swmp_logo.jpg" alt="SWMP Labs logo" class="w-full h-full object-cover" />
         </div>
         <div class="w-px h-8 bg-slate-800"></div>
         <div class="w-10 h-10 rounded-xl overflow-hidden bg-black ring-1 ring-cyan-500/40 flex items-center justify-center">
@@ -1297,7 +1328,7 @@
               type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder="AXIOM-XXXX-XXXX"
+              placeholder="SWMP-XXXX-XXXX"
               class="w-full bg-slate-950/90 border border-slate-700/80 focus:border-brand-500 rounded-xl px-4 py-3 text-sm font-mono tracking-widest text-center text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition uppercase"
             />
             <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
@@ -1340,7 +1371,7 @@
             <h3 class="text-base font-bold text-white">Support SWMP Labs</h3>
           </div>
           <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
-            Axiom is an open-source academic systems engine engineered by <strong class="text-slate-200">SWMP Labs</strong>. Your support helps maintain GPU inference clusters, crawler pipelines, and hosting infrastructure.
+            SWMP Labs is built and maintained by one person. Your support helps cover hosting and model API costs.
           </p>
         </div>
         <button id="btn-close-support" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition shrink-0 cursor-pointer">
@@ -1516,7 +1547,7 @@
         </div>
         <div>
           <label for="onboarding-code" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Academic Access / Referral Code</label>
-          <input id="onboarding-code" type="text" autocomplete="off" placeholder="e.g., AXIOM-RESEARCH-9472" autocapitalize="characters" spellcheck="false"
+          <input id="onboarding-code" type="text" autocomplete="off" placeholder="e.g., SWMP-XXXX-XXXX" autocapitalize="characters" spellcheck="false"
             class="w-full bg-slate-50 dark:bg-slate-950 text-xs font-mono uppercase text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-slate-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500" />
         </div>
       </div>
@@ -1560,6 +1591,33 @@
     </div>
   </div>
 
+  <!-- Guest Trial Exhaustion Prompt -->
+  <div id="trial-exhausted-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center text-slate-800 dark:text-slate-100 relative">
+      <button id="btn-trial-close" class="absolute top-3 right-3 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Dismiss">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+      <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-500">
+        <i data-lucide="battery-low" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold">Trial credits used up</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+          You've used your 10 free trial credits on this network.
+          Sign in or enter an Access Code to continue researching.
+        </p>
+      </div>
+      <div class="space-y-2 pt-1">
+        <button id="btn-trial-signin" class="w-full flex items-center justify-center px-4 py-2 rounded-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-semibold text-xs transition cursor-pointer">
+          <span>Sign In / Create Account</span>
+        </button>
+        <button id="btn-trial-code" class="w-full text-center text-[11px] font-mono text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer">
+          I have an Access Code
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- In-app Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-12 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
@@ -1583,7 +1641,7 @@
     function applyTheme(theme) {
       const isDark = theme === 'dark';
       document.documentElement.classList.toggle('dark', isDark);
-      localStorage.setItem('axiom_theme', theme);
+      localStorage.setItem('swmp_theme', theme);
       if (themeIcon) {
         themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
         themeIcon.className = `w-4 h-4 ${isDark ? 'text-amber-400' : 'text-slate-700'}`;
@@ -1592,7 +1650,7 @@
     }
 
     function initTheme() {
-      const savedTheme = localStorage.getItem('axiom_theme') || 'dark';
+      const savedTheme = localStorage.getItem('swmp_theme') || 'dark';
       applyTheme(savedTheme);
     }
 
@@ -1678,7 +1736,7 @@
         const data = await res.json();
 
         if (res.ok && data.valid) {
-          localStorage.setItem('axiom_access_token', code);
+          localStorage.setItem('swmp_access_token', code);
           try { sessionStorage.setItem('pending_access_code', code); } catch (_) {}
           hideAuthGate();
           if (!sbUser) {
@@ -1689,6 +1747,7 @@
           } else if (!sbOnboarded) {
             openOnboardingModal();
           } else {
+            unlockTrialGate();
             showToast(`Access granted (${data.type || 'researcher'}). Cohort active.`, 'success');
           }
         } else {
@@ -1710,9 +1769,11 @@
     }
 
     async function initCohortGate() {
-      const storedToken = localStorage.getItem('axiom_access_token');
+      // Guest-first: never force the access-code modal on initial visit.
+      // A stored token is silently re-validated; otherwise the user starts
+      // on the free IP trial and the gate only opens on explicit action.
+      const storedToken = localStorage.getItem('swmp_access_token');
       if (!storedToken) {
-        showAuthGate();
         return;
       }
 
@@ -1724,7 +1785,7 @@
         });
         const data = await res.json();
         if (!res.ok || !data.valid) {
-          localStorage.removeItem('axiom_access_token');
+          localStorage.removeItem('swmp_access_token');
           showAuthGate(data.error || 'Access session expired or unauthorized.');
         } else {
           hideAuthGate();
@@ -1735,14 +1796,14 @@
       }
     }
 
-    // Authenticated fetch wrapper injecting X-Axiom-Key (+ Supabase Bearer for
+    // Authenticated fetch wrapper injecting X-SWMP-Key (+ Supabase Bearer for
     // the invite path) and catching 401/402/403. Machine outcomes arrive via
     // the X-Access-Code header so invite-gate states never trigger the cohort gate.
     async function authenticatedFetch(url, options = {}) {
-      const token = localStorage.getItem('axiom_access_token') || '';
+      const token = localStorage.getItem('swmp_access_token') || '';
       const headers = { ...(options.headers || {}) };
       if (token) {
-        headers['X-Axiom-Key'] = token;
+        headers['X-SWMP-Key'] = token;
       }
       try {
         const sbTok = await sbGetToken();
@@ -1755,8 +1816,15 @@
         else showAuthGate('Enter your invite code to unlock research tools.');
         return response;
       }
+      if (machine === 'TRIAL_EXHAUSTED') {
+        openTrialExhaustedModal();
+        refreshTrialBadge();
+        return response;
+      }
       if (response.status === 402 || machine === 'CREDITS_EXHAUSTED') {
         showToast('Out of credits — contact the administrator for a top-up.', 'error');
+        if (typeof checkOnboardingStatus === 'function') checkOnboardingStatus();
+        else refreshTrialBadge();
         return response;
       }
       if (machine === 'ONBOARDING_REQUIRED') {
@@ -1773,10 +1841,10 @@
           const clone = response.clone();
           const errData = await clone.json();
           const msg = errData.detail || errData.error || 'Session unauthorized. Please re-authenticate.';
-          localStorage.removeItem('axiom_access_token');
+          localStorage.removeItem('swmp_access_token');
           showAuthGate(msg);
         } catch (_) {
-          localStorage.removeItem('axiom_access_token');
+          localStorage.removeItem('swmp_access_token');
           showAuthGate('Session unauthorized. Please enter your access code.');
         }
       }
@@ -2618,7 +2686,7 @@
     // --- Workspace State & LocalStorage Management ---
     let savedPapers = [];
     try {
-      savedPapers = JSON.parse(localStorage.getItem('axiom_saved_papers') || '[]');
+      savedPapers = JSON.parse(localStorage.getItem('swmp_saved_papers') || '[]');
     } catch (e) {
       savedPapers = [];
     }
@@ -2875,7 +2943,8 @@
         submitBtn.disabled = true;
         btnText.textContent = 'Analyzing...';
       } else {
-        submitBtn.disabled = false;
+        // Respect the trial lock: an exhausted guest stays disabled.
+        submitBtn.disabled = (typeof trialLocked !== 'undefined' && trialLocked);
         btnText.textContent = 'Research';
       }
     }
@@ -2895,7 +2964,7 @@
         savedPapers.push(paper);
         showToast('Paper saved to Saved workspace!', 'success');
       }
-      localStorage.setItem('axiom_saved_papers', JSON.stringify(savedPapers));
+      localStorage.setItem('swmp_saved_papers', JSON.stringify(savedPapers));
       updateWorkspaceBadges();
       renderPapersView();
       // Cloud sync when signed in (guests stay local-only, silent)
@@ -2938,7 +3007,7 @@
       btnClearSaved.addEventListener('click', () => {
         if (!savedPapers.length) return;
         savedPapers = [];
-        localStorage.setItem('axiom_saved_papers', JSON.stringify([]));
+        localStorage.setItem('swmp_saved_papers', JSON.stringify([]));
         updateWorkspaceBadges();
         renderPapersView();
         showToast('Saved papers cart cleared', 'info');
@@ -4332,7 +4401,7 @@
     ${matrixHtml}
   </div>
   <div class="print-footer">
-    <span>Axiom Research Engine · Cross-Paper Engineering Trade-offs</span>
+    <span>SWMP Labs · Cross-Paper Engineering Trade-offs</span>
     <span>Evaluation Matrix: 5 Structural Dimensions</span>
   </div>
 </body>
@@ -5356,10 +5425,11 @@
     }
 
     // --- Supabase Persistence Layer (optional cloud sync; guests run 100% offline) ---
-    // Publishable anon key is public-by-design. NEVER route these calls through
-    // authenticatedFetch(): its 401 handler would nuke the Axiom cohort session.
-    const SB_URL = 'https://qvlrgqunoodvdkkdsvnq.supabase.co';
-    const SB_ANON_KEY = 'sb_publishable_4tZ31-7PursiX2nArIcTCQ_4hAyytxv';
+    // Web credentials are injected server-side from the environment (see serve_ui).
+    // NEVER route these calls through authenticatedFetch(): its 401 handler would
+    // nuke the cohort session.
+    const SB_URL = {{ supabase_url|tojson }};
+    const SB_ANON_KEY = {{ supabase_anon_key|tojson }};
     const SB_SIGNIN_REQUIRED_MSG = 'Please sign in to save your history and artifacts.';
     let sbClient = null;
     let sbUser = null; // {id, email} once Supabase session resolves
@@ -5529,7 +5599,7 @@
           added++;
         });
         if (added > 0) {
-          localStorage.setItem('axiom_saved_papers', JSON.stringify(savedPapers));
+          localStorage.setItem('swmp_saved_papers', JSON.stringify(savedPapers));
           updateWorkspaceBadges();
           renderPapersView();
           showToast(`Synced ${added} bookmark${added === 1 ? '' : 's'} from your account.`, 'success');
@@ -5762,6 +5832,10 @@
 
     function initSupabaseLayer() {
       try {
+        if (!SB_URL || !SB_ANON_KEY) {
+          console.warn('Supabase web credentials unconfigured — guest mode (search unaffected).');
+          return;
+        }
         if (!window.supabase || !window.supabase.createClient) {
           console.warn('Supabase CDN unavailable — guest mode (search unaffected).');
           return;
@@ -5783,6 +5857,7 @@
               closeSbConfirmModal();
               showToast('Email confirmed — welcome!', 'success');
             }
+            unlockTrialGate();
             mergeServerBookmarks();
             checkOnboardingStatus();
           } else {
@@ -5795,6 +5870,7 @@
             updateSbAuthUI();
             updateSbCreditsUI();
             closeOnboardingModal();
+            refreshTrialBadge();
           }
         });
         updateSbAuthUI();
@@ -5911,6 +5987,7 @@
           sbOnboarded = true;
           sbCredits = data.credits || 0;
           try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
+          unlockTrialGate();
           closeOnboardingModal();
           updateSbCreditsUI();
         } else if (data && !data.guest) {
@@ -5978,6 +6055,7 @@
         sbCredits = (data && data.credits) || 0;
         updateSbCreditsUI();
         try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
+        unlockTrialGate();
         closeOnboardingModal();
         showToast(`Welcome, ${data.full_name || deriveDisplayName()}! ${sbCredits} credits granted.`, 'success');
       } catch (e) {
@@ -6022,6 +6100,7 @@
         sbCredits = (data && data.credits) || 0;
         updateSbCreditsUI();
         try { sessionStorage.removeItem('pending_access_code'); } catch (_) {}
+        unlockTrialGate();
         closeOnboardingModal();
         showToast(`Welcome, ${data.full_name || fullName}! ${sbCredits} credits granted.`, 'success');
       } catch (e) {
@@ -6043,6 +6122,79 @@
       });
       const signinBtn = document.getElementById('btn-onboarding-signin');
       if (signinBtn) signinBtn.addEventListener('click', () => { closeOnboardingModal(); openSbAuthModal(); });
+    })();
+
+    // --- Guest IP Trial (10 free credits, no account; server is source of truth) ---
+    // trialLocked gates the submit button; only auth events clear it.
+    let trialLocked = false;
+
+    function openTrialExhaustedModal() {
+      const modal = document.getElementById('trial-exhausted-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      trialLocked = true;
+      if (typeof submitBtn !== 'undefined' && submitBtn) submitBtn.disabled = true;
+      try { if (window.lucide) lucide.createIcons(); } catch (_) {}
+    }
+
+    function closeTrialExhaustedModal() {
+      const modal = document.getElementById('trial-exhausted-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function unlockTrialGate() {
+      trialLocked = false;
+      closeTrialExhaustedModal();
+      if (typeof submitBtn !== 'undefined' && submitBtn) submitBtn.disabled = false;
+      refreshTrialBadge();
+    }
+
+    async function refreshTrialBadge() {
+      const badge = document.getElementById('guest-trial-badge');
+      if (!badge) return;
+      const authed = (typeof sbUser !== 'undefined' && !!sbUser);
+      if (authed) {
+        badge.classList.add('hidden');
+        return;
+      }
+      try {
+        const headers = {};
+        const res = await fetch('/api/trial/status', { headers });
+        const data = await res.json().catch(() => ({}));
+        if (data && data.authenticated) {
+          badge.classList.add('hidden');
+          return;
+        }
+        const bal = (data && typeof data.balance === 'number') ? data.balance : 10;
+        const total = (data && data.trial_total) || 10;
+        badge.textContent = `Guest Trial: ${bal} / ${total} credits left`;
+        badge.classList.remove('hidden');
+        if (bal <= 0) {
+          openTrialExhaustedModal();
+        }
+      } catch (_) {
+        // Network failure: leave the badge hidden rather than guessing.
+      }
+    }
+
+    (function initTrialGate() {
+      const closeBtn = document.getElementById('btn-trial-close');
+      if (closeBtn) closeBtn.addEventListener('click', closeTrialExhaustedModal);
+      const signinBtn = document.getElementById('btn-trial-signin');
+      if (signinBtn) signinBtn.addEventListener('click', () => {
+        closeTrialExhaustedModal();
+        openSbAuthModal();
+      });
+      const codeBtn = document.getElementById('btn-trial-code');
+      if (codeBtn) codeBtn.addEventListener('click', () => {
+        closeTrialExhaustedModal();
+        showAuthGate('Enter your access code to continue researching.');
+      });
+      const modal = document.getElementById('trial-exhausted-modal');
+      if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeTrialExhaustedModal(); });
     })();
 
     // --- Export Handlers (NotebookLM Pack & Literature Review) ---
@@ -6071,7 +6223,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Axiom_NotebookLM_Source_Pack_${Date.now()}.md`;
+        a.download = `SWMP_NotebookLM_Source_Pack_${Date.now()}.md`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -6224,17 +6376,9 @@
         return;
       }
 
-      // Strict dual-gate: metered search needs BOTH an onboarded Supabase
-      // session and a validated code. Guests are fully blocked from running
-      // searches — the gate opens instead.
-      if (!(sbUser && sbOnboarded)) {
-        if (sbUser && !sbOnboarded) {
-          openOnboardingModal();
-          return;
-        }
-        showAuthGate('Enter your invite code to unlock research tools.');
-        return;
-      }
+      // Guest trial: unauthenticated visitors may run searches directly.
+      // The server enforces the 10-credit IP trial and answers 402
+      // TRIAL_EXHAUSTED when depleted (handled centrally below).
 
       welcomeCard.classList.add('hidden');
       setFormLoading(true);
@@ -6387,9 +6531,9 @@
         if (customAuthor) params.set('author', customAuthor);
         if (customInstitution) params.set('institution', customInstitution);
       }
-      const axiomToken = localStorage.getItem('axiom_access_token') || '';
-      if (axiomToken) {
-        params.set('access_code', axiomToken);
+      const swmpToken = localStorage.getItem('swmp_access_token') || '';
+      if (swmpToken) {
+        params.set('access_code', swmpToken);
       }
       // Invite path: EventSource cannot send headers, so the Supabase JWT
       // travels as sb_token for the credit/profile gate.
@@ -6505,6 +6649,7 @@
             renderMathInContainer(markdownBody);
             showToast('Literature discovery complete!', 'success');
             persistResearchSession(inquiry, accumulatedMarkdown);
+            refreshTrialBadge();
           } else if (type === 'error') {
             streamDone = true;
             clearInterval(timerInterval);
@@ -6514,6 +6659,7 @@
             eventSource.close();
             activeEventSource = null;
             showToast(data.message, 'error');
+            refreshTrialBadge();
           }
         } catch (err) {
           console.error('Error parsing SSE event:', err);
@@ -6544,6 +6690,14 @@
             if (res.ok) {
               try { if (res.body && res.body.cancel) await res.body.cancel(); } catch (_) {}
               showToast('Search stream interrupted. Please retry.', 'error');
+              return;
+            }
+            const probeMachine = res.headers ? res.headers.get('X-Access-Code') : null;
+            if (probeMachine === 'TRIAL_EXHAUSTED') {
+              try { if (res.body && res.body.cancel) await res.body.cancel(); } catch (_) {}
+              stageDetail.textContent = 'Free trial credits exhausted on this network.';
+              openTrialExhaustedModal();
+              refreshTrialBadge();
               return;
             }
             let detail = `Search request failed (HTTP ${res.status})`;
@@ -6612,7 +6766,7 @@
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `axiom-research-${Date.now()}.md`;
+          a.download = `swmp-labs-${Date.now()}.md`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -6640,7 +6794,7 @@
       if (text) text.textContent = 'Engine: Connecting...';
       if (badge) {
         badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 shadow-xs transition-colors';
-        badge.title = 'Axiom Engine: Connecting...';
+        badge.title = 'SWMP Labs engine: connecting...';
       }
 
       let isResolved = false;
@@ -6665,7 +6819,7 @@
           if (text) text.textContent = 'Engine: Active';
           if (badge) {
             badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shadow-xs transition-colors';
-            badge.title = 'Axiom Engine: Active (Cold-Start Ready)';
+            badge.title = 'SWMP Labs engine: active (cold-start ready)';
           }
         })
         .catch(err => {
@@ -6821,6 +6975,7 @@
     initServerHealthCheck();
     initBroadcastBanner();
     initSupabaseLayer();
+    refreshTrialBadge();
   </script>
 </body>
 </html>

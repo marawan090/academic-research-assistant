@@ -1,10 +1,14 @@
 """
-Invite-only access store: 20-code whitelist, per-user profiles, credit ledger.
+Invite-only access store: invite-code whitelist, per-user profiles, credit ledger.
 
 Authoritative local JSON store (data/access_store.json) for codes, onboarding
 profiles, and credits. Supabase Auth supplies identity only; all invite/credit
 state lives here so behavior is identical with or without Supabase tables.
 Thread-safe, atomic writes, zero impact on search pipelines.
+
+Seed codes come ONLY from the INVITE_CODES environment variable
+(comma-separated). When it is empty, nothing is seeded and nothing stored is
+purged, so existing codes, users and credits are never destroyed.
 """
 
 import json
@@ -18,44 +22,45 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("academic_assistant.access")
 
-# Part 1: whitelist of 20 structured high-entropy invite tokens.
-ACCESS_CODES: List[str] = [
-    "AXIOM-RESEARCH-9472",
-    "SWMP-SYSTEMS-3819",
-    "KERNEL-SCHOLAR-5184",
-    "DISTRIBUTED-SYNC-7291",
-    "LATENCY-ZERO-6435",
-    "CONSENSUS-CORE-8203",
-    "VECTOR-SYNTHESIS-1956",
-    "FABRIC-SECURE-4078",
-    "NEURAL-SCALE-8314",
-    "PIPELINE-FLOW-5721",
-    "STORAGE-TIER-9163",
-    "EPBF-TRACING-2847",
-    "CXL-MEMORY-6039",
-    "INFERENCE-ACCEL-4158",
-    "QUANTUM-GATE-7392",
-    "ACCELERATOR-FABRIC-3281",
-    "SERVERLESS-WARM-5920",
-    "COMPUTE-MESH-8471",
-    "ZERO-COPY-1635",
-    "OPTIMAL-STRAGGLER-9512",
-]
+
+def _mask_code(value: Optional[str]) -> str:
+    """Short public fingerprint for logs: first 4 chars + '...'. Never the raw value."""
+    text = (value or "").strip()
+    if len(text) <= 4:
+        return "****"
+    return text[:4] + "..."
+
+
+def _load_invite_codes() -> List[str]:
+    """
+    Optional seed list from INVITE_CODES (comma-separated, set in the hosting
+    dashboard). Empty/missing means: seed nothing; stored codes are kept as-is.
+    """
+    raw = os.getenv("INVITE_CODES") or ""
+    codes = [c.strip().upper() for c in raw.split(",") if c.strip()]
+    return codes
+
+
+# Part 1: whitelist of invite tokens, seeded ONLY from INVITE_CODES.
+# Empty env -> no seeding and no purging (existing stored codes are preserved).
+ACCESS_CODES: List[str] = _load_invite_codes()
 
 DEFAULT_CREDITS = 25
-ADMIN_PASSWORD_FALLBACK = "AxiomAdmin#2026!Secure"
+GUEST_TRIAL_CREDITS = 10
 
 
 def get_admin_password() -> str:
-    """Admin password from ADMIN_PASSWORD env, falling back to the provisioned default."""
-    return os.getenv("ADMIN_PASSWORD", "").strip() or ADMIN_PASSWORD_FALLBACK
+    """Admin password from ADMIN_PASSWORD env only. Empty string = admin disabled."""
+    return (os.getenv("ADMIN_PASSWORD") or "").strip()
 
 
 def verify_admin_password(candidate: Optional[str]) -> bool:
-    """Constant-time-ish comparison against the configured admin password."""
+    """Constant-time-ish comparison. Always False when no ADMIN_PASSWORD is configured."""
     if not candidate:
         return False
     expected = get_admin_password()
+    if not expected:
+        return False
     c = candidate.strip()
     if len(c) != len(expected):
         return False
@@ -73,10 +78,15 @@ def _utcnow_iso() -> str:
 class AccessStore:
     """
     Thread-safe JSON store:
-      codes: {CODE: {"active": bool, "bound_user_id": str|None, "bound_email": str|None,
-                     "bound_at": iso|None, "bound_ip": str|None}}
-      users: {supabase_user_id: {"email":..., "full_name":..., "code":..., "credits": int,
-                                 "ip":..., "created_at":..., "updated_at":..., "last_active":...}}
+      codes: {CODE: {"active": bool, "balance": int|None, "bound_user_id":...,
+                     "bound_email":..., "bound_at":..., "bound_ip":...}}
+      users: {supabase_user_id: {"email":..., "full_name":..., "code":...,
+                                 "ip":..., "created_at":..., "updated_at":...,
+                                 "last_active":...}}
+      guest_ips: {ip: {"balance": int, "total_consumed": int,
+                       "created_at":..., "last_active":...}}
+    Balances live on codes (seeded once at first redemption) and on guest IP
+    rows (seeded once at first guest use). User records carry no credits.
     """
 
     def __init__(self, storage_path: Optional[Path] = None):
@@ -84,6 +94,7 @@ class AccessStore:
         self._lock = threading.Lock()
         self.codes: Dict[str, Dict[str, Any]] = {}
         self.users: Dict[str, Dict[str, Any]] = {}
+        self.guest_ips: Dict[str, Dict[str, Any]] = {}
         self._load_or_initialize()
 
     # -- persistence ------------------------------------------------------
@@ -91,33 +102,60 @@ class AccessStore:
         with self._lock:
             loaded_codes: Dict[str, Dict[str, Any]] = {}
             loaded_users: Dict[str, Dict[str, Any]] = {}
+            loaded_guests: Dict[str, Dict[str, Any]] = {}
             if self.storage_path.exists():
                 try:
                     with open(self.storage_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     loaded_codes = data.get("codes", {}) or {}
                     loaded_users = data.get("users", {}) or {}
+                    loaded_guests = data.get("guest_ips", {}) or {}
                 except Exception as e:
                     logger.error("Failed to load access store from %s: %s", self.storage_path, str(e))
-            for code in ACCESS_CODES:
-                if code not in loaded_codes:
-                    loaded_codes[code] = {
-                        "active": True,
-                        "balance": None,  # None = never redeemed; seeded once on first redemption
-                        "bound_user_id": None,
-                        "bound_email": None,
-                        "bound_at": None,
-                        "bound_ip": None,
+            if not ACCESS_CODES:
+                # Fail closed with zero destruction: no seed list configured, so
+                # keep every stored code/user exactly as persisted. Add nothing,
+                # delete nothing (purge skipped entirely).
+                logger.warning(
+                    "INVITE_CODES is empty: invite seeding and whitelist purge "
+                    "disabled; existing stored codes preserved."
+                )
+                self.codes = loaded_codes
+                self.users = loaded_users
+            else:
+                for code in ACCESS_CODES:
+                    if code not in loaded_codes:
+                        loaded_codes[code] = {
+                            "active": True,
+                            "balance": None,  # None = never redeemed; seeded once on first redemption
+                            "bound_user_id": None,
+                            "bound_email": None,
+                            "bound_at": None,
+                            "bound_ip": None,
+                        }
+                # Drop stale codes no longer on the whitelist (keeps registry tight).
+                self.codes = {c: loaded_codes[c] for c in ACCESS_CODES if c in loaded_codes}
+                # Guarantee all whitelist codes present even if file predates them.
+                for code in ACCESS_CODES:
+                    self.codes.setdefault(code, {
+                        "active": True, "balance": None, "bound_user_id": None,
+                        "bound_email": None, "bound_at": None, "bound_ip": None,
+                    })
+                self.users = loaded_users
+            # Keep only well-formed guest rows (balance/total_consumed ints).
+            self.guest_ips = {}
+            for ip, g in loaded_guests.items():
+                if not isinstance(g, dict):
+                    continue
+                try:
+                    self.guest_ips[str(ip)] = {
+                        "balance": max(0, int(g.get("balance", 0) or 0)),
+                        "total_consumed": max(0, int(g.get("total_consumed", 0) or 0)),
+                        "created_at": g.get("created_at") or _utcnow_iso(),
+                        "last_active": g.get("last_active") or _utcnow_iso(),
                     }
-            # Drop stale codes no longer on the whitelist (keeps registry tight).
-            self.codes = {c: loaded_codes[c] for c in ACCESS_CODES if c in loaded_codes}
-            # Guarantee all whitelist codes present even if file predates them.
-            for code in ACCESS_CODES:
-                self.codes.setdefault(code, {
-                    "active": True, "balance": None, "bound_user_id": None,
-                    "bound_email": None, "bound_at": None, "bound_ip": None,
-                })
-            self.users = loaded_users
+                except (TypeError, ValueError):
+                    continue
             # Migration: balances used to live on user records. Adopt each bound
             # user's balance onto its code (once), then drop the user-level field
             # so the code entry is the single source of truth going forward.
@@ -165,7 +203,10 @@ class AccessStore:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             temp_path = self.storage_path.with_suffix(".tmp")
             with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump({"codes": self.codes, "users": self.users}, f, indent=2)
+                json.dump(
+                    {"codes": self.codes, "users": self.users, "guest_ips": self.guest_ips},
+                    f, indent=2,
+                )
             os.replace(temp_path, self.storage_path)
         except Exception as e:
             logger.error("Failed to persist access store: %s", str(e))
@@ -189,7 +230,7 @@ class AccessStore:
             entry["active"] = False
             entry["deactivated_at"] = _utcnow_iso()
             self._save_unlocked()
-        logger.warning("Admin deactivated access code %s", clean)
+        logger.warning("Admin deactivated access code %s", _mask_code(clean))
         return True, f"Code {clean} deactivated."
 
     def list_codes(self) -> List[Dict[str, Any]]:
@@ -251,7 +292,7 @@ class AccessStore:
             balance = self._code_balance_unlocked(clean_code) or 0
         logger.info(
             "Onboarding %s for user %s (code %s, first=%s, balance=%d)",
-            "completed" if first_redemption else "updated", user_id, clean_code,
+            "completed" if first_redemption else "updated", user_id, _mask_code(clean_code),
             first_redemption, balance,
         )
         result = dict(user)
@@ -323,6 +364,81 @@ class AccessStore:
         out["credits"] = balance
         return out
 
+    # -- guest IP trial (10 free credits, no account, server-side only) -----
+    @staticmethod
+    def normalize_ip(ip: Optional[str]) -> str:
+        return ((ip or "").strip() or "127.0.0.1")
+
+    def guest_status(self, ip: str, create: bool = False) -> Dict[str, Any]:
+        """
+        Read-only trial state for an IP. New IPs report the full trial
+        balance WITHOUT writing a row unless create=True (pure reads must
+        never provision ledger rows).
+        """
+        clean = self.normalize_ip(ip)
+        now = _utcnow_iso()
+        with self._lock:
+            rec = self.guest_ips.get(clean)
+            if rec is None:
+                if not create:
+                    return {
+                        "balance": GUEST_TRIAL_CREDITS,
+                        "total_consumed": 0,
+                        "provisioned": False,
+                        "created_at": None,
+                        "last_active": None,
+                    }
+                rec = {
+                    "balance": GUEST_TRIAL_CREDITS,
+                    "total_consumed": 0,
+                    "created_at": now,
+                    "last_active": now,
+                }
+                self.guest_ips[clean] = rec
+                self._save_unlocked()
+            return {
+                "balance": int(rec.get("balance", 0) or 0),
+                "total_consumed": int(rec.get("total_consumed", 0) or 0),
+                "provisioned": True,
+                "created_at": rec.get("created_at"),
+                "last_active": rec.get("last_active"),
+            }
+
+    def deduct_guest(self, ip: str) -> Tuple[bool, str, int]:
+        """
+        Atomically provision (first use: 10 credits) and deduct 1 trial
+        credit for an IP. Exhausted IPs get (False, msg, 402) with a
+        TRIAL_EXHAUSTED machine code at the endpoint layer — they can never
+        reclaim free credits; only sign-in/code paths unlock further use.
+        """
+        clean = self.normalize_ip(ip)
+        now = _utcnow_iso()
+        with self._lock:
+            rec = self.guest_ips.get(clean)
+            if rec is None:
+                rec = {
+                    "balance": GUEST_TRIAL_CREDITS,
+                    "total_consumed": 0,
+                    "created_at": now,
+                    "last_active": now,
+                }
+                self.guest_ips[clean] = rec
+            balance = int(rec.get("balance", 0) or 0)
+            if balance <= 0:
+                rec["last_active"] = now
+                self._save_unlocked()
+                return (
+                    False,
+                    "You've used your 10 free trial credits on this network. "
+                    "Sign in or enter an Access Code to continue.",
+                    402,
+                )
+            rec["balance"] = balance - 1
+            rec["total_consumed"] = int(rec.get("total_consumed", 0) or 0) + 1
+            rec["last_active"] = now
+            self._save_unlocked()
+            return True, "ok", 200
+
     def adjust_credits(
         self,
         user_id: Optional[str] = None,
@@ -356,7 +472,7 @@ class AccessStore:
             self.codes[clean]["balance"] = new_balance
             self.codes[clean]["updated_at"] = _utcnow_iso()
             self._save_unlocked()
-            logger.warning("Admin adjusted credits for code %s by %+d -> %d", clean, int(delta), new_balance)
+            logger.warning("Admin adjusted credits for code %s by %+d -> %d", _mask_code(clean), int(delta), new_balance)
             bound_uid = self.codes[clean].get("bound_user_id")
             user_view = dict(self.users.get(bound_uid, {})) if bound_uid else {}
             user_view.setdefault("code", clean)
@@ -380,7 +496,7 @@ class AccessStore:
             self.codes[clean]["balance"] = new_balance
             self.codes[clean]["updated_at"] = _utcnow_iso()
             self._save_unlocked()
-            logger.warning("Admin set credits for code %s -> %d", clean, new_balance)
+            logger.warning("Admin set credits for code %s -> %d", _mask_code(clean), new_balance)
             return True, "Credits updated.", 200, self._with_credits(dict(user), new_balance)
 
     # -- admin activity -------------------------------------------------------

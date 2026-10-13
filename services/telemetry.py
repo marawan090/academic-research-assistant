@@ -1,5 +1,5 @@
 """
-Axiom Telemetry & Observability Engine - Services Module.
+SWMP Labs Telemetry & Observability Engine - Services Module.
 Provides low-overhead in-memory ring-buffered event logging, live user presence tracking,
 IP/Key blacklisting, global broadcast alerts, and dynamic request throttling.
 Designed specifically for resource-constrained environments (Render Free/Starter tier)
@@ -17,6 +17,32 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger("academic_assistant.telemetry")
+
+
+# Sentinel / attribution values that are safe to store verbatim (not secrets).
+_PLAINTEXT_KEYS = frozenset({
+    "UNAUTHENTICATED / VISITOR",
+    "SUPABASE_USER",
+})
+
+
+def mask_key(value: Optional[str]) -> str:
+    """
+    Public fingerprint for stored telemetry and logs: first 4 chars + '...'.
+    Raw access codes/keys are never persisted. Attribution prefixes (sb:/guest:)
+    and display sentinels pass through so the admin activity view keeps working.
+    """
+    text = (value or "").strip()
+    if not text:
+        return "UNAUTHENTICATED / VISITOR"
+    upper = text.upper()
+    if upper in _PLAINTEXT_KEYS:
+        return text
+    if upper.startswith("SB:") or upper.startswith("GUEST:"):
+        return text
+    if len(text) <= 4:
+        return "****"
+    return text[:4] + "..."
 
 
 class TelemetryManager:
@@ -136,7 +162,8 @@ class TelemetryManager:
     ) -> Dict[str, Any]:
         """
         Appends a telemetry record to the ring buffer and updates live user presence.
-        Truncates query preview to 120 characters.
+        Truncates query preview to 120 characters. Raw access keys are never
+        stored: only the masked fingerprint (first 4 chars + '...') is kept.
         """
         now = time.time()
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -145,7 +172,7 @@ class TelemetryManager:
         if not raw_k or raw_k.upper() in ("NONE", "NULL", "ANONYMOUS", "UNAUTHENTICATED"):
             clean_key = "UNAUTHENTICATED / VISITOR"
         else:
-            clean_key = raw_k
+            clean_key = mask_key(raw_k)
         safe_query = (query_preview or "").strip()
         if len(safe_query) > 120:
             safe_query = safe_query[:117] + "..."
@@ -253,7 +280,7 @@ class TelemetryManager:
             if clean_ip in self.banned_ips:
                 return True, f"IP address {clean_ip} has been blacklisted by administrator."
             if clean_key and clean_key in self.banned_keys and clean_key not in ("ANONYMOUS", "UNAUTHENTICATED / VISITOR"):
-                return True, f"Access key {clean_key} has been revoked by administrator."
+                return True, f"Access key {mask_key(clean_key)} has been revoked by administrator."
 
         return False, ""
 
@@ -285,10 +312,10 @@ class TelemetryManager:
                 clean_key = clean_val.upper()
                 if block:
                     self.banned_keys.add(clean_key)
-                    action_msg = f"Access key {clean_key} revoked successfully."
+                    action_msg = f"Access key {mask_key(clean_key)} revoked successfully."
                 else:
                     self.banned_keys.discard(clean_key)
-                    action_msg = f"Access key {clean_key} restored successfully."
+                    action_msg = f"Access key {mask_key(clean_key)} restored successfully."
             else:
                 return {"status": "error", "message": f"Invalid target_type: {target_type}. Must be 'ip' or 'key'."}
 
