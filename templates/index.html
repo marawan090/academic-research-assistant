@@ -634,8 +634,8 @@
        (emerald/amber/rose) are intentionally preserved. -->
   <style id="swmp-warm-paper">
     /* Page + shell surfaces */
-    html body { background-color: #FAF8F4 !important; color: #1B1B1A; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
-    html.dark body { background-color: #141413 !important; color: #ECE9E2; }
+    html body { background-color: #FAF8F4 !important; color: #1B1B1A !important; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    html.dark body { background-color: #141413 !important; color: #ECE9E2 !important; }
     html header { background-color: rgba(250, 248, 244, 0.92) !important; border-color: #E4E0D8 !important; }
     html.dark header { background-color: rgba(20, 20, 19, 0.92) !important; border-color: #2A2926 !important; }
     html footer { background-color: rgba(250, 248, 244, 0.85) !important; border-color: #E4E0D8 !important; }
@@ -754,6 +754,121 @@
     html.dark ::-webkit-scrollbar-thumb { background: #2A2926; }
     html ::-webkit-scrollbar-thumb:hover { background: #2F5D50; }
     html.dark ::-webkit-scrollbar-thumb:hover { background: #7FB5A3; }
+  </style>
+
+  <!-- SWMP Labs Warm Paper layer 2: utility reconciliation (colors only).
+       The markup styles itself with hardcoded slate/zinc/indigo/brand
+       Tailwind utilities, so the token block alone cannot recolor it. This
+       layer maps those utilities onto the reference palette per theme.
+       Light conversions apply inside :where(main, header, footer, converted
+       modals) so intentionally-dark sheets (support/diagram) keep contrast.
+       Functional hues (emerald/amber/rose), spinners and layout untouched. -->
+  <style id="swmp-warm-paper-2">
+    /* Page root behind body (overscroll / letterbox) */
+    html.bg-slate-950 { background-color: #FAF8F4 !important; }
+    html.dark.bg-slate-950 { background-color: #141413 !important; color: #ECE9E2; }
+
+    /* ---- Light: surfaces -> #FFFFFF ---- */
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-zinc-800, .bg-zinc-900, .bg-slate-800\/60, .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-900\/60, .bg-slate-900\/80, .bg-slate-900\/85, .bg-slate-900\/90, .bg-slate-950\/60, .bg-slate-950\/90, .bg-slate-950\/95, .bg-zinc-900\/60, .bg-zinc-800\/90, .bg-slate-50, .bg-slate-100, .bg-slate-200, .bg-slate-200\/80, .bg-zinc-50, .bg-zinc-50\/50, .bg-zinc-50\/70, .bg-zinc-50\/80, .bg-zinc-100) { background-color: #FFFFFF !important; background-image: none !important; }
+
+    /* ---- Light: primary text -> #1B1B1A ---- */
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.text-zinc-900, .text-slate-900, .text-slate-800, .text-zinc-800, .text-slate-700, .text-zinc-700, .text-slate-200, .text-slate-100) { color: #1B1B1A; }
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.text-white) { color: #1B1B1A !important; }
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal) :is(.bg-brand-600, .bg-gradient-to-tr) :is(.text-white) { color: #FFFFFF !important; }
+
+    /* ---- Light: secondary text -> #6B6A66 ---- */
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.text-zinc-500, .text-zinc-400, .text-zinc-600, .text-slate-500, .text-slate-400, .text-slate-600, .text-slate-300) { color: #6B6A66; }
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.hover\:text-slate-900, .hover\:text-slate-800, .hover\:text-slate-700, .hover\:text-zinc-900, .hover\:text-zinc-800, .hover\:text-white):hover { color: #1B1B1A !important; }
+
+    /* ---- Light: borders -> #E4E0D8 ---- */
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.border-slate-700, .border-slate-800, .border-zinc-700, .border-zinc-800, .border-slate-700\/50, .border-slate-700\/60, .border-slate-700\/80, .border-slate-800\/60, .border-slate-800\/70, .border-slate-800\/80, .border-slate-800\/90, .border-zinc-700\/60) { border-color: #E4E0D8 !important; }
+
+    /* ---- Light: hover washes -> soft moss ---- */
+    html:not(.dark) :where(main, header, footer, #citation-modal, #broadcast-modal-backdrop, #auth-gate-modal, #sb-confirm-modal, #onboarding-modal, #trial-exhausted-modal) :is(.hover\:bg-slate-100, .hover\:bg-slate-200, .hover\:bg-slate-300, .hover\:bg-zinc-100, .hover\:bg-slate-700, .hover\:bg-slate-800):hover { background-color: rgba(47, 93, 80, 0.08) !important; }
+
+    /* ---- Light: modal fields (auth/citation use dark-idiom inputs) ---- */
+    html:not(.dark) :where(#auth-gate-modal, #citation-modal) :is(input, textarea, select) { background-color: #FFFFFF !important; color: #1B1B1A !important; border-color: #E4E0D8 !important; }
+    html:not(.dark) :where(#auth-gate-modal, #citation-modal) :is(input, textarea)::placeholder { color: #6B6A66 !important; opacity: 0.8 !important; }
+
+    /* ---- Dark: surfaces -> #1B1B19 ---- */
+    html.dark :is(.dark\:bg-slate-900, .dark\:bg-slate-950, .dark\:bg-slate-800, .dark\:bg-zinc-900, .dark\:bg-zinc-950, .dark\:bg-zinc-800, .dark\:bg-slate-900\/60, .bg-slate-900, .bg-slate-950, .bg-slate-800, .bg-zinc-900, .bg-zinc-950, .bg-zinc-800, .bg-slate-900\/60, .bg-slate-900\/80, .bg-slate-900\/85, .bg-slate-900\/90, .bg-slate-950\/60, .bg-slate-950\/90, .bg-slate-950\/95, .bg-slate-800\/60, .bg-slate-800\/70, .bg-slate-800\/80, .bg-zinc-900\/60, .bg-zinc-800\/90, .bg-slate-50, .bg-slate-100, .bg-slate-200, .bg-zinc-50, .bg-zinc-50\/50, .bg-zinc-100, .bg-white) { background-color: #1B1B19 !important; background-image: none !important; }
+
+    /* ---- Dark: primary text -> #ECE9E2 ---- */
+    html.dark :is(.dark\:text-zinc-100, .dark\:text-zinc-200, .dark\:text-slate-100, .dark\:text-slate-200, .dark\:text-slate-300, .dark\:text-white, .text-zinc-100, .text-zinc-200, .text-slate-100, .text-slate-200, .text-slate-300, .text-white, .text-zinc-900, .text-slate-900, .text-slate-800, .text-zinc-800, .text-slate-700, .text-zinc-700) { color: #ECE9E2 !important; }
+    html.dark :is(.text-white\/80) { color: rgba(236, 233, 226, 0.8) !important; }
+    html.dark :is(.dark\:hover\:text-slate-200, .dark\:hover\:text-zinc-200, .dark\:hover\:text-white, .dark\:hover\:text-zinc-300):hover { color: #ECE9E2 !important; }
+
+    /* ---- Dark: secondary text -> #A09D95 ---- */
+    html.dark :is(.dark\:text-zinc-400, .dark\:text-zinc-500, .dark\:text-zinc-600, .dark\:text-slate-400, .dark\:text-slate-500, .text-zinc-400, .text-zinc-500, .text-zinc-600, .text-slate-400, .text-slate-500, .text-slate-600) { color: #A09D95 !important; }
+
+    /* ---- Dark: borders -> #2A2926 ---- */
+    html.dark :is(.dark\:border-zinc-800, .dark\:border-zinc-700, .dark\:border-slate-800, .dark\:border-slate-700, .border-zinc-800, .border-zinc-700, .border-slate-800, .border-slate-700, .border-zinc-200, .border-slate-200, .border-slate-300, .border-slate-700\/50, .border-slate-700\/60, .border-slate-700\/80, .border-slate-800\/60, .border-slate-800\/70, .border-slate-800\/80, .border-slate-800\/90, .border-zinc-700\/60, .dark\:border-slate-800\/80, .dark\:border-slate-800\/70, .dark\:border-slate-700\/60) { border-color: #2A2926 !important; }
+
+    /* ---- Dark: hover washes -> soft moss ---- */
+    html.dark :is(.dark\:hover\:bg-slate-800, .dark\:hover\:bg-slate-700, .dark\:hover\:bg-zinc-800, .dark\:hover\:bg-zinc-900, .dark\:hover\:bg-zinc-800\/80):hover { background-color: rgba(127, 181, 163, 0.10) !important; }
+
+    /* ---- Accent: indigo/purple/brand -> moss (both modes; status hues untouched) ---- */
+    html :is(.text-brand-400, .text-brand-500, .text-brand-600) { color: #2F5D50 !important; }
+    html.dark :is(.text-brand-400, .text-brand-500, .text-brand-600, .dark\:text-brand-300, .dark\:text-brand-400) { color: #7FB5A3 !important; }
+    html :is(.text-indigo-200, .text-purple-200) { color: #1B1B1A !important; }
+    html.dark :is(.text-indigo-200, .text-purple-200) { color: #ECE9E2 !important; }
+    html :is(.text-indigo-300, .text-indigo-400, .text-purple-400) { color: #2F5D50 !important; }
+    html.dark :is(.text-indigo-300, .text-indigo-400, .text-purple-400) { color: #7FB5A3 !important; }
+    html :is(.bg-brand-500\/10, .bg-brand-600\/15, .bg-indigo-500\/20, .bg-indigo-950\/80, .bg-purple-950\/80) { background-color: rgba(47, 93, 80, 0.08) !important; background-image: none !important; }
+    html.dark :is(.bg-brand-500\/10, .bg-brand-600\/15, .bg-indigo-500\/20, .bg-indigo-950\/80, .bg-purple-950\/80) { background-color: rgba(127, 181, 163, 0.10) !important; }
+    html :is(.bg-indigo-500\/20, .bg-brand-500\/20).blur-3xl { background: transparent !important; }
+    html :is(.border-brand-500\/30, .border-indigo-500\/40, .border-indigo-500\/30, .border-indigo-700\/60, .border-purple-700\/60, .border-indigo-400\/30) { border-color: #2F5D50 !important; }
+    html.dark :is(.border-brand-500\/30, .border-indigo-500\/40, .border-indigo-500\/30, .border-indigo-700\/60, .border-purple-700\/60, .border-indigo-400\/30) { border-color: #7FB5A3 !important; }
+    html :is(.bg-brand-400) { background-color: #2F5D50 !important; }
+    html.dark :is(.bg-brand-400) { background-color: #7FB5A3 !important; }
+    html :is(.bg-zinc-400) { background-color: #2F5D50 !important; }
+    html.dark :is(.bg-zinc-400) { background-color: #7FB5A3 !important; }
+
+    /* ---- Accent: user bubbles + avatar discs -> flat moss ---- */
+    html :is(.bg-brand-600):not(.search-mode-btn):not(.paper-limit-btn):not(.depth-btn):not(.cite-tab-btn) { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; }
+    html.dark :is(.bg-brand-600):not(.search-mode-btn):not(.paper-limit-btn):not(.depth-btn):not(.cite-tab-btn) { background-color: #7FB5A3 !important; color: #141413 !important; }
+    html.dark :is(.bg-brand-600):not(.search-mode-btn):not(.paper-limit-btn):not(.depth-btn):not(.cite-tab-btn) :is(.text-white) { color: #141413 !important; }
+    html.dark :is(.bg-brand-600):not(.search-mode-btn):not(.paper-limit-btn):not(.depth-btn):not(.cite-tab-btn) :is(.bg-white\/20) { background-color: rgba(20, 20, 19, 0.25) !important; color: #141413 !important; }
+    html :is(.bg-gradient-to-tr) { background-image: none !important; background-color: #2F5D50 !important; color: #FFFFFF !important; }
+    html.dark :is(.bg-gradient-to-tr) { background-color: #7FB5A3 !important; color: #141413 !important; }
+    html.dark :is(.bg-gradient-to-tr) :is(.text-white) { color: #141413 !important; }
+    html :is(.cite-tab-btn.bg-brand-600) { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; }
+    html.dark :is(.cite-tab-btn.bg-brand-600) { background-color: #7FB5A3 !important; color: #141413 !important; }
+
+    /* ---- Primary buttons: extend moss treatment to missed CTAs ---- */
+    html :is(#btn-auth-gate-submit, #btn-copy-citation-modal, #btn-trial-signin, #sb-confirm-resend, #onboarding-submit) { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; border: 1px solid transparent !important; box-shadow: none !important; }
+    html.dark :is(#btn-auth-gate-submit, #btn-copy-citation-modal, #btn-trial-signin, #sb-confirm-resend, #onboarding-submit) { background-color: #7FB5A3 !important; color: #141413 !important; }
+    html :is(#btn-auth-gate-submit, #btn-copy-citation-modal, #btn-trial-signin, #sb-confirm-resend, #onboarding-submit):hover:not(:disabled) { opacity: 0.88; }
+    html :is(#btn-auth-gate-submit, #btn-copy-citation-modal, #btn-trial-signin, #sb-confirm-resend, #onboarding-submit) svg { color: inherit !important; }
+    html :is(#btn-auth-gate-submit, #btn-copy-citation-modal, #btn-trial-signin, #sb-confirm-resend, #onboarding-submit):disabled { opacity: 0.6 !important; }
+    html :is(.bg-indigo-600) { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; box-shadow: none !important; }
+    html.dark :is(.bg-indigo-600) { background-color: #7FB5A3 !important; color: #141413 !important; }
+    html :is(.hover\:bg-indigo-500):hover { opacity: 0.88; }
+    html #btn-auth-gate-submit svg { color: inherit !important; }
+
+    /* ---- Backdrops: remaining overlays -> shared token ---- */
+    html #onboarding-modal, html #sb-confirm-modal { background-color: rgba(20, 20, 19, 0.55) !important; }
+
+    /* ---- Error states -> reference error tokens (hue family preserved) ---- */
+    html :is(.text-rose-500) { color: #9C3A2E !important; }
+    html.dark :is(.text-rose-500) { color: #E09A90 !important; }
+    html :is(.hover\:text-rose-600):hover { color: #9C3A2E !important; }
+    html.dark :is(.dark\:hover\:text-rose-400):hover, html.dark :is(.hover\:text-rose-400):hover { color: #E09A90 !important; }
+    html #auth-gate-error { background-color: rgba(156, 58, 46, 0.07) !important; border-color: #9C3A2E !important; color: #9C3A2E !important; }
+    html #auth-gate-error svg, html #auth-gate-error i { color: #9C3A2E !important; }
+    html.dark #auth-gate-error { background-color: rgba(224, 154, 144, 0.08) !important; border-color: #E09A90 !important; color: #E09A90 !important; }
+    html.dark #auth-gate-error svg, html.dark #auth-gate-error i { color: #E09A90 !important; }
+    html #toast-container :is(.text-rose-200) { color: #E09A90 !important; }
+    html #toast-container :is(.border-rose-700) { border-color: #E09A90 !important; }
+
+    /* ---- Fields: moss focus, no competing rings; placeholders follow muted ink ---- */
+    html input:focus, html select:focus, html textarea:focus { --tw-ring-offset-shadow: 0 0 transparent !important; --tw-ring-shadow: 0 0 transparent !important; border-color: #2F5D50 !important; }
+    html.dark input:focus, html.dark select:focus, html.dark textarea:focus { border-color: #7FB5A3 !important; }
+    html input::placeholder, html textarea::placeholder { color: #6B6A66 !important; opacity: 0.8 !important; }
+    html.dark input::placeholder, html.dark textarea::placeholder { color: #A09D95 !important; }
+    html .ring-zinc-300 { --tw-ring-color: #E4E0D8 !important; }
+    html.dark .dark\:ring-zinc-700 { --tw-ring-color: #2A2926 !important; }
+    html.dark textarea[class*="bg-slate-950"], html.dark input[class*="bg-slate-950"], html.dark select[class*="bg-slate-950"] { background-color: #1B1B19 !important; border-color: #2A2926 !important; color: #ECE9E2 !important; }
   </style>
 </head>
 

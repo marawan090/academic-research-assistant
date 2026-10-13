@@ -59,6 +59,13 @@
     html input:focus, html select:focus { border-color: #7FB5A3 !important; }
     html a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
     html tbody tr:hover { background-color: rgba(127, 181, 163, 0.06) !important; }
+    /* Utility reconciliation: zinc text -> paper ink (status hues untouched) */
+    html .text-zinc-100, html .text-zinc-200 { color: #ECE9E2 !important; }
+    html .text-zinc-400, html .text-zinc-500, html .text-zinc-600 { color: #A09D95 !important; }
+    html .hover\:text-zinc-100:hover { color: #ECE9E2 !important; }
+    html .hover\:text-zinc-200:hover, html .hover\:text-zinc-300:hover { color: #ECE9E2 !important; }
+    html .hover\:bg-zinc-900:hover, html .hover\:bg-zinc-900\/60:hover { background-color: rgba(127, 181, 163, 0.08) !important; }
+    html input::placeholder { color: #A09D95 !important; opacity: 0.8 !important; }
   </style>
 </head>
 <body class="h-full bg-zinc-950 text-zinc-100 flex flex-col min-h-screen">
