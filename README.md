@@ -39,55 +39,6 @@ data/              runtime data directory (not tracked)
 requirements.txt   Python dependencies
 ```
 
-## Getting started
-
-Requirements: Python 3.10 or newer.
-
-1. Clone the repository and create a virtual environment.
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Copy `.env.example` to `.env` and fill in your own values:
-
-```bash
-cp .env.example .env
-```
-
-4. Start the server:
-
-```bash
-uvicorn main:app --reload
-```
-
-5. Open http://127.0.0.1:8000
-
-## Configuration
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| ORCAROUTER_API_KEY | yes | Key for the model router |
-| ORCAROUTER_BASE_URL | no | Router base URL |
-| MODEL_NAME | no | Model identifier, configurable |
-| SEMANTIC_SCHOLAR_API_KEY | no | Raises Semantic Scholar rate limits |
-| ADMIN_PASSWORD | no | Enables admin routes; admin is disabled when unset |
-| MASTER_CODE | no | Optional administrative master code |
-| MASTER_ADMIN_KEYS | no | Optional administrative master keys, comma-separated |
-| RESEARCHER_CODES | no | Optional seed list for cohort access codes, comma-separated |
-| INVITE_CODES | no | Optional seed list for invite codes, comma-separated |
-| RESEARCHER_CODE_EXPIRY | no | Expiry date for researcher codes (YYYY-MM-DD) |
-| ALLOWED_ORIGINS | no | Comma-separated CORS allow-list |
-| HOST | no | Server bind address |
-| PORT | no | Server bind port |
-| ENVIRONMENT | no | Set to test only in automated tests |
-| Supabase variables | — | See `.env.example` for the Supabase URL and key variables |
-
-## Deployment
-
-The hosted app runs on Render. All secrets are set as environment variables in the hosting dashboard and are never committed. On a free instance the first request after idle time can take up to 45 seconds while the server wakes up.
-
 ## Security
 
 Never commit secrets or access codes. Admin routes stay disabled unless ADMIN_PASSWORD is set. To report a security issue, contact the maintainer through https://swmp-labs.tech.
