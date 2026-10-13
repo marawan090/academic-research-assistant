@@ -32,12 +32,33 @@
 
   <style>
     html { color-scheme: dark; }
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #09090b; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #141413; color: #ECE9E2; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #09090b; }
-    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    ::-webkit-scrollbar-track { background: #141413; }
+    ::-webkit-scrollbar-thumb { background: #2A2926; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #7FB5A3; }
+  </style>
+
+  <!-- SWMP Labs Warm Paper (dark) console layer. Visual-only: warm paper
+       surfaces, hairline borders, moss accent + focus. Functional status
+       hues (emerald/amber/rose) and all behavior are untouched. -->
+  <style id="swmp-warm-paper-admin">
+    html body { background-color: #141413 !important; color: #ECE9E2; }
+    html header { background-color: rgba(20, 20, 19, 0.92) !important; border-color: #2A2926 !important; }
+    html main section, html .bg-zinc-900\/60 { background-color: #1B1B19 !important; border-color: #2A2926 !important; }
+    html .border-zinc-800 { border-color: #2A2926 !important; }
+    html .dark\:border-zinc-700, html .border-zinc-700 { border-color: #2A2926 !important; }
+    html .bg-zinc-950 { background-color: #141413 !important; }
+    html .bg-zinc-900 { background-color: #1B1B19 !important; }
+    html .bg-zinc-800 { background-color: #2A2926 !important; }
+    html thead.bg-zinc-950 { background-color: #141413 !important; }
+    html input, html select { background-color: #1B1B19 !important; border-color: #2A2926 !important; color: #ECE9E2 !important; }
+    html ::placeholder { opacity: 0.8 !important; }
+    html :focus-visible { outline: 2px solid #7FB5A3 !important; outline-offset: 2px; }
+    html input:focus, html select:focus { border-color: #7FB5A3 !important; }
+    html a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    html tbody tr:hover { background-color: rgba(127, 181, 163, 0.06) !important; }
   </style>
 </head>
 <body class="h-full bg-zinc-950 text-zinc-100 flex flex-col min-h-screen">

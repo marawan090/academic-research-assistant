@@ -36,6 +36,7 @@
           },
           fontFamily: {
             sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            serif: ['Newsreader', 'Fraunces', 'Georgia', 'serif'],
             mono: ['JetBrains Mono', 'Menlo', 'monospace']
           }
         }
@@ -43,10 +44,10 @@
     }
   </script>
 
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts: Inter, Newsreader & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Marked.js for Markdown & DOMPurify for security -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -115,18 +116,53 @@
   </script>
 
   <style>
-    /* Custom Theme Colors & Variables (matte zinc academic system) */
+    /* SWMP Labs Warm Paper / Editorial Minimal tokens.
+       Semantic theme layer: page, ink, muted ink, hairline borders, muted
+       green accent, card/input surfaces, error, focus, backdrop, radii. */
     :root {
-      --bg-body: #FAFAFA;
-      --border-color: #E4E4E7;
-      --text-main: #09090B;
-      --text-muted: #71717A;
+      --bg-body: #FAF8F4;
+      --border-color: #E4E0D8;
+      --text-main: #1B1B1A;
+      --text-muted: #6B6A66;
+      --paper: #FAF8F4;
+      --ink: #1B1B1A;
+      --ink-2: #6B6A66;
+      --line: #E4E0D8;
+      --moss: #2F5D50;
+      --moss-soft: rgba(47, 93, 80, 0.08);
+      --card: #FFFFFF;
+      --field: #FFFFFF;
+      --error: #9C3A2E;
+      --focus: #2F5D50;
+      --on-moss: #FFFFFF;
+      --backdrop: rgba(20, 20, 19, 0.55);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 10px;
+      --radius-card: 12px;
+      --radius-modal: 14px;
+      --radius-focus: 4px;
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-display: 'Newsreader', 'Fraunces', Georgia, serif;
     }
     html.dark {
-      --bg-body: #090A0C;
-      --border-color: #27272A;
-      --text-main: #F4F4F5;
-      --text-muted: #A1A1AA;
+      --bg-body: #141413;
+      --border-color: #2A2926;
+      --text-main: #ECE9E2;
+      --text-muted: #A09D95;
+      --paper: #141413;
+      --ink: #ECE9E2;
+      --ink-2: #A09D95;
+      --line: #2A2926;
+      --moss: #7FB5A3;
+      --moss-soft: rgba(127, 181, 163, 0.10);
+      --card: #1B1B19;
+      --field: #1B1B19;
+      --modal: #1B1B19;
+      --error: #E09A90;
+      --focus: #7FB5A3;
+      --on-moss: #141413;
+      --backdrop: rgba(20, 20, 19, 0.55);
     }
 
     /* Custom Scrollbar */
@@ -589,6 +625,135 @@
     html:not(.dark) #filter-pdf-toggle[data-active="true"] { background-color: #18181b !important; color: #fafafa !important; }
     html #server-status-badge { background: transparent !important; border: 0 !important; box-shadow: none !important; }
     html #server-status-badge #server-status-text { color: #a1a1aa !important; font-weight: 400 !important; }
+  </style>
+
+  <!-- SWMP Labs Warm Paper / Editorial Minimal theme layer.
+       Purely visual overrides: warm paper surfaces, hairline borders, muted
+       green accent, serif display type. Markup, IDs, JS hooks, layout,
+       spacing and responsive behavior are untouched. Functional status hues
+       (emerald/amber/rose) are intentionally preserved. -->
+  <style id="swmp-warm-paper">
+    /* Page + shell surfaces */
+    html body { background-color: #FAF8F4 !important; color: #1B1B1A; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    html.dark body { background-color: #141413 !important; color: #ECE9E2; }
+    html header { background-color: rgba(250, 248, 244, 0.92) !important; border-color: #E4E0D8 !important; }
+    html.dark header { background-color: rgba(20, 20, 19, 0.92) !important; border-color: #2A2926 !important; }
+    html footer { background-color: rgba(250, 248, 244, 0.85) !important; border-color: #E4E0D8 !important; }
+    html.dark footer { background-color: rgba(20, 20, 19, 0.85) !important; border-color: #2A2926 !important; }
+    html #analysis-pane, html #papers-drawer { background-color: #FFFFFF !important; border-color: #E4E0D8 !important; box-shadow: none !important; }
+    html.dark #analysis-pane, html.dark #papers-drawer { background-color: #1B1B19 !important; border-color: #2A2926 !important; box-shadow: none !important; }
+    html #welcome-card { background-color: #FFFFFF !important; border-color: #E4E0D8 !important; }
+    html.dark #welcome-card { background-color: #1B1B19 !important; border-color: #2A2926 !important; }
+
+    /* Hairline borders follow the theme line token */
+    html .border-zinc-200, html .border-slate-200, html .border-slate-300 { border-color: #E4E0D8 !important; }
+    html.dark .dark\:border-zinc-800, html.dark .dark\:border-zinc-700 { border-color: #2A2926 !important; }
+    html.dark .dark\:border-slate-800 { border-color: #2A2926 !important; }
+    html.dark .border-slate-700\/80, html.dark .border-slate-800\/80, html.dark .border-slate-800\/90 { border-color: #2A2926 !important; }
+
+    /* Paper cards, synthesis + status surfaces */
+    html #discovered-papers-list [data-paper-id] { background-color: #FFFFFF !important; background-image: none !important; border-color: #E4E0D8 !important; box-shadow: none !important; }
+    html.dark #discovered-papers-list [data-paper-id] { background-color: #1B1B19 !important; background-image: none !important; border-color: #2A2926 !important; box-shadow: none !important; }
+    html .status-timeline-card, html .synthesis-card { background-color: #FFFFFF !important; background-image: none !important; border-color: #E4E0D8 !important; box-shadow: none !important; }
+    html.dark .status-timeline-card, html.dark .synthesis-card { background-color: #1B1B19 !important; background-image: none !important; border-color: #2A2926 !important; box-shadow: none !important; }
+    html #compare-bar { background: #FFFFFF !important; border-color: #E4E0D8 !important; box-shadow: none !important; }
+    html.dark #compare-bar { background: #1B1B19 !important; border-color: #2A2926 !important; box-shadow: none !important; }
+    html #compare-bar #compare-count-text { color: #6B6A66 !important; }
+    html.dark #compare-bar #compare-count-text { color: #A09D95 !important; }
+
+    /* Secondary text follows the muted ink token (light mode only; dark keeps legible zinc) */
+    html:not(.dark) .text-zinc-500, html:not(.dark) .text-zinc-400 { color: #6B6A66; }
+    html.dark .dark\:text-zinc-400, html.dark .dark\:text-zinc-500 { color: #A09D95 !important; }
+    html.dark #server-status-badge #server-status-text { color: #A09D95 !important; }
+
+    /* Serif display typography (sizes and layout untouched) */
+    html .font-display, html #welcome-card h2 { font-family: 'Newsreader', 'Fraunces', Georgia, serif !important; font-weight: 500 !important; letter-spacing: -0.01em !important; }
+    html .synthesis-card .markdown-body.prose-academic h1, html .synthesis-card .markdown-body.prose-academic h2 { font-family: 'Newsreader', 'Fraunces', Georgia, serif !important; font-weight: 500 !important; letter-spacing: -0.01em !important; }
+
+    /* Links: accent, underline, 3px offset, 1px thickness */
+    html .prose-academic a { color: #2F5D50 !important; text-decoration: underline !important; text-decoration-thickness: 1px !important; text-underline-offset: 3px !important; }
+    html .prose-academic a:hover { color: #2F5D50 !important; opacity: 0.88; }
+    html.dark .prose-academic a { color: #7FB5A3 !important; }
+    html.dark .prose-academic a:hover { color: #7FB5A3 !important; opacity: 0.88; }
+    html .synthesis-card .markdown-body.prose-academic a { color: #2F5D50 !important; text-decoration-thickness: 1px !important; text-underline-offset: 3px !important; }
+    html.dark .synthesis-card .markdown-body.prose-academic a { color: #7FB5A3 !important; }
+
+    /* Editorial prose accents: moss headings, quotes, code, tables */
+    html .prose-academic h3 { color: #2F5D50; }
+    html.dark .prose-academic h3 { color: #7FB5A3 !important; }
+    html .prose-academic blockquote { border-left-color: #2F5D50 !important; background: rgba(47, 93, 80, 0.08) !important; }
+    html.dark .prose-academic blockquote { border-left-color: #7FB5A3 !important; background: rgba(127, 181, 163, 0.10) !important; }
+    html .prose-academic code { background: rgba(47, 93, 80, 0.08) !important; color: #1B1B1A !important; }
+    html.dark .prose-academic code { background: rgba(127, 181, 163, 0.10) !important; color: #ECE9E2 !important; }
+    html .prose-academic th { background: rgba(47, 93, 80, 0.08) !important; color: #1B1B1A !important; border-color: #E4E0D8 !important; }
+    html .prose-academic td { border-color: #E4E0D8 !important; }
+    html.dark .prose-academic th { background: rgba(127, 181, 163, 0.10) !important; color: #ECE9E2 !important; border-color: #2A2926 !important; }
+    html.dark .prose-academic td { border-color: #2A2926 !important; }
+    html .prose-academic pre { background: #FFFFFF !important; border: 1px solid #E4E0D8 !important; }
+    html.dark .prose-academic pre { background: #141413 !important; border-color: #2A2926 !important; }
+    html .tradeoff-matrix-table th { background-color: rgba(47, 93, 80, 0.08) !important; color: #1B1B1A !important; border-color: #E4E0D8 !important; }
+    html .tradeoff-matrix-table td { border-color: #E4E0D8 !important; }
+    html .tradeoff-matrix-table td:first-child { color: #2F5D50 !important; background-color: rgba(47, 93, 80, 0.08) !important; }
+    html.dark .tradeoff-matrix-table th { background-color: rgba(127, 181, 163, 0.10) !important; color: #ECE9E2 !important; border-color: #2A2926 !important; }
+    html.dark .tradeoff-matrix-table td { border-color: #2A2926 !important; }
+    html.dark .tradeoff-matrix-table td:first-child { color: #7FB5A3 !important; background-color: rgba(127, 181, 163, 0.10) !important; }
+    html .synthesis-card .markdown-body.prose-academic blockquote { border-left: 2px solid #2F5D50 !important; background: rgba(47, 93, 80, 0.08) !important; color: #6B6A66 !important; font-style: normal !important; }
+    html.dark .synthesis-card .markdown-body.prose-academic blockquote { border-left-color: #7FB5A3 !important; background: rgba(127, 181, 163, 0.10) !important; color: #A09D95 !important; }
+    html .synthesis-card .markdown-body.prose-academic code { background: rgba(47, 93, 80, 0.08) !important; color: #1B1B1A !important; }
+    html.dark .synthesis-card .markdown-body.prose-academic code { background: rgba(127, 181, 163, 0.10) !important; color: #ECE9E2 !important; }
+    html .synthesis-card .markdown-body .katex-display { background: #FAF8F4 !important; border: 1px solid #E4E0D8 !important; color: #1B1B1A !important; }
+    html.dark .synthesis-card .markdown-body .katex-display { background: #141413 !important; border: 1px solid #2A2926 !important; color: #ECE9E2 !important; }
+    html.dark .synthesis-card .markdown-body .katex { color: #ECE9E2 !important; }
+
+    /* Primary actions: moss accent, hover 0.88, disabled 0.6 */
+    html #submit-btn, html #btn-run-outreach, html #btn-mailto-outreach, html #btn-run-compare, html .btn-explain-paper { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; border: 1px solid transparent !important; box-shadow: none !important; }
+    html.dark #submit-btn, html.dark #btn-run-outreach, html.dark #btn-mailto-outreach, html.dark #btn-run-compare, html.dark .btn-explain-paper { background-color: #7FB5A3 !important; color: #141413 !important; }
+    html:not(.dark) #btn-run-outreach, html:not(.dark) #btn-mailto-outreach, html:not(.dark) .btn-explain-paper { background-color: #2F5D50 !important; background-image: none !important; color: #FFFFFF !important; border: 1px solid transparent !important; box-shadow: none !important; }
+    html #submit-btn:hover:not(:disabled), html #btn-run-outreach:hover:not(:disabled), html #btn-mailto-outreach:hover, html #btn-run-compare:hover:not(:disabled), html .btn-explain-paper:hover:not(:disabled) { opacity: 0.88; }
+    html:not(.dark) #btn-run-outreach:hover:not(:disabled), html:not(.dark) #btn-mailto-outreach:hover, html:not(.dark) .btn-explain-paper:hover:not(:disabled) { opacity: 0.88; }
+    html #submit-btn svg, html #btn-run-outreach svg, html #btn-mailto-outreach svg, html #btn-run-compare svg, html .btn-explain-paper svg { color: inherit !important; }
+    html #submit-btn:disabled, html #btn-run-outreach:disabled, html #btn-run-compare:disabled, html .btn-explain-paper:disabled { opacity: 0.6 !important; }
+
+    /* Selected segmented pills: soft accent wash with accent text */
+    html #search-mode-group .search-mode-btn.bg-brand-600 { background-color: rgba(47, 93, 80, 0.08) !important; color: #2F5D50 !important; box-shadow: none !important; border: 1px solid #2F5D50 !important; }
+    html.dark #search-mode-group .search-mode-btn.bg-brand-600 { background-color: rgba(127, 181, 163, 0.10) !important; color: #7FB5A3 !important; border-color: #7FB5A3 !important; }
+    html #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: rgba(47, 93, 80, 0.08) !important; color: #2F5D50 !important; box-shadow: none !important; border: 1px solid #2F5D50 !important; }
+    html.dark #paper-limit-group .paper-limit-btn.bg-brand-600 { background-color: rgba(127, 181, 163, 0.10) !important; color: #7FB5A3 !important; border-color: #7FB5A3 !important; }
+    html .depth-segmented-control .depth-btn.bg-brand-600 { background-color: rgba(47, 93, 80, 0.08) !important; color: #2F5D50 !important; box-shadow: none !important; }
+    html.dark .depth-segmented-control .depth-btn.bg-brand-600 { background-color: rgba(127, 181, 163, 0.10) !important; color: #7FB5A3 !important; }
+    html #tab-discovered.bg-brand-600, html #tab-saved.bg-brand-600 { background-color: rgba(47, 93, 80, 0.08) !important; color: #2F5D50 !important; border-color: #2F5D50 !important; box-shadow: none !important; }
+    html.dark #tab-discovered.bg-brand-600, html.dark #tab-saved.bg-brand-600 { background-color: rgba(127, 181, 163, 0.10) !important; color: #7FB5A3 !important; border-color: #7FB5A3 !important; }
+
+    /* Fields: paper/ink surfaces, hairline borders, moss focus-within */
+    html #search-input, html #custom-search-panel > div { background-color: #FFFFFF !important; border-color: #E4E0D8 !important; }
+    html.dark #search-input, html.dark #custom-search-panel > div { background-color: #1B1B19 !important; border-color: #2A2926 !important; }
+    html #search-input:focus-within, html #custom-search-panel > div:focus-within { border-color: #2F5D50 !important; }
+    html.dark #search-input:focus-within, html.dark #custom-search-panel > div:focus-within { border-color: #7FB5A3 !important; }
+    html textarea[class*="bg-slate-50"], html select[class*="bg-slate-50"], html input[class*="bg-slate-50"] { background-color: #FFFFFF !important; border-color: #E4E0D8 !important; }
+    html.dark textarea[class*="dark:bg-slate-950"], html.dark select[class*="dark:bg-slate-950"], html.dark input[class*="dark:bg-slate-950"] { background-color: #1B1B19 !important; border-color: #2A2926 !important; }
+    html ::placeholder { opacity: 0.8 !important; }
+
+    /* Visible keyboard focus is always moss */
+    html :focus-visible { outline: 2px solid #2F5D50 !important; outline-offset: 2px; }
+    html.dark :focus-visible { outline-color: #7FB5A3 !important; }
+
+    /* Modal backdrops + dark panel surfaces (light panels keep existing treatment) */
+    html #broadcast-modal-backdrop, html #citation-modal, html #diagram-modal, html #outreach-modal, html #compare-matrix-modal, html #support-modal, html #trial-exhausted-modal { background-color: rgba(20, 20, 19, 0.55) !important; }
+    html.dark #citation-modal > div, html.dark #diagram-modal > div, html.dark #outreach-modal > div, html.dark #compare-matrix-modal > div, html.dark #support-modal > div, html.dark #broadcast-modal-backdrop > div { background-color: #1B1B19 !important; border-color: #2A2926 !important; box-shadow: none !important; }
+    html.dark #citation-modal > div, html.dark #diagram-modal > div, html.dark #support-modal > div, html.dark #broadcast-modal-backdrop > div { background-image: none !important; }
+
+    /* Paper-card badges: quiet mono tags on the paper surface */
+    html #discovered-papers-list [data-paper-id] .rounded.text-\[10px\] { background-color: rgba(47, 93, 80, 0.08) !important; background-image: none !important; color: #6B6A66 !important; border-color: #E4E0D8 !important; box-shadow: none !important; }
+    html.dark #discovered-papers-list [data-paper-id] .rounded.text-\[10px\] { background-color: rgba(127, 181, 163, 0.10) !important; color: #A09D95 !important; border-color: #2A2926 !important; }
+
+    /* Flat editorial surfaces: no decorative gradients or glow shadows */
+    html #btn-run-outreach, html #btn-mailto-outreach { background-image: none !important; box-shadow: none !important; }
+    html ::selection { background: rgba(47, 93, 80, 0.16); }
+    html.dark ::selection { background: rgba(127, 181, 163, 0.28); }
+    html ::-webkit-scrollbar-thumb { background: #E4E0D8; }
+    html.dark ::-webkit-scrollbar-thumb { background: #2A2926; }
+    html ::-webkit-scrollbar-thumb:hover { background: #2F5D50; }
+    html.dark ::-webkit-scrollbar-thumb:hover { background: #7FB5A3; }
   </style>
 </head>
 
@@ -3685,13 +3850,13 @@
     function archGraphTheme() {
       const dark = document.documentElement.classList.contains('dark');
       return dark ? {
-        nodeBg: '#1b1d23', nodeBorder: '#3f3f46', nodeText: '#e4e4e7',
-        coreBg: '#27272a', coreBorder: '#a1a1aa',
-        edgeLine: '#52525b', edgeText: '#a1a1aa', arrow: '#71717a'
+        nodeBg: '#1B1B19', nodeBorder: '#2A2926', nodeText: '#ECE9E2',
+        coreBg: '#2F5D50', coreBorder: '#7FB5A3',
+        edgeLine: '#A09D95', edgeText: '#A09D95', arrow: '#7FB5A3'
       } : {
-        nodeBg: '#fafafa', nodeBorder: '#d4d4d8', nodeText: '#27272a',
-        coreBg: '#f4f4f5', coreBorder: '#71717a',
-        edgeLine: '#a1a1aa', edgeText: '#52525b', arrow: '#71717a'
+        nodeBg: '#FFFFFF', nodeBorder: '#E4E0D8', nodeText: '#1B1B1A',
+        coreBg: 'rgba(47, 93, 80, 0.08)', coreBorder: '#2F5D50',
+        edgeLine: '#6B6A66', edgeText: '#6B6A66', arrow: '#2F5D50'
       };
     }
 
